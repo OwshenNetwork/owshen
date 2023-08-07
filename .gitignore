@@ -12,3 +12,15 @@ docs/
 
 # Dotenv file
 .env
+
+src/Verifier.sol
+test/Verifier.t.sol
+circuits/*.sym
+circuits/*.r1cs
+circuits/*.json
+circuits/*.zkey
+circuits/*.ptau
+circuits/*.wtns
+circuits/calldata
+circuits/owshen_js/
+circuits/owshen_cpp
