@@ -13,8 +13,10 @@ docs/
 # Dotenv file
 .env
 
-src/Verifier.sol
-test/Verifier.t.sol
+src/CoinWithdrawVerifier.sol
+src/RewardWithdrawVerifier.sol
+test/CoinWithdrawVerifier.t.sol
+test/RewardWithdrawVerifier.t.sol
 circuits/*.sym
 circuits/*.r1cs
 circuits/*.json
@@ -22,5 +24,5 @@ circuits/*.zkey
 circuits/*.ptau
 circuits/*.wtns
 circuits/calldata
-circuits/owshen_js/
-circuits/owshen_cpp
+circuits/*_js/
+circuits/*_cpp
