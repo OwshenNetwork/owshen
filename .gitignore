@@ -23,6 +23,6 @@ circuits/*.json
 circuits/*.zkey
 circuits/*.ptau
 circuits/*.wtns
-circuits/calldata
+circuits/*_calldata
 circuits/*_js/
 circuits/*_cpp
