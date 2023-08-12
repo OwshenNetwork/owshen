@@ -13,6 +13,11 @@ async fn main() -> Result<()> {
     let provider = GOERLI.provider();
     let provider = Arc::new(provider);
 
+    let counter = bindings::counter::Counter::deploy(Arc::clone(&provider), ())?.send().await?;
+
+    let addr = counter.address();
+    println!("Counter.sol has been deployed to {:?}", addr);
+
     let address = "0x0000000000000000000000000000000000000000".parse::<Address>()?;
 
     let contract = Counter::new(address, provider);
