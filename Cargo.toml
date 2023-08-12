@@ -1,0 +1,10 @@
+[package]
+name = "owshen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bindings = { path = "./bindings" }
+ethers = { version = "2", default-features = false, features = ["rustls"] }
+eyre = "0.6"
+tokio = { version = "1.30.0", features = ["macros", "rt", "rt-multi-thread"] }

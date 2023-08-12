@@ -1,8 +1,11 @@
-.PHONY: test
+.PHONY: test build
 
 ENTROPY = 1234
 
-test: circuits/reward_withdraw_cpp/ circuits/coin_withdraw_cpp/ circuits/coin_withdraw_0001.zkey circuits/reward_withdraw_0001.zkey circuits/coin_withdraw_verif_key.json circuits/reward_withdraw_verif_key.json src/CoinWithdrawVerifier.sol src/RewardWithdrawVerifier.sol
+build: circuits/reward_withdraw_cpp/ circuits/coin_withdraw_cpp/ circuits/coin_withdraw_0001.zkey circuits/reward_withdraw_0001.zkey circuits/coin_withdraw_verif_key.json circuits/reward_withdraw_verif_key.json src/CoinWithdrawVerifier.sol src/RewardWithdrawVerifier.sol
+	forge build
+
+test: build
 	# Pass inputs
 	echo '{"a": 11, "b": 3}' > circuits/coin_withdraw_input.json
 	echo '{"a": 11, "b": 3}' > circuits/reward_withdraw_input.json
