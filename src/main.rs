@@ -1,3 +1,6 @@
+mod fp;
+use fp::Fp;
+
 use bindings::counter::Counter;
 
 use ethers::{prelude::Middleware, providers::test_provider::GOERLI, types::Address};

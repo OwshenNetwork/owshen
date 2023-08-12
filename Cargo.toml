@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ff = { version = "0.13.0", features = ["derive"]}
 bindings = { path = "./bindings" }
 ethers = { version = "2", default-features = false, features = ["rustls"] }
 eyre = "0.6"
