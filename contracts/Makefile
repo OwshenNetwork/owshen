@@ -31,9 +31,9 @@ test: build
 			import \"forge-std/Test.sol\"; \n\
 			import \"../src/$${circ}Verifier.sol\"; \n\
 			contract VerifierTest is Test { \n\
-				Groth16Verifier public verifier; \n\
+				$${circ}Verifier public verifier; \n\
 				function setUp() public { \n\
-					verifier = new Groth16Verifier(); \n\
+					verifier = new $${circ}Verifier(); \n\
 				} \n\
 				function testVerifier() public view { \n\
 				assert(verifier.verifyProof( \n\
@@ -70,9 +70,11 @@ circuits/reward_withdraw_0001.zkey: circuits/reward_withdraw.r1cs circuits/pot12
 
 src/CoinWithdrawVerifier.sol: circuits/coin_withdraw_0001.zkey
 	cd circuits && snarkjs zkey export solidityverifier coin_withdraw_0001.zkey ../src/CoinWithdrawVerifier.sol
+	sed -i 's/Groth16Verifier/CoinWithdrawVerifier/' src/CoinWithdrawVerifier.sol
 
 src/RewardWithdrawVerifier.sol: circuits/reward_withdraw_0001.zkey
 	cd circuits && snarkjs zkey export solidityverifier reward_withdraw_0001.zkey ../src/RewardWithdrawVerifier.sol
+	sed -i 's/Groth16Verifier/RewardWithdrawVerifier/' src/RewardWithdrawVerifier.sol
 
 circuits/pot12_final.ptau:
 	# Generate Powers of Tau params
