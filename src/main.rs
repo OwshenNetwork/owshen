@@ -1,27 +1,44 @@
 mod fp;
-use fp::Fp;
 
 use bindings::counter::Counter;
 
-use ethers::{prelude::Middleware, providers::test_provider::GOERLI, types::Address};
+use ethers::prelude::*;
 
 use eyre::Result;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let provider = GOERLI.provider();
+    /*let port = 8545u16;
+    let url = format!("http://localhost:{}", port).to_string();
+
+    let ganache = Ganache::new()
+        .port(port)
+        .mnemonic("abstract vacuum mammal awkward pudding scene penalty purchase dinner depart evoke puzzle")
+        .spawn();*/
+    let provider = Provider::<Http>::try_from("http://localhost:8545")?;
     let provider = Arc::new(provider);
 
-    let counter = bindings::counter::Counter::deploy(Arc::clone(&provider), ())?.send().await?;
+    let accounts = provider.get_accounts().await?;
+    let from = accounts[0];
 
-    let addr = counter.address();
-    println!("Counter.sol has been deployed to {:?}", addr);
+    let counter = Counter::deploy(provider.clone(), ())?
+        .legacy()
+        .from(from)
+        .send()
+        .await?;
 
-    let address = "0x0000000000000000000000000000000000000000".parse::<Address>()?;
+    counter
+        .set_number(1234.into())
+        .legacy()
+        .from(from)
+        .send()
+        .await?;
 
-    let contract = Counter::new(address, provider);
-    let blk = contract.client().get_block_number().await?;
-    println!("Hello, world! {}", blk);
+    let num_req = counter.number().legacy().from(from);
+    let num = num_req.call().await?;
+
+    println!("{:?}", num);
+
     Ok(())
 }
