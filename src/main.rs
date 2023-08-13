@@ -1,12 +1,15 @@
 mod fp;
 pub use fp::Fp;
 
+use ff::Field;
+
 use bindings::counter::Counter;
 
 use ethers::prelude::*;
 use ethers::utils::Ganache;
 
 use eyre::Result;
+use rand::Rng;
 use std::sync::Arc;
 
 fn hash(left: Fp, right: Fp) -> Fp {
@@ -19,6 +22,11 @@ struct PrivateKey {
 }
 
 impl PrivateKey {
+    pub fn generate<R: Rng>(rng: &mut R) -> Self {
+        Self {
+            secret: Fp::random(rng),
+        }
+    }
     pub fn nullifier(&self) -> Fp {
         hash(self.secret, Fp::from(2))
     }
@@ -39,6 +47,11 @@ impl From<PrivateKey> for PublicKey {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    println!("Welcome to Owshen Client!");
+
+    let sk = PrivateKey::generate(&mut rand::thread_rng());
+    println!("Public key: {:?}", PublicKey::from(sk.clone()));
+
     let port = 8545u16;
     let url = format!("http://localhost:{}", port).to_string();
 
