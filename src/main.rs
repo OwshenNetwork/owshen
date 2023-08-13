@@ -1,4 +1,5 @@
 mod fp;
+pub use fp::Fp;
 
 use bindings::counter::Counter;
 
@@ -7,6 +8,34 @@ use ethers::utils::Ganache;
 
 use eyre::Result;
 use std::sync::Arc;
+
+fn hash(left: Fp, right: Fp) -> Fp {
+    left * right // Dummy hash function!
+}
+
+#[derive(Debug, Clone)]
+struct PrivateKey {
+    secret: Fp,
+}
+
+impl PrivateKey {
+    pub fn nullifier(&self) -> Fp {
+        hash(self.secret, Fp::from(2))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PublicKey {
+    commitment: Fp,
+}
+
+impl From<PrivateKey> for PublicKey {
+    fn from(sk: PrivateKey) -> Self {
+        Self {
+            commitment: hash(sk.secret, Fp::from(1)),
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
