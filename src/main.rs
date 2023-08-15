@@ -56,30 +56,38 @@ struct Proof {
     public: Vec<U256>,
 }
 
-fn prove(a: Fp, b: Fp) -> Result<Proof> {
-    std::fs::write(
-        "contracts/circuits/coin_withdraw_input.json",
-        format!(
-            "{{ \"a\": {:?}, \"b\": {:?} }}",
-            BigUint::from_bytes_le(a.to_repr().as_ref()),
-            BigUint::from_bytes_le(b.to_repr().as_ref())
-        ),
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
+use tempfile::NamedTempFile;
+
+fn prove<P: AsRef<Path>>(params: P, a: Fp, b: Fp) -> Result<Proof> {
+    let mut inputs_file = NamedTempFile::new()?;
+    write!(
+        inputs_file,
+        "{{ \"a\": {:?}, \"b\": {:?} }}",
+        BigUint::from_bytes_le(a.to_repr().as_ref()),
+        BigUint::from_bytes_le(b.to_repr().as_ref())
     )?;
+
+    let mut witness_file = NamedTempFile::new()?;
     let wtns_gen_output = Command::new("contracts/circuits/coin_withdraw_cpp/coin_withdraw")
-        .arg("contracts/circuits/coin_withdraw_input.json")
-        .arg("contracts/circuits/coin_withdraw_witness.wtns")
+        .arg(inputs_file.path())
+        .arg(witness_file.path())
         .output()?;
 
     assert_eq!(wtns_gen_output.stdout.len(), 0);
     assert_eq!(wtns_gen_output.stderr.len(), 0);
 
+    let mut proof_file = NamedTempFile::new()?;
+    let mut pub_inp_file = NamedTempFile::new()?;
     let proof_gen_output = Command::new("snarkjs")
         .arg("groth16")
         .arg("prove")
-        .arg("contracts/circuits/coin_withdraw_0001.zkey")
-        .arg("contracts/circuits/coin_withdraw_witness.wtns")
-        .arg("contracts/circuits/coin_withdraw_proof.json")
-        .arg("contracts/circuits/coin_withdraw_public.json")
+        .arg(params.as_ref().as_os_str())
+        .arg(witness_file.path())
+        .arg(proof_file.path())
+        .arg(pub_inp_file.path())
         .output()?;
 
     assert_eq!(proof_gen_output.stdout.len(), 0);
@@ -87,8 +95,8 @@ fn prove(a: Fp, b: Fp) -> Result<Proof> {
 
     let generatecall_output = Command::new("snarkjs")
         .arg("generatecall")
-        .arg("contracts/circuits/coin_withdraw_public.json")
-        .arg("contracts/circuits/coin_withdraw_proof.json")
+        .arg(pub_inp_file.path())
+        .arg(proof_file.path())
         .output()?;
     let mut calldata = std::str::from_utf8(&generatecall_output.stdout)?.to_string();
     calldata = calldata
@@ -119,7 +127,9 @@ async fn main() -> Result<()> {
     let sk = PrivateKey::generate(&mut rand::thread_rng());
     println!("Public key: {:?}", PublicKey::from(sk.clone()));
 
-    println!("Proof: {:?}", prove(123.into(), 234.into())?);
+    let params_file = "contracts/circuits/coin_withdraw_0001.zkey";
+
+    println!("Proof: {:?}", prove(params_file, 123.into(), 234.into())?);
 
     let port = 8545u16;
     let url = format!("http://localhost:{}", port).to_string();
