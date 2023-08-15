@@ -3,69 +3,99 @@ mod hash;
 mod keys;
 mod proof;
 
-
-
-use keys::{PrivateKey, PublicKey};
-use proof::{prove};
-
-
-
 use bindings::counter::Counter;
-
-
 use ethers::prelude::*;
 use ethers::utils::Ganache;
-
-
 use eyre::Result;
-
-
+use keys::{PrivateKey, PublicKey};
+use proof::prove;
 use std::sync::Arc;
+use structopt::StructOpt;
+
+// Show wallet info
+#[derive(StructOpt, Debug)]
+pub struct InfoOpt {}
+
+// Deposit to Owshen address
+#[derive(StructOpt, Debug)]
+pub struct DepositOpt {
+    #[structopt(long)]
+    to: PublicKey,
+}
+
+// Withdraw to Ethereum address
+#[derive(StructOpt, Debug)]
+pub struct WithdrawOpt {
+    #[structopt(long)]
+    to: Address,
+}
+
+// Test Owshen on Ganache
+#[derive(StructOpt, Debug)]
+pub struct TestOpt {}
+
+#[derive(StructOpt, Debug)]
+enum OwshenCliOpt {
+    Info(InfoOpt),
+    Deposit(DepositOpt),
+    Withdraw(WithdrawOpt),
+    Test(TestOpt),
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("Welcome to Owshen Client!");
+    const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
-    let sk = PrivateKey::generate(&mut rand::thread_rng());
-    println!("Public key: {:?}", PublicKey::from(sk.clone()));
+    let opt = OwshenCliOpt::from_args();
 
-    let params_file = "contracts/circuits/coin_withdraw_0001.zkey";
+    match opt {
+        OwshenCliOpt::Info(InfoOpt {}) => {
+            let sk = PrivateKey::generate(&mut rand::thread_rng());
+            println!("Owshen Address: {}", PublicKey::from(sk.clone()));
+        }
+        OwshenCliOpt::Deposit(DepositOpt { to }) => {
+            // Transfer ETH to the Owshen contract and create a new commitment
+            println!("Depositing a coin to Owshen address: {}", to);
+        }
+        OwshenCliOpt::Withdraw(WithdrawOpt { to }) => {
+            // Prove you own a certain coin in the Owshen contract and retrieve rewards in the given ETH address
+            println!("Proof: {:?}", prove(PARAMS_FILE, 123.into(), 234.into())?);
+            println!("Withdraw a coin to Ethereum address: {}", to);
+        }
+        OwshenCliOpt::Test(TestOpt {}) => {
+            // Deploy contract locally on Ganache and debug
+            let port = 8545u16;
+            let url = format!("http://localhost:{}", port).to_string();
 
-    println!("Proof: {:?}", prove(params_file, 123.into(), 234.into())?);
+            let ganache = Ganache::new().port(port).spawn();
 
-    let port = 8545u16;
-    let url = format!("http://localhost:{}", port).to_string();
+            let provider = Provider::<Http>::try_from(url)?;
+            let provider = Arc::new(provider);
 
-    let ganache = Ganache::new()
-        .port(port)
-        .mnemonic("abstract vacuum mammal awkward pudding scene penalty purchase dinner depart evoke puzzle")
-        .spawn();
+            let accounts = provider.get_accounts().await?;
+            let from = accounts[0];
 
-    let provider = Provider::<Http>::try_from(url)?;
-    let provider = Arc::new(provider);
+            let counter = Counter::deploy(provider.clone(), ())?
+                .legacy()
+                .from(from)
+                .send()
+                .await?;
 
-    let accounts = provider.get_accounts().await?;
-    let from = accounts[0];
+            counter
+                .set_number(1234.into())
+                .legacy()
+                .from(from)
+                .send()
+                .await?;
 
-    let counter = Counter::deploy(provider.clone(), ())?
-        .legacy()
-        .from(from)
-        .send()
-        .await?;
+            let num_req = counter.number().legacy().from(from);
+            let num = num_req.call().await?;
 
-    counter
-        .set_number(1234.into())
-        .legacy()
-        .from(from)
-        .send()
-        .await?;
+            println!("{:?}", num);
 
-    let num_req = counter.number().legacy().from(from);
-    let num = num_req.call().await?;
-
-    println!("{:?}", num);
-
-    drop(ganache);
+            drop(ganache);
+        }
+    }
 
     Ok(())
 }

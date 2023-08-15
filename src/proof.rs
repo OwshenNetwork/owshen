@@ -1,20 +1,15 @@
 use crate::fp::Fp;
 
-
-
-use ff::{PrimeField};
-
+use ff::PrimeField;
 
 use num_bigint::BigUint;
 
 use ethers::prelude::*;
 
-
 use ethers::abi::ethabi::ethereum_types::FromStrRadixErr;
 use eyre::Result;
 
 use std::process::Command;
-
 
 #[derive(Clone, Debug)]
 pub struct Proof {
@@ -23,7 +18,6 @@ pub struct Proof {
     c: [U256; 2],
     public: Vec<U256>,
 }
-
 
 use std::io::Write;
 use std::path::Path;
