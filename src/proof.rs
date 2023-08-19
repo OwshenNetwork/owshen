@@ -13,10 +13,10 @@ use std::process::Command;
 
 #[derive(Clone, Debug)]
 pub struct Proof {
-    a: [U256; 2],
-    b: [[U256; 2]; 2],
-    c: [U256; 2],
-    public: Vec<U256>,
+    pub a: [U256; 2],
+    pub b: [[U256; 2]; 2],
+    pub c: [U256; 2],
+    pub public: Vec<U256>,
 }
 
 use std::io::Write;

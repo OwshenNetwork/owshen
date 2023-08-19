@@ -3,7 +3,7 @@ mod hash;
 mod keys;
 mod proof;
 
-use bindings::counter::Counter;
+use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
 use ethers::prelude::*;
 use ethers::utils::Ganache;
 use eyre::Result;
@@ -75,23 +75,29 @@ async fn main() -> Result<()> {
             let accounts = provider.get_accounts().await?;
             let from = accounts[0];
 
-            let counter = Counter::deploy(provider.clone(), ())?
+            let proof = prove(PARAMS_FILE, 123.into(), 234.into())?;
+
+            let verifier = CoinWithdrawVerifier::deploy(provider.clone(), ())?
                 .legacy()
                 .from(from)
                 .send()
                 .await?;
 
-            counter
-                .set_number(1234.into())
+            let verified = verifier
+                .verify_proof(
+                    proof.a,
+                    proof.b,
+                    proof.c,
+                    proof.public.clone().try_into().unwrap(),
+                )
                 .legacy()
                 .from(from)
-                .send()
+                .call()
                 .await?;
 
-            let num_req = counter.number().legacy().from(from);
-            let num = num_req.call().await?;
-
-            println!("{:?}", num);
+            if verified {
+                println!("Proof verified successfully!");
+            }
 
             drop(ganache);
         }
