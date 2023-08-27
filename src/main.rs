@@ -2,6 +2,7 @@ mod fp;
 mod hash;
 mod keys;
 mod proof;
+mod tree;
 
 use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
 use ethers::prelude::*;
