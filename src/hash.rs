@@ -10,13 +10,13 @@ pub fn mimc_sponge(left: Fp, right: Fp) -> Fp {
     let x_right_out: Fp;
     let left_out: Fp;
     let k: Fp = Fp::from(0);
-    (x_left_out, x_right_out) = mimc_feistel(left, Fp::from(0), k).unwrap();
-    (left_out, _) = mimc_feistel(x_left_out + right, x_right_out, k).unwrap();
+    (x_left_out, x_right_out) = mimc_feistel(left, Fp::from(0), k);
+    (left_out, _) = mimc_feistel(x_left_out + right, x_right_out, k);
 
     return left_out;
 }
 
-pub fn mimc_feistel(left: Fp, right: Fp, k: Fp) -> Option<(Fp, Fp)> {
+pub fn mimc_feistel(left: Fp, right: Fp, k: Fp) -> (Fp, Fp) {
     const NROUNDS: usize = 220;
 
     let c_partial: [Fp; 218] = [
@@ -241,9 +241,10 @@ pub fn mimc_feistel(left: Fp, right: Fp, k: Fp) -> Option<(Fp, Fp)> {
     ]
     .into_iter()
     .map(|s| Fp::from_str_vartime(s).unwrap())
-    .collect();
+    .collect::<Vec<_>>()
+    .try_into()
+    .unwrap();
 
-    let mut t;
     let mut t2: [Fp; NROUNDS] = [Fp::from(0); NROUNDS];
     let mut t4: [Fp; NROUNDS] = [Fp::from(0); NROUNDS];
     let mut x_left: [Fp; NROUNDS - 1] = [Fp::from(0); NROUNDS - 1];
@@ -251,14 +252,13 @@ pub fn mimc_feistel(left: Fp, right: Fp, k: Fp) -> Option<(Fp, Fp)> {
     let mut x_right_out: Fp = Fp::from(0);
     let mut x_left_out: Fp = Fp::from(0);
 
-    let mut c: Fp = Fp::from(0);
     for i in 0..NROUNDS {
-        if (i == 0) || (i == NROUNDS - 1) {
-            c = Fp::from(0);
+        let c = if (i == 0) || (i == NROUNDS - 1) {
+            Fp::from(0)
         } else {
-            c = c_partial[i - 1];
-        }
-        t = if i == 0 {
+            c_partial[i - 1]
+        };
+        let t = if i == 0 {
             k + left
         } else {
             k + x_left[i - 1] + c
@@ -274,7 +274,7 @@ pub fn mimc_feistel(left: Fp, right: Fp, k: Fp) -> Option<(Fp, Fp)> {
             x_left_out = x_left[i - 1];
         }
     }
-    return Some((x_left_out, x_right_out));
+    (x_left_out, x_right_out)
 }
 
 #[cfg(test)]
@@ -289,6 +289,6 @@ mod tests {
             "20873465551905417246270225393360073881989948543683254892256709153974136274798",
         )
         .unwrap();
-        assert_eq!(Some(out), expected);
+        assert_eq!(out, expected);
     }
 }
