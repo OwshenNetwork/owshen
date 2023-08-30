@@ -12,6 +12,7 @@ use keys::{PrivateKey, PublicKey};
 use proof::prove;
 use std::sync::Arc;
 use structopt::StructOpt;
+use tree::SparseMerkleTree;
 
 // Show wallet info
 #[derive(StructOpt, Debug)]
@@ -45,6 +46,18 @@ enum OwshenCliOpt {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut smt = SparseMerkleTree::new(32);
+    smt.set(123, 4567.into());
+    smt.set(2345, 4567.into());
+    smt.set(2346, 1234.into());
+    smt.set(0, 11234.into());
+    smt.set(12345678, 11234.into());
+    let val = smt.get(0);
+    println!(
+        "SMT verify: {}",
+        SparseMerkleTree::verify(smt.root(), 0, &val)
+    );
+
     const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
     let opt = OwshenCliOpt::from_args();
