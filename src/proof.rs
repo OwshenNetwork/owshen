@@ -23,13 +23,18 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::NamedTempFile;
 
-pub fn prove<P: AsRef<Path>>(params: P, a: Fp, b: Fp) -> Result<Proof> {
+pub fn prove<P: AsRef<Path>>(params: P, index: u32, value: Fp, proof: [Fp; 32]) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
     write!(
         inputs_file,
-        "{{ \"a\": {:?}, \"b\": {:?} }}",
-        BigUint::from_bytes_le(a.to_repr().as_ref()),
-        BigUint::from_bytes_le(b.to_repr().as_ref())
+        "{{ \"index\": {:?}, \"value\": {:?}, \"proof\": [{}] }}",
+        index,
+        BigUint::from_bytes_le(value.to_repr().as_ref()),
+        proof
+            .iter()
+            .map(|p| BigUint::from_bytes_le(p.to_repr().as_ref()).to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     )?;
 
     let witness_file = NamedTempFile::new()?;
@@ -67,6 +72,7 @@ pub fn prove<P: AsRef<Path>>(params: P, a: Fp, b: Fp) -> Result<Proof> {
         .replace("]", "")
         .replace(" ", "")
         .replace("\n", "");
+
     let data = calldata
         .split(",")
         .map(|k| U256::from_str_radix(k, 16))

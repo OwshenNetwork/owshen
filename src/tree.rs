@@ -10,8 +10,8 @@ pub struct SparseMerkleTree {
 
 #[derive(Debug, Clone)]
 pub struct MerkleProof {
-    value: Fp,
-    proof: Vec<Fp>,
+    pub value: Fp,
+    pub proof: Vec<Fp>,
 }
 
 impl SparseMerkleTree {
@@ -81,7 +81,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_merkle_trees() {
-        let mut tree = SparseMerkleTree::new();
+        let mut tree = SparseMerkleTree::new(32);
         tree.set(123, Fp::from(234));
         tree.set(345, Fp::from(456));
         assert_eq!(tree.root(), Fp::from(567));

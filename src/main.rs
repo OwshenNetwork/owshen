@@ -52,10 +52,11 @@ async fn main() -> Result<()> {
     smt.set(2346, 1234.into());
     smt.set(0, 11234.into());
     smt.set(12345678, 11234.into());
-    let val = smt.get(0);
+    let val = smt.get(2345);
     println!(
-        "SMT verify: {}",
-        SparseMerkleTree::verify(smt.root(), 0, &val)
+        "{:?}: {}",
+        smt.root(),
+        SparseMerkleTree::verify(smt.root(), 2345, &val)
     );
 
     const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
@@ -73,7 +74,10 @@ async fn main() -> Result<()> {
         }
         OwshenCliOpt::Withdraw(WithdrawOpt { to }) => {
             // Prove you own a certain coin in the Owshen contract and retrieve rewards in the given ETH address
-            println!("Proof: {:?}", prove(PARAMS_FILE, 123.into(), 234.into())?);
+            println!(
+                "Proof: {:?}",
+                prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap())?
+            );
             println!("Withdraw a coin to Ethereum address: {}", to);
         }
         OwshenCliOpt::Test(TestOpt {}) => {
@@ -89,7 +93,7 @@ async fn main() -> Result<()> {
             let accounts = provider.get_accounts().await?;
             let from = accounts[0];
 
-            let proof = prove(PARAMS_FILE, 123.into(), 234.into())?;
+            let proof = prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap())?;
 
             let verifier = CoinWithdrawVerifier::deploy(provider.clone(), ())?
                 .legacy()
