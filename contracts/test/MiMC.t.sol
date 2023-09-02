@@ -12,6 +12,8 @@ contract MiMCTest is Test {
     }
 
     function testMiMC() public {
-        assertEq(mimc.hashLeftRight(3, 11), 20873465551905417246270225393360073881989948543683254892256709153974136274798);
+        assertEq(
+            mimc.hashLeftRight(3, 11), 20873465551905417246270225393360073881989948543683254892256709153974136274798
+        );
     }
 }
