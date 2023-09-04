@@ -6,6 +6,8 @@ import "./MiMC.sol";
 import "./CoinWithdrawVerifier.sol";
 
 contract Owshen {
+    event Sent(uint256 indexed pub_key, uint index);
+
     struct Proof {
         uint256[2] a;
         uint256[2][2] b;
@@ -32,6 +34,7 @@ contract Owshen {
         uint256 id_time = deposits << 64 + block.timestamp;
         uint256 leaf = mimc.hashLeftRight(pub_key, id_time); // Hash with coin-number so that each coin is unique
         tree.set(deposits, leaf);
+        emit Sent(pub_key, deposits);
         deposits += 1;
     }
 
