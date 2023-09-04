@@ -5,27 +5,16 @@ import "forge-std/Test.sol";
 import "../src/Owshen.sol";
 
 contract OwshenTest is Test {
-    Owshen public counter;
+    Owshen public owshen;
 
     function setUp() public {
-        counter = new Owshen();
-        counter.setNumber(0);
+        owshen = new Owshen();
     }
 
     function testDeposit() public {
-        counter.deposit{value: 1.0 ether}(123);
-        assertEq(counter.deposits(), 1);
-        counter.deposit{value: 1.0 ether}(234);
-        assertEq(counter.deposits(), 2);
-    }
-
-    function testIncrement() public {
-        counter.increment();
-        assertEq(counter.number(), 1);
-    }
-
-    function testSetNumber(uint256 x) public {
-        counter.setNumber(x);
-        assertEq(counter.number(), x);
+        owshen.deposit{value: 1.0 ether}(123);
+        assertEq(owshen.deposits(), 1);
+        owshen.deposit{value: 1.0 ether}(234);
+        assertEq(owshen.deposits(), 2);
     }
 }

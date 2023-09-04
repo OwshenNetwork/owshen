@@ -53,14 +53,4 @@ contract Owshen {
         spend(nullifier, proof);
         payable(msg.sender).transfer(1 ether);
     }
-
-    uint256 public number;
-
-    function setNumber(uint256 newNumber) public {
-        number = newNumber;
-    }
-
-    function increment() public {
-        number++;
-    }
 }
