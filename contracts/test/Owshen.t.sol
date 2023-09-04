@@ -12,6 +12,13 @@ contract OwshenTest is Test {
         counter.setNumber(0);
     }
 
+    function testDeposit() public {
+        counter.deposit{value: 1.0 ether}(123);
+        assertEq(counter.deposits(), 1);
+        counter.deposit{value: 1.0 ether}(234);
+        assertEq(counter.deposits(), 2);
+    }
+
     function testIncrement() public {
         counter.increment();
         assertEq(counter.number(), 1);
