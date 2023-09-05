@@ -13,6 +13,9 @@ pub struct PrivateKey {
 }
 
 impl PrivateKey {
+    pub fn from_secret(secret: Fp ) -> Self {
+        Self{secret}
+    }
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
         Self {
             secret: Fp::random(rng),

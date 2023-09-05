@@ -46,6 +46,9 @@ enum OwshenCliOpt {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+
+    let private_key = PrivateKey::from_secret(1234.into());
+
     let mut smt = SparseMerkleTree::new(32);
     smt.set(123, 4567.into());
     smt.set(2345, 4567.into());
@@ -65,8 +68,7 @@ async fn main() -> Result<()> {
 
     match opt {
         OwshenCliOpt::Info(InfoOpt {}) => {
-            let sk = PrivateKey::generate(&mut rand::thread_rng());
-            println!("Owshen Address: {}", PublicKey::from(sk.clone()));
+            println!("Owshen Address: {}", PublicKey::from(private_key.clone()));
         }
         OwshenCliOpt::Deposit(DepositOpt { to }) => {
             // Transfer ETH to the Owshen contract and create a new commitment
