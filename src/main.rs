@@ -94,12 +94,6 @@ mod tests {
         smt.set(12345678, 11234.into());
         let val = smt.get(2345);
 
-        println!(
-            "{:?}: {}",
-            smt.root(),
-            SparseMerkleTree::verify(smt.root(), 2345, &val)
-        );
-
         let port = 8545u16;
         let url = format!("http://localhost:{}", port).to_string();
 
