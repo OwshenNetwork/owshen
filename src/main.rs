@@ -93,6 +93,7 @@ mod tests {
         smt.set(0, 11234.into());
         smt.set(12345678, 11234.into());
         let val = smt.get(2345);
+
         println!(
             "{:?}: {}",
             smt.root(),
@@ -128,9 +129,7 @@ mod tests {
             .await
             .unwrap();
 
-        if verified {
-            println!("Proof verified successfully!");
-        }
+        assert!(verified);
 
         drop(ganache);
     }
