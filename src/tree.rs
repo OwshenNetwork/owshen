@@ -80,12 +80,18 @@ impl SparseMerkleTree {
 mod tests {
     use super::*;
     use ff::PrimeField;
-    
+
     #[test]
     fn test_merkle_trees() {
         let mut tree = SparseMerkleTree::new(32);
         tree.set(123, Fp::from(234));
         tree.set(345, Fp::from(456));
-        assert_eq!(tree.root(), Fp::from_str_vartime("15901536096620855161893017204769913722630450952860564330042326739189738305463").unwrap());
+        assert_eq!(
+            tree.root(),
+            Fp::from_str_vartime(
+                "15901536096620855161893017204769913722630450952860564330042326739189738305463"
+            )
+            .unwrap()
+        );
     }
 }

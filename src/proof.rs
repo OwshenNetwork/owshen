@@ -32,7 +32,10 @@ pub fn prove<P: AsRef<Path>>(params: P, index: u32, value: Fp, proof: [Fp; 32]) 
         BigUint::from_bytes_le(value.to_repr().as_ref()),
         proof
             .iter()
-            .map(|p| format!("\"{}\"", BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()))
+            .map(|p| format!(
+                "\"{}\"",
+                BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()
+            ))
             .collect::<Vec<_>>()
             .join(",")
     )?;
