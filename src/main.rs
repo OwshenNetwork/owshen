@@ -4,15 +4,26 @@ mod keys;
 mod proof;
 mod tree;
 
+use axum::{
+    http::StatusCode,
+    response::{Html, IntoResponse},
+    routing::{get, post},
+    Json, Router,
+};
 use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
 use ethers::prelude::*;
 use ethers::utils::Ganache;
 use eyre::Result;
 use keys::{PrivateKey, PublicKey};
 use proof::prove;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
+
+// Open web wallet interface
+#[derive(StructOpt, Debug)]
+pub struct WalletOpt {}
 
 // Show wallet info
 #[derive(StructOpt, Debug)]
@@ -37,9 +48,26 @@ enum OwshenCliOpt {
     Info(InfoOpt),
     Deposit(DepositOpt),
     Withdraw(WithdrawOpt),
+    Wallet(WalletOpt),
 }
 
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
+
+async fn root() -> Html<&'static str> {
+    Html(include_str!("html/wallet.html"))
+}
+
+async fn serve_wallet() -> Result<()> {
+    let app = Router::new().route("/", get(root));
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    println!("Running wallet on: http://127.0.0.1:8000");
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -48,6 +76,9 @@ async fn main() -> Result<()> {
     let opt = OwshenCliOpt::from_args();
 
     match opt {
+        OwshenCliOpt::Wallet(WalletOpt {}) => {
+            serve_wallet().await?;
+        }
         OwshenCliOpt::Info(InfoOpt {}) => {
             println!("Owshen Address: {}", PublicKey::from(private_key.clone()));
         }
