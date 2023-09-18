@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Owshen Network</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&amp;display=swap" rel="stylesheet">
+  <style>
+    * {
+        font-family: 'JetBrains Mono', monospace;
+        margin: 0;
+        padding: 0;
+        border: none;
+    }
+    button {
+        color: inherit;
+        text-decoration: inherit;
+        border: 2px solid black;
+        font-size: 0.5em;
+        padding: 0.5em 2em;
+        margin: 1em;
+        background-color: inherit;
+    }
+    button:hover {
+        color:white;
+        background-color: black;
+        text-decoration: inherit; 
+        cursor: pointer;
+    }
+    input, select {
+        background-color: inherit;
+        border: 1px solid black;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+    }
+    .modal-content {
+        border: 2px solid black;
+        text-align: center;
+        width: 30vw;
+        padding: 1em;
+        margin: 15% auto;
+        background-color: white;
+    }
+  </style>
+  
+</head>
+<body>
+    <div class="modal" id="send-modal">
+        <div class="modal-content">
+            <h3>Send</h3>
+            <p>Privately send ERC-20 tokens to Owshen users!</p>
+            <br>
+            <div><label><b>From: </b></label>
+                <select>
+                    <option>Your Ethereum Account</option>
+                    <option>Your Owshen Account</option>
+                </select>
+            </div>
+            <div><label><b>To: </b></label><input type="text"></div>
+            <button style="font-size: 1em;" onclick="send()">Send</a>
+        </div>
+    </div>
+    <div style="width: 100vw; text-align: center;">
+        <div style="font-size: xx-large;  margin-top: 45vh;">
+            🌊 Owshen Wallet 🌊
+            <br>
+            <i style="font-size: 0.5em;"><b>Address:</b> OoOo179a20df8b79e81b243be1360c7de5ae690e4e45a96d319fab2a43de3c9bb71e</i>
+            <br>
+            <i style="font-size: 0.5em;"><b>Balance:</b> 0.0 ETH | 0.0 DIVE</i>
+            <br>
+            <button onclick="openSend()">Send</a>
+        </div>
+    </div>
+    <script>
+        function openSend() {
+            let elem = document.getElementById("send-modal");
+            elem.style.display = 'block';
+        }
+        function send() {
+            let elem = document.getElementById("send-modal");
+            elem.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
