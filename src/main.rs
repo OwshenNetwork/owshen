@@ -4,20 +4,15 @@ mod keys;
 mod proof;
 mod tree;
 
-use axum::{
-    http::StatusCode,
-    response::{Html, IntoResponse},
-    routing::{get, post},
-    Json, Router,
-};
-use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
+use axum::{response::Html, routing::get, Router};
+
 use ethers::prelude::*;
-use ethers::utils::Ganache;
+
 use eyre::Result;
 use keys::{PrivateKey, PublicKey};
 use proof::prove;
 use std::net::SocketAddr;
-use std::sync::Arc;
+
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
 
