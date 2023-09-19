@@ -114,7 +114,6 @@ mod tests {
     use ethers::utils::Ganache;
     use std::sync::Arc;
 
-    use ethers::abi::AbiEncode;
     use ethers::core::types::Bytes;
     use ethers::middleware::contract::ContractFactory;
     use std::str::FromStr;
@@ -124,7 +123,7 @@ mod tests {
         let port = 8545u16;
         let url = format!("http://localhost:{}", port).to_string();
 
-        let ganache = Ganache::new().port(port).spawn();
+        let _ganache = Ganache::new().port(port).spawn();
         let provider = Provider::<Http>::try_from(url).unwrap();
         let provider = Arc::new(provider);
         let accounts = provider.get_accounts().await.unwrap();
