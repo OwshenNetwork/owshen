@@ -133,26 +133,24 @@ mod tests {
         let abi = serde_json::from_str::<Abi>(include_str!("html/poseidon2.abi")).unwrap();
         let bytecode = Bytes::from_str(include_str!("html/poseidon2.evm")).unwrap();
 
-        // connect to the network
         let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
         let client = std::sync::Arc::new(client);
 
-        // create a factory which will be used to deploy instances of the contract
         let factory = ContractFactory::new(abi, bytecode, client);
 
-        // The deployer created by the `deploy` call exposes a builder which gets consumed
-        // by the async `send` call
         let mut deployer = factory.deploy(()).unwrap().legacy();
         deployer.tx.set_from(from);
 
         let contract = deployer.send().await.unwrap();
 
-        let hash = contract
+        let func = contract
             .method_hash::<_, U256>([41, 165, 242, 246], ([U256::from(123), U256::from(234)],))
-            .unwrap()
-            .call()
-            .await
             .unwrap();
+
+        let gas = func.clone().estimate_gas().await.unwrap();
+        assert_eq!(gas, 50349.into());
+
+        let hash = func.clone().call().await.unwrap();
 
         assert_eq!(
             hash,
