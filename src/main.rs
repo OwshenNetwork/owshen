@@ -109,6 +109,60 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
+    use ethers::abi::Abi;
+    use ethers::utils::Ganache;
+    use std::sync::Arc;
+
+    use ethers::abi::AbiEncode;
+    use ethers::core::types::Bytes;
+    use ethers::middleware::contract::ContractFactory;
+    use std::str::FromStr;
+
+    #[tokio::test]
+    async fn test_poseidon() {
+        let port = 8545u16;
+        let url = format!("http://localhost:{}", port).to_string();
+
+        let ganache = Ganache::new().port(port).spawn();
+        let provider = Provider::<Http>::try_from(url).unwrap();
+        let provider = Arc::new(provider);
+        let accounts = provider.get_accounts().await.unwrap();
+        let from = accounts[0];
+
+        let abi = serde_json::from_str::<Abi>(include_str!("html/poseidon2.abi")).unwrap();
+        let bytecode = Bytes::from_str(include_str!("html/poseidon2.evm")).unwrap();
+
+        // connect to the network
+        let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
+        let client = std::sync::Arc::new(client);
+
+        // create a factory which will be used to deploy instances of the contract
+        let factory = ContractFactory::new(abi, bytecode, client);
+
+        // The deployer created by the `deploy` call exposes a builder which gets consumed
+        // by the async `send` call
+        let mut deployer = factory.deploy(()).unwrap().legacy();
+        deployer.tx.set_from(from);
+
+        let contract = deployer.send().await.unwrap();
+
+        let hash = contract
+            .method_hash::<_, U256>([41, 165, 242, 246], ([U256::from(123), U256::from(234)],))
+            .unwrap()
+            .call()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            hash,
+            U256::from_str_radix(
+                "0x0e331f99e024251a3a17152d7562d6257edc99595f9169b4e3b122d58a0e9d62",
+                16
+            )
+            .unwrap()
+        );
+    }
 
     #[tokio::test]
     async fn test_deposit() {
