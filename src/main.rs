@@ -82,16 +82,18 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
 async fn main() -> Result<()> {
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
 
-    let wallet = std::fs::read_to_string(&wallet_path).map(|s| {
-        let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
-        w
-    });
+    let wallet = std::fs::read_to_string(&wallet_path)
+        .map(|s| {
+            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+            w
+        })
+        .ok();
 
     let opt = OwshenCliOpt::from_args();
 
     match opt {
         OwshenCliOpt::Init(InitOpt { endpoint }) => {
-            if wallet.is_err() {
+            if wallet.is_none() {
                 let wallet = Wallet {
                     priv_key: PrivateKey::generate(&mut rand::thread_rng()),
                     endpoint,
@@ -102,14 +104,14 @@ async fn main() -> Result<()> {
             }
         }
         OwshenCliOpt::Wallet(WalletOpt {}) => {
-            if let Ok(wallet) = &wallet {
+            if let Some(wallet) = &wallet {
                 serve_wallet(wallet.priv_key.clone().into()).await?;
             } else {
                 println!("Wallet is not initialized!");
             }
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
-            if let Ok(wallet) = &wallet {
+            if let Some(wallet) = &wallet {
                 println!(
                     "Owshen Address: {}",
                     PublicKey::from(wallet.priv_key.clone())
