@@ -48,12 +48,12 @@ enum OwshenCliOpt {
 
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
-async fn root() -> Html<&'static str> {
-    Html(include_str!("html/wallet.html"))
+async fn root(pub_key: PublicKey) -> Html<String> {
+    Html(include_str!("html/wallet.html").replace("{OWSHEN_ADDRESS}", &pub_key.to_string()))
 }
 
-async fn serve_wallet() -> Result<()> {
-    let app = Router::new().route("/", get(root));
+async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
+    let app = Router::new().route("/", get(move || async { root(pub_key).await }));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
     println!("Running wallet on: http://127.0.0.1:8000");
@@ -72,7 +72,7 @@ async fn main() -> Result<()> {
 
     match opt {
         OwshenCliOpt::Wallet(WalletOpt {}) => {
-            serve_wallet().await?;
+            serve_wallet(private_key.into()).await?;
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
             println!("Owshen Address: {}", PublicKey::from(private_key.clone()));
