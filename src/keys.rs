@@ -4,10 +4,11 @@ use ff::{Field, PrimeField};
 use num_bigint::BigUint;
 use num_traits::Num;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivateKey {
     secret: Fp,
 }
@@ -26,7 +27,7 @@ impl PrivateKey {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicKey {
     commitment: Fp,
 }

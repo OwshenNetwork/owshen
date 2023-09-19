@@ -11,10 +11,17 @@ use ethers::prelude::*;
 use eyre::Result;
 use keys::{PrivateKey, PublicKey};
 use proof::prove;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
+
+// Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
+#[derive(StructOpt, Debug)]
+pub struct InitOpt {
+    endpoint: String,
+}
 
 // Open web wallet interface
 #[derive(StructOpt, Debug)]
@@ -40,10 +47,17 @@ pub struct WithdrawOpt {
 
 #[derive(StructOpt, Debug)]
 enum OwshenCliOpt {
+    Init(InitOpt),
     Info(InfoOpt),
     Deposit(DepositOpt),
     Withdraw(WithdrawOpt),
     Wallet(WalletOpt),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Wallet {
+    priv_key: PrivateKey,
+    endpoint: String,
 }
 
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
@@ -66,16 +80,39 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let private_key = PrivateKey::from_secret(1234.into());
+    let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
+
+    let wallet = std::fs::read_to_string(&wallet_path).map(|s| {
+        let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+        w
+    });
 
     let opt = OwshenCliOpt::from_args();
 
     match opt {
+        OwshenCliOpt::Init(InitOpt { endpoint }) => {
+            let wallet = Wallet {
+                priv_key: PrivateKey::generate(&mut rand::thread_rng()),
+                endpoint,
+            };
+            std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
+        }
         OwshenCliOpt::Wallet(WalletOpt {}) => {
-            serve_wallet(private_key.into()).await?;
+            if let Ok(wallet) = &wallet {
+                serve_wallet(wallet.priv_key.clone().into()).await?;
+            } else {
+                println!("Wallet is not initialized!");
+            }
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
-            println!("Owshen Address: {}", PublicKey::from(private_key.clone()));
+            if let Ok(wallet) = &wallet {
+                println!(
+                    "Owshen Address: {}",
+                    PublicKey::from(wallet.priv_key.clone())
+                );
+            } else {
+                println!("Wallet is not initialized!");
+            }
         }
         OwshenCliOpt::Deposit(DepositOpt { to }) => {
             // Transfer ETH to the Owshen contract and create a new commitment
