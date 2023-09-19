@@ -155,7 +155,13 @@ async fn main() -> Result<()> {
             );
             println!(
                 "Proof: {:?}",
-                prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap())?
+                prove(
+                    PARAMS_FILE,
+                    2345,
+                    val.value,
+                    123,
+                    val.proof.try_into().unwrap()
+                )?
             );
             println!("Withdraw a coin to Ethereum address: {}", to);
         }
@@ -221,9 +227,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_deposit() {
+        let priv_key = PrivateKey::from_secret(1234.into());
+        let pub_key: PublicKey = priv_key.clone().into();
+        let timestamp = 123;
+
         let mut smt = SparseMerkleTree::new(32);
         smt.set(123, 4567.into());
-        smt.set(2345, 4567.into());
+        smt.set(2345, pub_key.commitment);
         smt.set(2346, 1234.into());
         smt.set(0, 11234.into());
         smt.set(12345678, 11234.into());
@@ -240,7 +250,14 @@ mod tests {
         let accounts = provider.get_accounts().await.unwrap();
         let from = accounts[0];
 
-        let proof = prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap()).unwrap();
+        let proof = prove(
+            PARAMS_FILE,
+            2345,
+            1234.into(),
+            timestamp,
+            val.proof.try_into().unwrap(),
+        )
+        .unwrap();
 
         let verifier = CoinWithdrawVerifier::deploy(provider.clone(), ())
             .unwrap()
@@ -251,7 +268,12 @@ mod tests {
             .unwrap();
 
         let verified = verifier
-            .verify_proof(proof.a, proof.b, proof.c, [smt.root().into()])
+            .verify_proof(
+                proof.a,
+                proof.b,
+                proof.c,
+                [smt.root().into(), priv_key.nullifier(2345).into()],
+            )
             .legacy()
             .from(from)
             .call()

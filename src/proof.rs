@@ -24,13 +24,20 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::NamedTempFile;
 
-pub fn prove<P: AsRef<Path>>(params: P, index: u32, value: Fp, proof: [Fp; 32]) -> Result<Proof> {
+pub fn prove<P: AsRef<Path>>(
+    params: P,
+    index: u32,
+    secret: Fp,
+    timestamp: u32,
+    proof: [Fp; 32],
+) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
     write!(
         inputs_file,
-        "{{ \"index\": \"{:?}\", \"value\": \"{:?}\", \"proof\": [{}] }}",
+        "{{ \"index\": \"{:?}\", \"secret\": \"{:?}\", \"timestamp\": \"{:?}\", \"proof\": [{}] }}",
         index,
-        BigUint::from_bytes_le(value.to_repr().as_ref()),
+        BigUint::from_bytes_le(secret.to_repr().as_ref()),
+        timestamp,
         proof
             .iter()
             .map(|p| format!(

@@ -29,21 +29,36 @@ template BitDecompose(N) {
 
 template CoinWithdraw() {
     signal input index;
-    signal input value;
+    signal input secret;
+    signal input timestamp;
     signal input proof[32];
     signal output root;
+    signal output nullifier;
 
-    component bd = BitDecompose(32);
-    component swaps[32];
-    bd.num <== index;
-    component hashers[32];
+    signal commit;
     signal inters[33];
 
-    inters[0] <== value;
+    component bd = BitDecompose(32);
+    bd.num <== index;
+    
+    component commiter = Hasher();
+    commiter.left <== secret;
+    commiter.right <== 0;
+    commit <== commiter.hash;
 
-    var i = 0;
+    component leaf_hasher = Hasher();
+    leaf_hasher.left <== commit;
+    leaf_hasher.right <== timestamp;
+    inters[0] <== leaf_hasher.hash;
 
-    for(i=0; i < 32; i++) {
+    component nullifier_hasher = Hasher();
+    nullifier_hasher.left <== secret;
+    nullifier_hasher.right <== index;
+    nullifier <== nullifier_hasher.hash;
+
+    component hashers[32];
+    component swaps[32];
+    for(var i=0; i < 32; i++) {
         swaps[i] = CSwap();
         swaps[i].swap <== bd.bits[i];
         swaps[i].a <== inters[i];

@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrivateKey {
-    secret: Fp,
+    pub secret: Fp,
 }
 
 impl PrivateKey {
@@ -22,20 +22,20 @@ impl PrivateKey {
             secret: Fp::random(rng),
         }
     }
-    pub fn nullifier(&self) -> Fp {
-        hash(self.secret, Fp::from(2))
+    pub fn nullifier(&self, index: u32) -> Fp {
+        hash(self.secret, Fp::from(index as u64))
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublicKey {
-    commitment: Fp,
+    pub commitment: Fp,
 }
 
 impl From<PrivateKey> for PublicKey {
     fn from(sk: PrivateKey) -> Self {
         Self {
-            commitment: hash(sk.secret, Fp::from(1)),
+            commitment: hash(sk.secret, Fp::from(0)),
         }
     }
 }

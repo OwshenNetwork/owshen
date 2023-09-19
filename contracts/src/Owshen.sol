@@ -31,8 +31,7 @@ contract Owshen {
 
     function deposit(uint256 pub_key) public payable {
         require(msg.value == 1 ether);
-        uint256 id_time = deposits << 64 + block.timestamp;
-        uint256 leaf = mimc.hashLeftRight(pub_key, id_time); // Hash with coin-number so that each coin is unique
+        uint256 leaf = mimc.hashLeftRight(pub_key, block.timestamp);
         tree.set(deposits, leaf);
         emit Sent(pub_key, deposits);
         deposits += 1;
@@ -41,7 +40,7 @@ contract Owshen {
     function spend(uint256 nullifier, Proof calldata proof) internal {
         require(nullifiers[nullifier] == false);
         nullifiers[nullifier] = true;
-        require(coin_withdraw_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root()]));
+        require(coin_withdraw_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root(), nullifier]));
     }
 
     function send(uint256 nullifier, Proof calldata proof, uint256 pub_key) public {
