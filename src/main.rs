@@ -81,8 +81,11 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
         .route("/", get(move || async { root(pub_key).await }))
         .route("/withdraw", get(|| async { Json(Proof::default()) }));
 
+    const PORT: u16 = 8000;
+    let url = format!("http://127.0.0.1:{}", PORT);
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
-    println!("Running wallet on: http://127.0.0.1:8000");
+    println!("Running wallet on: {}", url);
+    open::that(url).unwrap();
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
