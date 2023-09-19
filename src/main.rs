@@ -91,11 +91,15 @@ async fn main() -> Result<()> {
 
     match opt {
         OwshenCliOpt::Init(InitOpt { endpoint }) => {
-            let wallet = Wallet {
-                priv_key: PrivateKey::generate(&mut rand::thread_rng()),
-                endpoint,
-            };
-            std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
+            if wallet.is_err() {
+                let wallet = Wallet {
+                    priv_key: PrivateKey::generate(&mut rand::thread_rng()),
+                    endpoint,
+                };
+                std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
+            } else {
+                println!("Wallet is already initialized!");
+            }
         }
         OwshenCliOpt::Wallet(WalletOpt {}) => {
             if let Ok(wallet) = &wallet {
