@@ -9,9 +9,10 @@ use ethers::prelude::*;
 use ethers::abi::ethabi::ethereum_types::FromStrRadixErr;
 use eyre::Result;
 
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Proof {
     pub a: [U256; 2],
     pub b: [[U256; 2]; 2],

@@ -4,7 +4,11 @@ mod keys;
 mod proof;
 mod tree;
 
-use axum::{response::Html, routing::get, Router};
+use axum::{
+    response::{Html, Json},
+    routing::get,
+    Router,
+};
 
 use ethers::prelude::*;
 
@@ -14,6 +18,7 @@ use proof::prove;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
+use proof::Proof;
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
 
@@ -55,6 +60,11 @@ enum OwshenCliOpt {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct GetWithdrawResponse {
+    proof: Proof,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     priv_key: PrivateKey,
     endpoint: String,
@@ -67,7 +77,9 @@ async fn root(pub_key: PublicKey) -> Html<String> {
 }
 
 async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
-    let app = Router::new().route("/", get(move || async { root(pub_key).await }));
+    let app = Router::new()
+        .route("/", get(move || async { root(pub_key).await }))
+        .route("/withdraw", get(|| async { Json(Proof::default()) }));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
     println!("Running wallet on: http://127.0.0.1:8000");
