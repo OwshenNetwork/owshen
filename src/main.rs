@@ -1,8 +1,12 @@
+mod babyjubjub;
 mod fp;
 mod hash;
 mod keys;
 mod proof;
 mod tree;
+
+#[macro_use]
+extern crate lazy_static;
 
 use axum::{
     response::{Html, Json},
