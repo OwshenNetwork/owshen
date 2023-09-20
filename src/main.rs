@@ -173,6 +173,7 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hash::hash;
     use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
     use ethers::abi::Abi;
     use ethers::utils::Ganache;
@@ -229,11 +230,11 @@ mod tests {
     async fn test_deposit() {
         let priv_key = PrivateKey::from_secret(1234.into());
         let pub_key: PublicKey = priv_key.clone().into();
-        let timestamp = 123;
+        let timestamp = 123u32;
 
         let mut smt = SparseMerkleTree::new(32);
         smt.set(123, 4567.into());
-        smt.set(2345, pub_key.commitment);
+        smt.set(2345, hash(pub_key.commitment, (timestamp as u64).into()));
         smt.set(2346, 1234.into());
         smt.set(0, 11234.into());
         smt.set(12345678, 11234.into());
