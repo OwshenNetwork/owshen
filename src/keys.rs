@@ -102,6 +102,11 @@ pub struct PublicKey {
     pub point: Point,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct EphemeralKey {
+    pub point: Point,
+}
+
 impl From<PrivateKey> for PublicKey {
     fn from(sk: PrivateKey) -> Self {
         Self {
@@ -122,6 +127,15 @@ impl PublicKey {
             a: *BASE * random,
             b: msg + self.point * random,
         }
+    }
+
+    pub fn derive<R: Rng>(&self, rng: &mut R) -> (EphemeralKey, PublicKey) {
+        let r = Fp::random(rng);
+        let ephemeral = *BASE * r;
+        let shared_secret = self.point * r;
+        let shared_secret_hash = hash(shared_secret.x, shared_secret.y);
+        let pub_key = self.point + *BASE * shared_secret_hash;
+        (EphemeralKey { point: ephemeral }, Self { point: pub_key })
     }
 }
 
