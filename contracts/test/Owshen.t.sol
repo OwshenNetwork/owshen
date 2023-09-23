@@ -12,9 +12,9 @@ contract OwshenTest is Test {
     }
 
     function testDeposit() public {
-        owshen.deposit{value: 1.0 ether}(123, 234, 345, 456);
+        owshen.deposit{value: 1.0 ether}(123, 234);
         assertEq(owshen.deposits(), 1);
-        owshen.deposit{value: 1.0 ether}(234, 345, 456, 567);
+        owshen.deposit{value: 1.0 ether}(234, 345);
         assertEq(owshen.deposits(), 2);
     }
 }
