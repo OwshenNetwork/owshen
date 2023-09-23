@@ -21,13 +21,6 @@ template CoinWithdraw() {
     signal input proof[32];
     signal output root;
     signal output nullifier;
-    signal pubX;
-    signal pubY;
-
-    component pk = BabyPbk();
-    pk.in <== secret;
-    pubX <== pk.Ax;
-    pubY <== pk.Ay;
 
     signal commit;
     signal inters[33];
@@ -35,9 +28,11 @@ template CoinWithdraw() {
     component bd = BitDecompose(32);
     bd.num <== index;
     
+    component pk = BabyPbk();
+    pk.in <== secret;
     component commiter = Hasher();
-    commiter.left <== secret;
-    commiter.right <== 0;
+    commiter.left <== pk.Ax;
+    commiter.right <== pk.Ay;
     commit <== commiter.hash;
 
     component leaf_hasher = Hasher();

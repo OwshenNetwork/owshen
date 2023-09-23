@@ -1,4 +1,3 @@
-mod babyjubjub;
 mod fp;
 mod hash;
 mod keys;
@@ -82,7 +81,7 @@ async fn root(pub_key: PublicKey) -> Html<String> {
 
 async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
     let app = Router::new()
-        .route("/", get(move || async { root(pub_key).await }))
+        .route("/", get(move || async move { root(pub_key).await }))
         .route("/withdraw", get(|| async { Json(Proof::default()) }));
 
     const PORT: u16 = 8000;
@@ -232,13 +231,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_deposit() {
-        let priv_key = PrivateKey::from_secret(1234.into());
+        let priv_key = PrivateKey {
+            secret: 1234.into(),
+        };
         let pub_key: PublicKey = priv_key.clone().into();
         let timestamp = 123u32;
 
         let mut smt = SparseMerkleTree::new(32);
         smt.set(123, 4567.into());
-        smt.set(2345, hash(pub_key.commitment, (timestamp as u64).into()));
+        smt.set(
+            2345,
+            hash(
+                hash(pub_key.point.x, pub_key.point.y),
+                (timestamp as u64).into(),
+            ),
+        );
         smt.set(2346, 1234.into());
         smt.set(0, 11234.into());
         smt.set(12345678, 11234.into());

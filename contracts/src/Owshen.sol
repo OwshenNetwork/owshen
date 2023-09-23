@@ -6,7 +6,7 @@ import "./MiMC.sol";
 import "./CoinWithdrawVerifier.sol";
 
 contract Owshen {
-    event Sent(uint256 indexed pub_key, uint index);
+    event Sent(uint256 x, uint256 y, uint256 rnd_x, uint256 rnd_y, uint256 index);
 
     struct Proof {
         uint256[2] a;
@@ -29,11 +29,12 @@ contract Owshen {
         deposits = 0;
     }
 
-    function deposit(uint256 pub_key) public payable {
+    function deposit(uint256 pub_x, uint256 pub_y, uint256 rnd_x, uint256 rnd_y) public payable {
         require(msg.value == 1 ether);
+        uint256 pub_key = mimc.hashLeftRight(pub_x, pub_y);
         uint256 leaf = mimc.hashLeftRight(pub_key, block.timestamp);
         tree.set(deposits, leaf);
-        emit Sent(pub_key, deposits);
+        emit Sent(pub_x, pub_y, rnd_x, rnd_y, deposits);
         deposits += 1;
     }
 
@@ -43,9 +44,11 @@ contract Owshen {
         require(coin_withdraw_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root(), nullifier]));
     }
 
-    function send(uint256 nullifier, Proof calldata proof, uint256 pub_key) public {
+    function send(uint256 nullifier, Proof calldata proof, uint256 pub_x, uint256 pub_y, uint256 rnd_x, uint256 rnd_y)
+        public
+    {
         spend(nullifier, proof);
-        deposit(pub_key);
+        deposit(pub_x, pub_y, rnd_x, rnd_y);
     }
 
     function withdraw(uint256 nullifier, Proof calldata proof) public {
