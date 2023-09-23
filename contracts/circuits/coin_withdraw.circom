@@ -1,6 +1,8 @@
 pragma circom 2.0.0;
 
 include "hasher.circom";
+include "utils.circom";
+include "babyjub.circom";
 
 template CSwap() {
     signal input a;
@@ -12,21 +14,6 @@ template CSwap() {
     r <== (a - b) * swap + b;
 }
 
-template BitDecompose(N) {
-    signal input num;
-    signal output bits[N];
-    var pow = 1;
-    var i = 0;
-    var total = 0;
-    for(i=0; i<N; i++) {
-        bits[i] <-- (num >> i) & 1;
-        bits[i] * (bits[i] - 1) === 0;
-        total += pow * bits[i];
-        pow = pow * 2;
-    }
-    total === num;
-}
-
 template CoinWithdraw() {
     signal input index;
     signal input secret;
@@ -34,6 +21,13 @@ template CoinWithdraw() {
     signal input proof[32];
     signal output root;
     signal output nullifier;
+    signal pubX;
+    signal pubY;
+
+    component pk = BabyPbk();
+    pk.in <== secret;
+    pubX <== pk.Ax;
+    pubY <== pk.Ay;
 
     signal commit;
     signal inters[33];

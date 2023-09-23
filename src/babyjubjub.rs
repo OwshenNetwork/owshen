@@ -4,17 +4,23 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-struct Point {
+pub struct Point {
     pub x: Fp,
     pub y: Fp,
 }
 
 lazy_static! {
-    static ref INF: Point = Point {
+    pub static ref INF: Point = Point {
         x: 0.into(),
         y: 1.into(),
     };
-    static ref G: Point = Point {
+    pub static ref BASE: Point = {
+        let base2 = *G + *G;
+        let base4 = base2 + base2;
+        let base8 = base4 + base4;
+        base8
+    };
+    pub static ref G: Point = Point {
         x: Fp::from_str_vartime(
             "995203441582195749578291179787384436505546430278305826713579947235728471134"
         )
@@ -24,8 +30,8 @@ lazy_static! {
         )
         .unwrap(),
     };
-    static ref A: Fp = 168700.into();
-    static ref D: Fp = 168696.into();
+    pub static ref A: Fp = 168700.into();
+    pub static ref D: Fp = 168696.into();
 }
 
 impl Point {
@@ -93,7 +99,7 @@ struct PublicKey {
 impl From<PrivateKey> for PublicKey {
     fn from(sk: PrivateKey) -> Self {
         Self {
-            point: *G * sk.secret,
+            point: *BASE * sk.secret,
         }
     }
 }
@@ -107,7 +113,7 @@ struct Cipher {
 impl PublicKey {
     pub fn encrypt(&self, random: Fp, msg: Point) -> Cipher {
         Cipher {
-            a: *G * random,
+            a: *BASE * random,
             b: msg + self.point * random,
         }
     }
