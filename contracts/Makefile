@@ -60,12 +60,12 @@ circuits/reward_withdraw.r1cs circuits/reward_withdraw_cpp/: circuits/reward_wit
 	cd circuits && circom reward_withdraw.circom --r1cs --wasm --sym --c
 	cd circuits/reward_withdraw_cpp && make
 
-circuits/coin_withdraw_0001.zkey: circuits/coin_withdraw.r1cs circuits/pot20_final.ptau
-	cd circuits && snarkjs groth16 setup coin_withdraw.r1cs pot20_final.ptau coin_withdraw_0000.zkey
+circuits/coin_withdraw_0001.zkey: circuits/coin_withdraw.r1cs circuits/pot_final.ptau
+	cd circuits && snarkjs groth16 setup coin_withdraw.r1cs pot_final.ptau coin_withdraw_0000.zkey
 	cd circuits && snarkjs zkey contribute coin_withdraw_0000.zkey coin_withdraw_0001.zkey --name="1st Contributor Name" --entropy=${ENTROPY} -v
 
-circuits/reward_withdraw_0001.zkey: circuits/reward_withdraw.r1cs circuits/pot20_final.ptau
-	cd circuits && snarkjs groth16 setup reward_withdraw.r1cs pot20_final.ptau reward_withdraw_0000.zkey
+circuits/reward_withdraw_0001.zkey: circuits/reward_withdraw.r1cs circuits/pot_final.ptau
+	cd circuits && snarkjs groth16 setup reward_withdraw.r1cs pot_final.ptau reward_withdraw_0000.zkey
 	cd circuits && snarkjs zkey contribute reward_withdraw_0000.zkey reward_withdraw_0001.zkey --name="1st Contributor Name" --entropy=${ENTROPY} -v
 
 src/CoinWithdrawVerifier.sol: circuits/coin_withdraw_0001.zkey
@@ -76,11 +76,11 @@ src/RewardWithdrawVerifier.sol: circuits/reward_withdraw_0001.zkey
 	cd circuits && snarkjs zkey export solidityverifier reward_withdraw_0001.zkey ../src/RewardWithdrawVerifier.sol
 	sed -i 's/Groth16Verifier/RewardWithdrawVerifier/' src/RewardWithdrawVerifier.sol
 
-circuits/pot20_final.ptau:
+circuits/pot_final.ptau:
 	# Generate Powers of Tau params
-	cd circuits && snarkjs powersoftau new bn128 20 pot20_0000.ptau -v
-	cd circuits && snarkjs powersoftau contribute pot20_0000.ptau pot20_0001.ptau --name="First contribution" --entropy=${ENTROPY} -v
-	cd circuits && snarkjs powersoftau prepare phase2 pot20_0001.ptau pot20_final.ptau -v
+	cd circuits && snarkjs powersoftau new bn128 16 pot_0000.ptau -v
+	cd circuits && snarkjs powersoftau contribute pot_0000.ptau pot_0001.ptau --name="First contribution" --entropy=${ENTROPY} -v
+	cd circuits && snarkjs powersoftau prepare phase2 pot_0001.ptau pot_final.ptau -v
 
 clean:
 	rm -rf src/CoinWithdrawVerifier.sol test/CoinWithdrawVerifier.t.sol
