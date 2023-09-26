@@ -84,20 +84,25 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
 
     const API_PORT: u16 = 8000;
     const FRONT_PORT: u16 = 8080;
-    let api_url = format!("http://127.0.0.1:{}", API_PORT);
     let front_url = format!("http://127.0.0.1:{}", FRONT_PORT);
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], API_PORT));
     open::that(front_url).unwrap();
 
-    let frontend = task::spawn_blocking(move || {
-        Command::new("http-server")
-            .arg("./client/html")
-            .spawn()
-            .unwrap();
-    });
-    let backend = axum::Server::bind(&addr).serve(app.into_make_service());
+    let frontend = async {
+        task::spawn_blocking(move || {
+            Command::new("http-server").arg("./client/html").spawn()?;
+            Ok::<(), eyre::Error>(())
+        });
+        Ok::<(), eyre::Error>(())
+    };
+    let backend = async {
+        axum::Server::bind(&addr)
+            .serve(app.into_make_service())
+            .await?;
+        Ok::<(), eyre::Error>(())
+    };
 
-    tokio::join!(backend, frontend);
+    tokio::try_join!(backend, frontend)?;
     Ok(())
 }
 
