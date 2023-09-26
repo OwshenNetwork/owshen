@@ -8,20 +8,23 @@ mod tree;
 extern crate lazy_static;
 
 use axum::{
+    extract,
     response::{Html, Json},
     routing::get,
     Router,
 };
 use bindings::owshen::{Owshen, Point as OwshenPoint};
+use tower_http::cors::CorsLayer;
 
 use ethers::prelude::*;
 
 use eyre::Result;
-use keys::{PrivateKey, PublicKey};
+use keys::{EphemeralKey, PrivateKey, PublicKey};
 use proof::prove;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::process::Command;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::task;
 
@@ -67,6 +70,22 @@ enum OwshenCliOpt {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct GetInfoResponse {
+    address: PublicKey,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GetStealthRequest {
+    address: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GetStealthResponse {
+    address: PublicKey,
+    ephemeral: EphemeralKey,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 struct GetWithdrawResponse {
     proof: Proof,
 }
@@ -80,17 +99,41 @@ struct Wallet {
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
 async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
-    let app = Router::new().route("/withdraw", get(|| async { Json(Proof::default()) }));
+    let info_addr = pub_key.clone();
+    let app = Router::new()
+        .route(
+            "/withdraw",
+            get(|| async {
+                Json(GetWithdrawResponse {
+                    proof: Default::default(),
+                })
+            }),
+        )
+        .route(
+            "/stealth",
+            get(
+                |extract::Query(req): extract::Query<GetStealthRequest>| async move {
+                    let pub_key = PublicKey::from_str(&req.address).unwrap();
+                    let (ephemeral, address) = pub_key.derive(&mut rand::thread_rng());
+                    Json(GetStealthResponse { address, ephemeral })
+                },
+            ),
+        )
+        .route(
+            "/info",
+            get(move || async move { Json(GetInfoResponse { address: info_addr }) }),
+        )
+        .layer(CorsLayer::permissive());
 
     const API_PORT: u16 = 8000;
     const FRONT_PORT: u16 = 8080;
-    let front_url = format!("http://127.0.0.1:{}", FRONT_PORT);
+    let front_url = format!("http://127.0.0.1:{}/html", FRONT_PORT);
     let addr = SocketAddr::from(([127, 0, 0, 1], API_PORT));
     open::that(front_url).unwrap();
 
     let frontend = async {
         task::spawn_blocking(move || {
-            Command::new("http-server").arg("./client/html").spawn()?;
+            Command::new("http-server").arg("./client").spawn()?;
             Ok::<(), eyre::Error>(())
         });
         Ok::<(), eyre::Error>(())
