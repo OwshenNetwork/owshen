@@ -4,6 +4,15 @@ Owshen is the fanciest privacy solution ever built for Ethereum!
 
 Join our Discord: [https://discord.gg/jMRRmANvf](https://discord.gg/jMRRmANvf)
 
+## Usage
+
+ - Clone the project `git clone https://github.com/OwshenNetwork/owshen --recurse-submodules`
+ - Install dependencies: `apt-get install nodejs npm libgmp3-dev nasm nlohmann-json3-dev`
+ - Install Circom/SnarkJS: `npm i -g snarkjs circom`
+ - Install Owshen: `cd owshen && make install`
+ - Initialize your pub/priv keys by running `owshen init --network sepolia/ganache/...` (Your keys will be saved in `~/.owshen-wallet`)
+ - Run the wallet: `owshen wallet`
+
 ## Abstract
 
 Owshen is the very first implementation of an ***Anonymity Marketplace***. An Anonymity Marketplace is a market in which users metaphorically sell their identities, by mixing their identity into an anonymity pool. People who use this anonymity pool for the purpose of making their actions private (Buyers) will pay those who join the pool merely for increasing the size of the pool (Sellers). A large number of sellers will bring more buyers to the market (Given that the pool has got bigger thus more private), and a large number of buyers will bring more sellers (Since it gets very profitable to join as a seller). This whitepaper will discuss a practical implementation of such system using the help of zkSNARKs, and will analyze the dynamics of an Anonymity Marketplace.
