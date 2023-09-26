@@ -12,6 +12,7 @@ use axum::{
     routing::get,
     Router,
 };
+use bindings::owshen::{Owshen, Point as OwshenPoint};
 
 use ethers::prelude::*;
 
@@ -20,6 +21,7 @@ use keys::{PrivateKey, PublicKey};
 use proof::prove;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use proof::Proof;
 use structopt::StructOpt;
@@ -141,6 +143,40 @@ async fn main() -> Result<()> {
         OwshenCliOpt::Deposit(DepositOpt { to }) => {
             // Transfer ETH to the Owshen contract and create a new commitment
             println!("Depositing a coin to Owshen address: {}", to);
+
+            let port = 8545u16;
+            let url = format!("http://localhost:{}", port).to_string();
+            let provider = Provider::<Http>::try_from(url).unwrap();
+            let provider = Arc::new(provider);
+
+            let accounts = provider.get_accounts().await.unwrap();
+            let from = accounts[0];
+
+            let owshen = Owshen::deploy(provider.clone(), ())
+                .unwrap()
+                .legacy()
+                .from(from)
+                .send()
+                .await
+                .unwrap();
+
+            owshen
+                .deposit(
+                    OwshenPoint {
+                        x: 123.into(),
+                        y: 234.into(),
+                    },
+                    OwshenPoint {
+                        x: 234.into(),
+                        y: 345.into(),
+                    },
+                )
+                .legacy()
+                .from(from)
+                .value(U256::try_from("1000000000000000000").unwrap())
+                .call()
+                .await
+                .unwrap();
         }
         OwshenCliOpt::Withdraw(WithdrawOpt { to }) => {
             // Prove you own a certain coin in the Owshen contract and retrieve rewards in the given ETH address
