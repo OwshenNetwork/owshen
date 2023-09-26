@@ -1,0 +1,9 @@
+{
+  "name": "client",
+  "packageManager": "yarn@3.3.1",
+  "dependencies": {
+    "@walletconnect/web3-provider": "^1.8.0",
+    "ethers": "^6.7.1",
+    "web3modal": "^1.9.12"
+  }
+}

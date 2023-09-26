@@ -21,7 +21,9 @@ use keys::{PrivateKey, PublicKey};
 use proof::prove;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::process::Command;
 use std::sync::Arc;
+use tokio::task;
 
 use proof::Proof;
 use structopt::StructOpt;
@@ -77,24 +79,25 @@ struct Wallet {
 
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
-async fn root(pub_key: PublicKey) -> Html<String> {
-    Html(include_str!("html/wallet.html").replace("{OWSHEN_ADDRESS}", &pub_key.to_string()))
-}
-
 async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
-    let app = Router::new()
-        .route("/", get(move || async move { root(pub_key).await }))
-        .route("/withdraw", get(|| async { Json(Proof::default()) }));
+    let app = Router::new().route("/withdraw", get(|| async { Json(Proof::default()) }));
 
-    const PORT: u16 = 8000;
-    let url = format!("http://127.0.0.1:{}", PORT);
+    const API_PORT: u16 = 8000;
+    const FRONT_PORT: u16 = 8080;
+    let api_url = format!("http://127.0.0.1:{}", API_PORT);
+    let front_url = format!("http://127.0.0.1:{}", FRONT_PORT);
     let addr = SocketAddr::from(([127, 0, 0, 1], 8000));
-    println!("Running wallet on: {}", url);
-    open::that(url).unwrap();
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    open::that(front_url).unwrap();
+
+    let frontend = task::spawn_blocking(move || {
+        Command::new("http-server")
+            .arg("./client/html")
+            .spawn()
+            .unwrap();
+    });
+    let backend = axum::Server::bind(&addr).serve(app.into_make_service());
+
+    tokio::join!(backend, frontend);
     Ok(())
 }
 

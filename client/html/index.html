@@ -3,54 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>Owshen Network</title>
+  <link rel="stylesheet" href="../style/main.css" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&amp;display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <style>
-    * {
-        font-family: 'JetBrains Mono', monospace;
-        margin: 0;
-        padding: 0;
-        border: none;
-    }
-    button {
-        color: inherit;
-        text-decoration: inherit;
-        border: 2px solid black;
-        font-size: 0.5em;
-        padding: 0.5em 2em;
-        margin: 1em;
-        background-color: inherit;
-    }
-    button:hover {
-        color:white;
-        background-color: black;
-        text-decoration: inherit; 
-        cursor: pointer;
-    }
-    input, select {
-        background-color: inherit;
-        border: 1px solid black;
-    }
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-    }
-    .modal-content {
-        border: 2px solid black;
-        text-align: center;
-        width: 30vw;
-        padding: 1em;
-        margin: 15% auto;
-        background-color: white;
-    }
-  </style>
-  
 </head>
 <body>
     <div class="modal" id="send-modal">
@@ -78,19 +33,9 @@
             <br>
             <button onclick="openSend()">Send</a>
         </div>
-    </div>
-    <script>
-        function openSend() {
-            let elem = document.getElementById("send-modal");
-            elem.style.display = 'block';
-        }
-        function send() {
-            let elem = document.getElementById("send-modal");
-            elem.style.display = 'none';
-            $.getJSON( "/withdraw", function(data) {
-                alert(JSON.stringify(data));
-            });
-        }
-    </script>
+    </div> 
+    <script src="../js/helper.js"></script>
+    <script src="../js/http.js"></script>
+    <script src="../js/walletConnection.js"></script>
 </body>
 </html>
