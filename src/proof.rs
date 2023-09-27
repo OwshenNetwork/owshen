@@ -30,11 +30,13 @@ pub fn prove<P: AsRef<Path>>(
     secret: Fp,
     timestamp: u32,
     proof: [Fp; 32],
+    token: Fp,
+    amount: Fp,
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
     write!(
         inputs_file,
-        "{{ \"index\": \"{:?}\", \"secret\": \"{:?}\", \"timestamp\": \"{:?}\", \"proof\": [{}] }}",
+        "{{ \"index\": \"{:?}\", \"secret\": \"{:?}\", \"timestamp\": \"{:?}\", \"proof\": [{}], \"token\": \"{:?}\", \"amount\": \"{:?}\" }}",
         index,
         BigUint::from_bytes_le(secret.to_repr().as_ref()),
         timestamp,
@@ -45,7 +47,9 @@ pub fn prove<P: AsRef<Path>>(
                 BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()
             ))
             .collect::<Vec<_>>()
-            .join(",")
+            .join(","),
+            BigUint::from_bytes_le(token.to_repr().as_ref()),
+            BigUint::from_bytes_le(amount.to_repr().as_ref()),
     )?;
 
     let witness_file = NamedTempFile::new()?;

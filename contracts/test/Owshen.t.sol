@@ -12,9 +12,9 @@ contract OwshenTest is Test {
     }
 
     function testDeposit() public {
-        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 123, y: 234}), Owshen.Point({x: 123, y: 234}));
+        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 123, y: 234}), Owshen.Point({x: 123, y: 234}), 123, 234);
         assertEq(owshen.deposits(), 1);
-        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 234, y: 345}), Owshen.Point({x: 123, y: 234}));
+        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 234, y: 345}), Owshen.Point({x: 123, y: 234}), 123, 234);
         assertEq(owshen.deposits(), 2);
     }
 }

@@ -14,9 +14,9 @@ docs/
 .env
 
 src/CoinWithdrawVerifier.sol
-src/RewardWithdrawVerifier.sol
+src/CoinSendVerifier.sol
 test/CoinWithdrawVerifier.t.sol
-test/RewardWithdrawVerifier.t.sol
+test/CoinSendVerifier.t.sol
 circuits/*.sym
 circuits/*.r1cs
 circuits/*.json

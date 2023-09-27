@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 import "./SparseMerkleTree.sol";
 import "./MiMC.sol";
 import "./CoinWithdrawVerifier.sol";
+import "./CoinSendVerifier.sol";
 
 contract Owshen {
     event Sent(Point pub_key, Point ephemeral, uint256 index);
@@ -20,6 +21,7 @@ contract Owshen {
     }
 
     CoinWithdrawVerifier coin_withdraw_verifier;
+    CoinSendVerifier coin_send_verifier;
 
     mapping(uint256 => bool) nullifiers;
 
@@ -31,11 +33,11 @@ contract Owshen {
         tree = new SparseMerkleTree();
         mimc = new MiMC();
         coin_withdraw_verifier = new CoinWithdrawVerifier();
+        coin_send_verifier = new CoinSendVerifier();
         deposits = 0;
     }
 
-    function deposit(Point calldata pub_key, Point calldata ephemeral) public payable {
-        require(msg.value == 1 ether);
+    function deposit(Point calldata pub_key, Point calldata ephemeral, uint256 token, uint256 amount) public payable {
         uint256 pub_key_hash = mimc.hashLeftRight(pub_key.x, pub_key.y);
         uint256 leaf = mimc.hashLeftRight(pub_key_hash, block.timestamp);
         tree.set(deposits, leaf);
@@ -43,19 +45,22 @@ contract Owshen {
         deposits += 1;
     }
 
-    function spend(uint256 nullifier, Proof calldata proof) internal {
+    function send(
+        uint256 nullifier,
+        uint256 token,
+        uint256 amount,
+        Proof calldata proof,
+        Point calldata pub_key,
+        Point calldata ephemeral
+    ) public {
         require(nullifiers[nullifier] == false);
         nullifiers[nullifier] = true;
-        require(coin_withdraw_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root(), nullifier]));
+        require(coin_send_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root(), nullifier, token, amount]));
     }
 
-    function send(uint256 nullifier, Proof calldata proof, Point calldata pub_key, Point calldata ephemeral) public {
-        spend(nullifier, proof);
-        deposit(pub_key, ephemeral);
-    }
-
-    function withdraw(uint256 nullifier, Proof calldata proof) public {
-        spend(nullifier, proof);
-        payable(msg.sender).transfer(1 ether);
+    function withdraw(uint256 nullifier, uint256 token, uint256 amount, Proof calldata proof) public {
+        require(nullifiers[nullifier] == false);
+        nullifiers[nullifier] = true;
+        require(coin_withdraw_verifier.verifyProof(proof.a, proof.b, proof.c, [tree.root(), nullifier, token, amount]));
     }
 }

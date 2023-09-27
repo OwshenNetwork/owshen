@@ -221,10 +221,11 @@ async fn main() -> Result<()> {
                         x: 234.into(),
                         y: 345.into(),
                     },
+                    123.into(),
+                    234.into(),
                 )
                 .legacy()
                 .from(from)
-                .value(U256::try_from("1000000000000000000").unwrap())
                 .call()
                 .await
                 .unwrap();
@@ -250,7 +251,9 @@ async fn main() -> Result<()> {
                     2345,
                     val.value,
                     123,
-                    val.proof.try_into().unwrap()
+                    val.proof.try_into().unwrap(),
+                    123.into(),
+                    234.into()
                 )?
             );
             println!("Withdraw a coin to Ethereum address: {}", to);
@@ -355,6 +358,8 @@ mod tests {
             1234.into(),
             timestamp,
             val.proof.try_into().unwrap(),
+            123.into(),
+            234.into(),
         )
         .unwrap();
 
@@ -371,7 +376,12 @@ mod tests {
                 proof.a,
                 proof.b,
                 proof.c,
-                [smt.root().into(), priv_key.nullifier(2345).into()],
+                [
+                    smt.root().into(),
+                    priv_key.nullifier(2345).into(),
+                    123.into(),
+                    234.into(),
+                ],
             )
             .legacy()
             .from(from)
