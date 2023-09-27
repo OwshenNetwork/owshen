@@ -284,8 +284,8 @@ mod tests {
         let accounts = provider.get_accounts().await.unwrap();
         let from = accounts[0];
 
-        let abi = serde_json::from_str::<Abi>(include_str!("html/poseidon2.abi")).unwrap();
-        let bytecode = Bytes::from_str(include_str!("html/poseidon2.evm")).unwrap();
+        let abi = serde_json::from_str::<Abi>(include_str!("assets/poseidon2.abi")).unwrap();
+        let bytecode = Bytes::from_str(include_str!("assets/poseidon2.evm")).unwrap();
 
         let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
         let client = std::sync::Arc::new(client);
