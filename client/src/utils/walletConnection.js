@@ -17,9 +17,7 @@ const web3Modal = new Web3Modal({
   providerOptions, // required
 });
 
-const connectWallet = async () => {
+export const connectWallet = async () => {
   const provider = await web3Modal.connect();
   return new ethers.providers.Web3Provider(provider);
 };
-
-document.getElementById("btn-connect").addEventListener("click", connectWallet);

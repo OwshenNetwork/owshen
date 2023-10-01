@@ -126,15 +126,14 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
         .layer(CorsLayer::permissive());
 
     const API_PORT: u16 = 8000;
-    const FRONT_PORT: u16 = 8080;
-    let front_url = format!("http://127.0.0.1:{}/html", FRONT_PORT);
     let addr = SocketAddr::from(([127, 0, 0, 1], API_PORT));
-    open::that(front_url).unwrap();
 
     let frontend = async {
         task::spawn_blocking(move || {
-            Command::new("http-server").arg("./client").spawn()?;
-            Ok::<(), eyre::Error>(())
+            let output = Command::new("npm")
+            .arg("start")
+            .output()
+            .expect("failed to execute process");
         });
         Ok::<(), eyre::Error>(())
     };
@@ -284,8 +283,13 @@ mod tests {
         let accounts = provider.get_accounts().await.unwrap();
         let from = accounts[0];
 
+<<<<<<< HEAD
         let abi = serde_json::from_str::<Abi>(include_str!("assets/poseidon2.abi")).unwrap();
         let bytecode = Bytes::from_str(include_str!("assets/poseidon2.evm")).unwrap();
+=======
+        let abi = serde_json::from_str::<Abi>(include_str!("../client/src/common/poseidon2.abi")).unwrap();
+        let bytecode = Bytes::from_str(include_str!("../client/src/common/poseidon2.evm")).unwrap();
+>>>>>>> 6500b74 (Prototype client's react project)
 
         let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
         let client = std::sync::Arc::new(client);
