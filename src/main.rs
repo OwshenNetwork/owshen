@@ -131,9 +131,10 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
     let frontend = async {
         task::spawn_blocking(move || {
             let output = Command::new("npm")
-            .arg("start")
-            .output()
-            .expect("failed to execute process");
+                .arg("start")
+                .current_dir("client")
+                .spawn()
+                .expect("failed to execute process");
         });
         Ok::<(), eyre::Error>(())
     };
@@ -283,13 +284,8 @@ mod tests {
         let accounts = provider.get_accounts().await.unwrap();
         let from = accounts[0];
 
-<<<<<<< HEAD
         let abi = serde_json::from_str::<Abi>(include_str!("assets/poseidon2.abi")).unwrap();
         let bytecode = Bytes::from_str(include_str!("assets/poseidon2.evm")).unwrap();
-=======
-        let abi = serde_json::from_str::<Abi>(include_str!("../client/src/common/poseidon2.abi")).unwrap();
-        let bytecode = Bytes::from_str(include_str!("../client/src/common/poseidon2.evm")).unwrap();
->>>>>>> 6500b74 (Prototype client's react project)
 
         let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
         let client = std::sync::Arc::new(client);
