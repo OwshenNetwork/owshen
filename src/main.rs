@@ -28,6 +28,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::task;
 
+use keys::Point;
 use proof::Proof;
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
@@ -149,6 +150,15 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
     Ok(())
 }
 
+impl Into<OwshenPoint> for Point {
+    fn into(self) -> OwshenPoint {
+        OwshenPoint {
+            x: self.x.into(),
+            y: self.y.into(),
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
@@ -192,50 +202,48 @@ async fn main() -> Result<()> {
             }
         }
         OwshenCliOpt::Deposit(DepositOpt { to }) => {
-            // Transfer ETH to the Owshen contract and create a new commitment
-            println!("Depositing a coin to Owshen address: {}", to);
+            if let Some(wallet) = &wallet {
+                // Transfer ETH to the Owshen contract and create a new commitment
+                println!("Depositing a coin to Owshen address: {}", to);
 
-            let port = 8545u16;
-            let url = format!("http://localhost:{}", port).to_string();
-            let provider = Provider::<Http>::try_from(url).unwrap();
-            let provider = Arc::new(provider);
+                let port = 8545u16;
+                let url = format!("http://localhost:{}", port).to_string();
+                let provider = Provider::<Http>::try_from(url).unwrap();
+                let provider = Arc::new(provider);
 
-            let poseidon2_addr = deploy(
-                provider.clone(),
-                include_str!("assets/mimc7.abi"),
-                include_str!("assets/mimc7.evm"),
-            )
-            .await
-            .address();
-
-            let accounts = provider.get_accounts().await.unwrap();
-            let from = accounts[0];
-
-            let owshen = Owshen::deploy(provider.clone(), (poseidon2_addr))
-                .unwrap()
-                .legacy()
-                .from(from)
-                .send()
-                .await
-                .unwrap();
-
-            owshen
-                .deposit(
-                    OwshenPoint {
-                        x: 123.into(),
-                        y: 234.into(),
-                    },
-                    OwshenPoint {
-                        x: 234.into(),
-                        y: 345.into(),
-                    },
+                let poseidon2_addr = deploy(
+                    provider.clone(),
+                    include_str!("assets/mimc7.abi"),
+                    include_str!("assets/mimc7.evm"),
                 )
-                .legacy()
-                .from(from)
-                .value(U256::try_from("1000000000000000000").unwrap())
-                .call()
                 .await
-                .unwrap();
+                .address();
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+
+                let owshen = Owshen::deploy(provider.clone(), (poseidon2_addr))
+                    .unwrap()
+                    .legacy()
+                    .from(from)
+                    .send()
+                    .await
+                    .unwrap();
+
+                let (ephkey, pubkey) =
+                    PublicKey::from(wallet.priv_key.clone()).derive(&mut rand::thread_rng());
+
+                owshen
+                    .deposit(pubkey.point.into(), ephkey.point.into())
+                    .legacy()
+                    .from(from)
+                    .value(U256::try_from("1000000000000000000").unwrap())
+                    .call()
+                    .await
+                    .unwrap();
+            } else {
+                println!("Wallet is not initialized!");
+            }
         }
         OwshenCliOpt::Withdraw(WithdrawOpt { to }) => {
             // Prove you own a certain coin in the Owshen contract and retrieve rewards in the given ETH address
