@@ -2,13 +2,15 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
+import "forge-std/StdCheats.sol";
 import "../src/MiMC.sol";
 
 contract MiMCTest is Test {
     MiMC public mimc;
 
     function setUp() public {
-        mimc = new MiMC();
+        address cont;
+        mimc = new MiMC(IHasher(cont));
     }
 
     function testMiMC() public {

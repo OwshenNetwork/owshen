@@ -27,17 +27,15 @@ contract Owshen {
     SparseMerkleTree tree;
     uint256 public deposits;
 
-    constructor() {
-        tree = new SparseMerkleTree();
-        mimc = new MiMC();
+    constructor(IHasher _hasher) {
+        tree = new SparseMerkleTree(_hasher);
+        mimc = new MiMC(_hasher);
         coin_withdraw_verifier = new CoinWithdrawVerifier();
         deposits = 0;
     }
 
     function deposit(Point calldata pub_key, Point calldata ephemeral) public payable {
-        require(msg.value == 1 ether);
-        uint256 pub_key_hash = mimc.hashLeftRight(pub_key.x, pub_key.y);
-        uint256 leaf = mimc.hashLeftRight(pub_key_hash, block.timestamp);
+        uint256 leaf = mimc.hashLeftRight(pub_key.x, pub_key.y);
         tree.set(deposits, leaf);
         emit Sent(pub_key, ephemeral, deposits);
         deposits += 1;

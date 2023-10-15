@@ -8,7 +8,8 @@ contract OwshenTest is Test {
     Owshen public owshen;
 
     function setUp() public {
-        owshen = new Owshen();
+        address cont;
+        owshen = new Owshen(IHasher(cont));
     }
 
     function testDeposit() public {

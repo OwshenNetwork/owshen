@@ -6,8 +6,8 @@ import "./MiMC.sol";
 contract SparseMerkleTree {
     MiMC mimc;
 
-    constructor() {
-        mimc = new MiMC();
+    constructor(IHasher _hasher) {
+        mimc = new MiMC(_hasher);
     }
 
     mapping(uint256 => mapping(uint256 => uint256)) layers;

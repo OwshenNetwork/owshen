@@ -200,10 +200,18 @@ async fn main() -> Result<()> {
             let provider = Provider::<Http>::try_from(url).unwrap();
             let provider = Arc::new(provider);
 
+            let poseidon2_addr = deploy(
+                provider.clone(),
+                include_str!("assets/mimc7.abi"),
+                include_str!("assets/mimc7.evm"),
+            )
+            .await
+            .address();
+
             let accounts = provider.get_accounts().await.unwrap();
             let from = accounts[0];
 
-            let owshen = Owshen::deploy(provider.clone(), ())
+            let owshen = Owshen::deploy(provider.clone(), (poseidon2_addr))
                 .unwrap()
                 .legacy()
                 .from(from)
@@ -259,6 +267,22 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+use ethers::abi::Abi;
+
+async fn deploy(
+    client: Arc<Provider<Http>>,
+    abi: &str,
+    bytecode: &str,
+) -> ContractInstance<Arc<Provider<Http>>, Provider<Http>> {
+    let from = client.get_accounts().await.unwrap()[0];
+    let abi = serde_json::from_str::<Abi>(abi).unwrap();
+    let bytecode = Bytes::from_str(bytecode).unwrap();
+    let factory = ContractFactory::new(abi, bytecode, client);
+    let mut deployer = factory.deploy(()).unwrap().legacy();
+    deployer.tx.set_from(from);
+    let contract = deployer.send().await.unwrap();
+    contract
+}
 
 #[cfg(test)]
 mod tests {
@@ -272,6 +296,49 @@ mod tests {
     use ethers::core::types::Bytes;
     use ethers::middleware::contract::ContractFactory;
     use std::str::FromStr;
+
+    #[tokio::test]
+    async fn test_mimc7() {
+        let port = 8545u16;
+        let url = format!("http://localhost:{}", port).to_string();
+
+        let _ganache = Ganache::new().port(port).spawn();
+        let provider = Provider::<Http>::try_from(url).unwrap();
+        let provider = Arc::new(provider);
+        let accounts = provider.get_accounts().await.unwrap();
+        let from = accounts[0];
+
+        let abi = serde_json::from_str::<Abi>(include_str!("assets/mimc7.abi")).unwrap();
+        let bytecode = Bytes::from_str(include_str!("assets/mimc7.evm")).unwrap();
+
+        let client = Provider::<Http>::try_from("http://localhost:8545").unwrap();
+        let client = std::sync::Arc::new(client);
+
+        let factory = ContractFactory::new(abi, bytecode, client);
+
+        let mut deployer = factory.deploy(()).unwrap().legacy();
+        deployer.tx.set_from(from);
+
+        let contract = deployer.send().await.unwrap();
+
+        let func = contract
+            .method::<_, U256>("MiMCSponge", (U256::from(3), U256::from(11)))
+            .unwrap();
+
+        //let gas = func.clone().estimate_gas().await.unwrap();
+        //assert_eq!(gas, 40566.into());
+
+        let hash = func.clone().call().await.unwrap();
+
+        assert_eq!(
+            hash,
+            U256::from_str_radix(
+                "0x2e25f67c1ce6bdf965097b228987b3a1fd2be8069e36c354cbaf0b5dcef2ff6e",
+                16
+            )
+            .unwrap()
+        );
+    }
 
     #[tokio::test]
     async fn test_poseidon() {

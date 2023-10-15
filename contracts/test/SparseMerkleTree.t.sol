@@ -8,7 +8,8 @@ contract SparseMerkleTreeTest is Test {
     SparseMerkleTree public tree;
 
     function setUp() public {
-        tree = new SparseMerkleTree();
+        address cont;
+        tree = new SparseMerkleTree(IHasher(cont));
     }
 
     function testTree() public {
