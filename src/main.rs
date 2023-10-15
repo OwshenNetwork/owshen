@@ -241,6 +241,35 @@ async fn main() -> Result<()> {
                     .call()
                     .await
                     .unwrap();
+
+                let mut smt = SparseMerkleTree::new(32);
+                smt.set(0, crate::hash::hash(pubkey.point.x, pubkey.point.y));
+                let merkle_proof = smt.get(0);
+
+                let stealthpriv = wallet.priv_key.derive(ephkey);
+                let zkproof = prove(
+                    PARAMS_FILE,
+                    0,
+                    stealthpriv.secret,
+                    merkle_proof.proof.try_into().unwrap(),
+                )?;
+
+                let nullifier = stealthpriv.nullifier(0);
+
+                owshen
+                    .withdraw(
+                        nullifier.into(),
+                        bindings::owshen::Proof {
+                            a: zkproof.a.into(),
+                            b: zkproof.b.into(),
+                            c: zkproof.c.into(),
+                        },
+                    )
+                    .legacy()
+                    .from(from)
+                    .call()
+                    .await
+                    .unwrap();
             } else {
                 println!("Wallet is not initialized!");
             }
@@ -261,13 +290,7 @@ async fn main() -> Result<()> {
             );
             println!(
                 "Proof: {:?}",
-                prove(
-                    PARAMS_FILE,
-                    2345,
-                    val.value,
-                    123,
-                    val.proof.try_into().unwrap()
-                )?
+                prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap())?
             );
             println!("Withdraw a coin to Ethereum address: {}", to);
         }
@@ -428,7 +451,6 @@ mod tests {
             PARAMS_FILE,
             2345,
             1234.into(),
-            timestamp,
             val.proof.try_into().unwrap(),
         )
         .unwrap();

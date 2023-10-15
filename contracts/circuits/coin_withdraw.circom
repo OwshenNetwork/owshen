@@ -17,12 +17,10 @@ template CSwap() {
 template CoinWithdraw() {
     signal input index;
     signal input secret;
-    signal input timestamp;
     signal input proof[32];
     signal output root;
     signal output nullifier;
 
-    signal commit;
     signal inters[33];
 
     component bd = BitDecompose(32);
@@ -33,12 +31,7 @@ template CoinWithdraw() {
     component commiter = Hasher();
     commiter.left <== pk.Ax;
     commiter.right <== pk.Ay;
-    commit <== commiter.hash;
-
-    component leaf_hasher = Hasher();
-    leaf_hasher.left <== commit;
-    leaf_hasher.right <== timestamp;
-    inters[0] <== leaf_hasher.hash;
+    inters[0] <== commiter.hash;
 
     component nullifier_hasher = Hasher();
     nullifier_hasher.left <== secret;
