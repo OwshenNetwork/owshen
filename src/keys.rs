@@ -97,7 +97,7 @@ pub struct PrivateKey {
     pub secret: Fp,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct PublicKey {
     pub point: Point,
 }
@@ -143,6 +143,13 @@ impl PrivateKey {
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
         Self {
             secret: Fp::random(rng),
+        }
+    }
+    pub fn derive(&self, eph: EphemeralKey) -> Self {
+        let shared_secret = eph.point * self.secret;
+        let shared_secret_hash = hash(shared_secret.x, shared_secret.y);
+        Self {
+            secret: self.secret + shared_secret_hash,
         }
     }
     pub fn decrypt(&self, cipher: Cipher) -> Point {
@@ -196,6 +203,18 @@ impl Display for PublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_stealth() {
+        let master_priv_key = PrivateKey {
+            secret: 23456.into(),
+        };
+        let master_pub_key: PublicKey = master_priv_key.into();
+        let (stealth_eph, stealth_pub_key) = master_pub_key.derive(&mut rand::thread_rng());
+        assert!(master_pub_key != stealth_pub_key);
+        let stealth_priv_key = master_priv_key.derive(stealth_eph);
+        assert_eq!(PublicKey::from(stealth_priv_key), stealth_pub_key);
+    }
 
     #[test]
     fn test_encrypt() {
