@@ -47,26 +47,10 @@ pub struct WalletOpt {}
 #[derive(StructOpt, Debug)]
 pub struct InfoOpt {}
 
-// Deposit to Owshen address
-#[derive(StructOpt, Debug)]
-pub struct DepositOpt {
-    #[structopt(long)]
-    to: PublicKey,
-}
-
-// Withdraw to Ethereum address
-#[derive(StructOpt, Debug)]
-pub struct WithdrawOpt {
-    #[structopt(long)]
-    to: Address,
-}
-
 #[derive(StructOpt, Debug)]
 enum OwshenCliOpt {
     Init(InitOpt),
     Info(InfoOpt),
-    Deposit(DepositOpt),
-    Withdraw(WithdrawOpt),
     Wallet(WalletOpt),
 }
 
@@ -201,99 +185,6 @@ async fn main() -> Result<()> {
                 println!("Wallet is not initialized!");
             }
         }
-        OwshenCliOpt::Deposit(DepositOpt { to }) => {
-            if let Some(wallet) = &wallet {
-                // Transfer ETH to the Owshen contract and create a new commitment
-                println!("Depositing a coin to Owshen address: {}", to);
-
-                let port = 8545u16;
-                let url = format!("http://localhost:{}", port).to_string();
-                let provider = Provider::<Http>::try_from(url).unwrap();
-                let provider = Arc::new(provider);
-
-                let poseidon2_addr = deploy(
-                    provider.clone(),
-                    include_str!("assets/mimc7.abi"),
-                    include_str!("assets/mimc7.evm"),
-                )
-                .await
-                .address();
-
-                let accounts = provider.get_accounts().await.unwrap();
-                let from = accounts[0];
-
-                let owshen = Owshen::deploy(provider.clone(), (poseidon2_addr))
-                    .unwrap()
-                    .legacy()
-                    .from(from)
-                    .send()
-                    .await
-                    .unwrap();
-
-                let (ephkey, pubkey) =
-                    PublicKey::from(wallet.priv_key.clone()).derive(&mut rand::thread_rng());
-
-                owshen
-                    .deposit(pubkey.point.into(), ephkey.point.into())
-                    .legacy()
-                    .from(from)
-                    .value(U256::try_from("1000000000000000000").unwrap())
-                    .call()
-                    .await
-                    .unwrap();
-
-                let mut smt = SparseMerkleTree::new(32);
-                smt.set(0, crate::hash::hash(pubkey.point.x, pubkey.point.y));
-                let merkle_proof = smt.get(0);
-
-                let stealthpriv = wallet.priv_key.derive(ephkey);
-                let zkproof = prove(
-                    PARAMS_FILE,
-                    0,
-                    stealthpriv.secret,
-                    merkle_proof.proof.try_into().unwrap(),
-                )?;
-
-                let nullifier = stealthpriv.nullifier(0);
-
-                owshen
-                    .withdraw(
-                        nullifier.into(),
-                        bindings::owshen::Proof {
-                            a: zkproof.a.into(),
-                            b: zkproof.b.into(),
-                            c: zkproof.c.into(),
-                        },
-                    )
-                    .legacy()
-                    .from(from)
-                    .call()
-                    .await
-                    .unwrap();
-            } else {
-                println!("Wallet is not initialized!");
-            }
-        }
-        OwshenCliOpt::Withdraw(WithdrawOpt { to }) => {
-            // Prove you own a certain coin in the Owshen contract and retrieve rewards in the given ETH address
-            let mut smt = SparseMerkleTree::new(32);
-            smt.set(123, 4567.into());
-            smt.set(2345, 4567.into());
-            smt.set(2346, 1234.into());
-            smt.set(0, 11234.into());
-            smt.set(12345678, 11234.into());
-            let val = smt.get(2345);
-            println!(
-                "{:?}: {}",
-                smt.root(),
-                SparseMerkleTree::verify(smt.root(), 2345, &val)
-            );
-            println!(
-                "Proof: {:?}",
-                prove(PARAMS_FILE, 2345, val.value, val.proof.try_into().unwrap())?
-            );
-            println!("Withdraw a coin to Ethereum address: {}", to);
-        }
     }
 
     Ok(())
@@ -415,47 +306,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_deposit() {
+    async fn test_deposit_withdraw() {
         let priv_key = PrivateKey {
             secret: 1234.into(),
         };
-        let pub_key: PublicKey = priv_key.clone().into();
-        let timestamp = 123u32;
-
-        let mut smt = SparseMerkleTree::new(32);
-        smt.set(123, 4567.into());
-        smt.set(
-            2345,
-            hash(
-                hash(pub_key.point.x, pub_key.point.y),
-                (timestamp as u64).into(),
-            ),
-        );
-        smt.set(2346, 1234.into());
-        smt.set(0, 11234.into());
-        smt.set(12345678, 11234.into());
-        let val = smt.get(2345);
-
         let port = 8545u16;
         let url = format!("http://localhost:{}", port).to_string();
-
-        let ganache = Ganache::new().port(port).spawn();
+        let _ganache = Ganache::new().port(port).spawn();
 
         let provider = Provider::<Http>::try_from(url).unwrap();
         let provider = Arc::new(provider);
 
+        let poseidon2_addr = deploy(
+            provider.clone(),
+            include_str!("assets/mimc7.abi"),
+            include_str!("assets/mimc7.evm"),
+        )
+        .await
+        .address();
+
         let accounts = provider.get_accounts().await.unwrap();
         let from = accounts[0];
 
-        let proof = prove(
-            PARAMS_FILE,
-            2345,
-            1234.into(),
-            val.proof.try_into().unwrap(),
-        )
-        .unwrap();
-
-        let verifier = CoinWithdrawVerifier::deploy(provider.clone(), ())
+        let owshen = Owshen::deploy(provider.clone(), (poseidon2_addr))
             .unwrap()
             .legacy()
             .from(from)
@@ -463,21 +336,50 @@ mod tests {
             .await
             .unwrap();
 
-        let verified = verifier
-            .verify_proof(
-                proof.a,
-                proof.b,
-                proof.c,
-                [smt.root().into(), priv_key.nullifier(2345).into()],
-            )
+        let (ephkey, pubkey) = PublicKey::from(priv_key.clone()).derive(&mut rand::thread_rng());
+
+        let mut smt = SparseMerkleTree::new(32);
+        let root = owshen.root().legacy().from(from).call().await.unwrap();
+        assert_eq!(root, smt.root().into());
+
+        owshen
+            .deposit(pubkey.point.into(), ephkey.point.into())
             .legacy()
             .from(from)
-            .call()
+            .send()
             .await
             .unwrap();
 
-        assert!(verified);
+        smt.set(0, crate::hash::hash(pubkey.point.x, pubkey.point.y));
+        let merkle_proof = smt.get(0);
 
-        drop(ganache);
+        let root = owshen.root().legacy().from(from).call().await.unwrap();
+        assert_eq!(root, smt.root().into());
+
+        let stealthpriv = priv_key.derive(ephkey);
+        let zkproof = prove(
+            PARAMS_FILE,
+            0,
+            stealthpriv.secret,
+            merkle_proof.proof.try_into().unwrap(),
+        )
+        .unwrap();
+
+        let nullifier = stealthpriv.nullifier(0);
+
+        owshen
+            .withdraw(
+                nullifier.into(),
+                bindings::owshen::Proof {
+                    a: zkproof.a.into(),
+                    b: zkproof.b.into(),
+                    c: zkproof.c.into(),
+                },
+            )
+            .legacy()
+            .from(from)
+            .send()
+            .await
+            .unwrap();
     }
 }

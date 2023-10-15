@@ -1,8 +1,8 @@
 use crate::fp::Fp;
 use crate::hash::hash;
 use ff::{Field, PrimeField, PrimeFieldBits};
-use num_bigint::BigUint;
-use num_traits::Num;
+use num_bigint::{BigUint, RandBigInt};
+use num_traits::{Num, Zero};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
@@ -26,6 +26,10 @@ lazy_static! {
         let base8 = base4 + base4;
         base8
     };
+    pub static ref ORDER: BigUint = BigUint::from_str(
+        "2736030358979909402780800718157159386076813972158567259200215660948447373041"
+    )
+    .unwrap();
     pub static ref G: Point = Point {
         x: Fp::from_str_vartime(
             "995203441582195749578291179787384436505546430278305826713579947235728471134"
@@ -141,15 +145,24 @@ impl PublicKey {
 
 impl PrivateKey {
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
+        let rnd = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
         Self {
-            secret: Fp::random(rng),
+            secret: Fp::from_str_vartime(rnd.to_string().as_str()).unwrap(),
         }
     }
     pub fn derive(&self, eph: EphemeralKey) -> Self {
         let shared_secret = eph.point * self.secret;
         let shared_secret_hash = hash(shared_secret.x, shared_secret.y);
+        let secret = BigUint::from_bytes_le(self.secret.to_repr().as_ref());
+        let shared_secret = BigUint::from_bytes_le(shared_secret_hash.to_repr().as_ref());
+        let stealth_secret = Fp::from_str_vartime(
+            ((secret + shared_secret) % ORDER.clone())
+                .to_string()
+                .as_str(),
+        )
+        .unwrap();
         Self {
-            secret: self.secret + shared_secret_hash,
+            secret: stealth_secret,
         }
     }
     pub fn decrypt(&self, cipher: Cipher) -> Point {
@@ -207,7 +220,10 @@ mod tests {
     #[test]
     fn test_stealth() {
         let master_priv_key = PrivateKey {
-            secret: 23456.into(),
+            secret: Fp::from_str_vartime(
+                "2399676232724823934106751350900953157674194292910175666859294040926337260522",
+            )
+            .unwrap(),
         };
         let master_pub_key: PublicKey = master_priv_key.into();
         let (stealth_eph, stealth_pub_key) = master_pub_key.derive(&mut rand::thread_rng());

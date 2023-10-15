@@ -41,6 +41,10 @@ contract Owshen {
         deposits += 1;
     }
 
+    function root() public view returns (uint256) {
+        return tree.root();
+    }
+
     function spend(uint256 nullifier, Proof calldata proof) internal {
         require(nullifiers[nullifier] == false);
         nullifiers[nullifier] = true;
@@ -54,6 +58,5 @@ contract Owshen {
 
     function withdraw(uint256 nullifier, Proof calldata proof) public {
         spend(nullifier, proof);
-        payable(msg.sender).transfer(1 ether);
     }
 }
