@@ -1,0 +1,19 @@
+.received-coins-container {
+  text-align: center !important;
+  height: 100px !important;
+  scroll-behavior: revert !important;
+}
+
+.list-container {
+  border: 1px solid;
+  height: 250px;
+  overflow-y: auto;
+  width: 390px;
+  margin: 0 auto;
+}
+
+.coin-container {
+  display: flex;
+  margin: 0 auto;
+  justify-content: center;
+}

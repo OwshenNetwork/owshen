@@ -13,9 +13,23 @@ contract OwshenTest is Test {
     }
 
     function testDeposit() public {
-        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 123, y: 234}), Owshen.Point({x: 123, y: 234}));
-        assertEq(owshen.deposits(), 1);
-        owshen.deposit{value: 1.0 ether}(Owshen.Point({x: 234, y: 345}), Owshen.Point({x: 123, y: 234}));
-        assertEq(owshen.deposits(), 2);
+        owshen.deposit(
+            Owshen.Point({x: 123, y: 234}),
+            Owshen.Point({x: 123, y: 234}),
+            0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6,
+            1000,
+            0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1,
+            0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1
+        );
+        assertEq(owshen.depositIndex(), 1);
+        owshen.deposit(
+            Owshen.Point({x: 234, y: 345}),
+            Owshen.Point({x: 123, y: 234}),
+            0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6,
+            2000, // Add the amount here
+            0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1,
+            0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1
+        );
+        assertEq(owshen.depositIndex(), 2);
     }
 }

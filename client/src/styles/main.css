@@ -42,3 +42,7 @@ select {
   margin: 15% auto;
   background-color: white;
 }
+.close-btn-container {
+  display: flex;
+  justify-content: center;
+}

@@ -58,10 +58,12 @@ impl SparseMerkleTree {
         MerkleProof { value, proof }
     }
 
+    #[allow(dead_code)]
     pub fn root(&self) -> Fp {
         self.get_at_layer(self.depth(), 0)
     }
 
+    #[allow(dead_code)]
     pub fn verify(root: Fp, mut index: u64, proof: &MerkleProof) -> bool {
         let mut value = proof.value;
         for p in proof.proof.iter() {

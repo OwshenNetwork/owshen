@@ -7,11 +7,18 @@ Join our Discord: [https://discord.gg/jMRRmANvf](https://discord.gg/jMRRmANvf)
 ## Usage
 
  - Clone the project `git clone https://github.com/OwshenNetwork/owshen --recurse-submodules`
+ - If you already cloned the project without the cloning submodules first running: `git submodule update --init --recursive`
+ - The option `--remote` was added to support updating to latest tips of remote branches: `git submodule update --recursive --remote`
+ - Install Rust language: `curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh`
+ - Install Foundry: `https://book.getfoundry.sh/getting-started/installation`
  - Install dependencies: `apt-get install nodejs npm libgmp3-dev nasm nlohmann-json3-dev`
  - Install Circom/SnarkJS: `npm i -g snarkjs circom`
  - Install Owshen: `cd owshen && make install`
- - Initialize your pub/priv keys by running `owshen init --network sepolia/ganache/...` (Your keys will be saved in `~/.owshen-wallet`)
- - Run the wallet: `owshen wallet`
+ - For installing client dependencies we need to go to client route and: `yarn` or `npm install`  
+ - Running proper Ganache localhost network: `ganache-cli -d --db chain`
+ (We need to import first account from Ganache to metamask for local testing)
+ - Initialize your pub/priv keys and deploying dependencies by running  `cargo run -- init --endpoint http://127.0.0.1:8545 --db test.json` (Your keys will be saved in `~/.owshen-wallet.json` - also you can running this command multiple times for testing purpose)
+ - Run the wallet (GUI): `cargo run -- wallet --port 9000 --db test.json`
 
 ## Abstract
 

@@ -7,41 +7,48 @@ mod tree;
 #[macro_use]
 extern crate lazy_static;
 
-use axum::{
-    extract,
-    response::{Html, Json},
-    routing::get,
-    Router,
-};
-use bindings::owshen::{Owshen, Point as OwshenPoint};
+use axum::{extract, response::Json, routing::get, Router};
+use bindings::dive_token::DiveToken;
+use bindings::owshen::{Owshen, Point as OwshenPoint, SentFilter, WithdrawFilter};
 use tower_http::cors::CorsLayer;
 
 use ethers::prelude::*;
 
 use eyre::Result;
 use keys::{EphemeralKey, PrivateKey, PublicKey};
-use proof::prove;
+
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::Arc;
 use tokio::task;
-
-use keys::Point;
-use proof::Proof;
-use structopt::StructOpt;
 use tree::SparseMerkleTree;
+
+use crate::fp::Fp;
+use ff::PrimeField;
+use keys::Point;
+use proof::{prove, Proof};
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 // Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
 pub struct InitOpt {
+    #[structopt(long, default_value = "http://127.0.0.1:8545")]
     endpoint: String,
+    #[structopt(long)]
+    db: Option<PathBuf>,
 }
 
 // Open web wallet interface
 #[derive(StructOpt, Debug)]
-pub struct WalletOpt {}
+pub struct WalletOpt {
+    #[structopt(long)]
+    db: Option<PathBuf>,
+    #[structopt(long, default_value = "8000")]
+    port: u16,
+}
 
 // Show wallet info
 #[derive(StructOpt, Debug)]
@@ -57,6 +64,10 @@ enum OwshenCliOpt {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct GetInfoResponse {
     address: PublicKey,
+    dive_abi: Abi,
+    dive_address: H160,
+    contract_address: H160,
+    contract_abi: Abi,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -66,33 +77,213 @@ struct GetStealthRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct GetStealthResponse {
-    address: PublicKey,
-    ephemeral: EphemeralKey,
+    address: Point,
+    ephemeral: Point,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GetWithdrawRequest {
+    index: U256,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Coin {
+    pub index: U256,
+    pub token: H160,
+    pub amount: U256,
+    pub priv_key: PrivateKey,
+    pub pub_key: PublicKey,
+    pub nullifier: U256,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 struct GetWithdrawResponse {
     proof: Proof,
+    pub token: H160,
+    pub amount: U256,
+    pub nullifier: U256,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+struct GetCoinsResponse {
+    coins: Vec<Coin>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     priv_key: PrivateKey,
     endpoint: String,
+    dive_contract_address: H160,
+    owshen_contract_address: H160,
+    owshen_contract_abi: Abi,
+    dive_contract_abi: Abi,
+}
+
+struct Context {
+    coins: Vec<Coin>,
+    tree: SparseMerkleTree,
 }
 
 const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 
-async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
+use std::sync::Mutex;
+
+async fn serve_wallet(
+    provider: Arc<Provider<Http>>,
+    port: u16,
+    priv_key: PrivateKey,
+    pub_key: PublicKey,
+    owshen_address: H160,
+    dive_address: H160,
+    abi: Abi,
+    dive_abi: Abi,
+) -> Result<()> {
     let info_addr = pub_key.clone();
+    let coins_owshen_address = owshen_address.clone();
+    let div_address = dive_address.clone();
+    let coins_owshen_abi = abi.clone();
+    let tree: SparseMerkleTree = SparseMerkleTree::new(32);
+    let context = Arc::new(Mutex::new(Context {
+        coins: vec![],
+        tree,
+    }));
+
+    let context_coin = context.clone();
+
+    let context_tree = context.clone();
+    let context_withdraw = context.clone();
+    let contract = Contract::new(coins_owshen_address, coins_owshen_abi, provider);
+    let contract_clone = contract.clone();
     let app = Router::new()
         .route(
-            "/withdraw",
-            get(|| async {
-                Json(GetWithdrawResponse {
-                    proof: Default::default(),
+            "/coins",
+            get(move || async move {
+                let mut my_coins = Vec::new();
+                let mut tree = SparseMerkleTree::new(32);
+                for sent_event in contract_clone
+                    .event::<SentFilter>()
+                    .from_block(0)
+                    .to_block(100)
+                    .query()
+                    .await
+                    .unwrap()
+                {
+                    let ephemeral = Point {
+                        x: Fp::from_str_vartime(&sent_event.ephemeral.x.to_string()).unwrap(),
+                        y: Fp::from_str_vartime(&sent_event.ephemeral.y.to_string()).unwrap(),
+                    };
+                    let pubkey = Point {
+                        x: Fp::from_str_vartime(&sent_event.pub_key.x.to_string()).unwrap(),
+                        y: Fp::from_str_vartime(&sent_event.pub_key.y.to_string()).unwrap(),
+                    };
+                    let stealth_priv = priv_key.derive(EphemeralKey { point: ephemeral });
+                    let stealth_pub: PublicKey = stealth_priv.clone().into();
+                    let index: U256 = sent_event.index;
+                    let u64_index: u64 = index.low_u64();
+                    tree.set(
+                        u64_index,
+                        crate::hash::hash(stealth_pub.point.x, stealth_pub.point.y),
+                    );
+
+                    if stealth_pub.point == pubkey {
+                        println!("ITS FOR US! :O");
+                        my_coins.push(Coin {
+                            index,
+                            token: div_address,
+                            amount: sent_event.amount,
+                            nullifier: stealth_priv.nullifier(index.low_u32()).into(),
+                            priv_key: stealth_priv,
+                            pub_key: stealth_pub,
+                        });
+                    }
+                }
+
+                for withdraw_event in contract_clone
+                    .event::<WithdrawFilter>()
+                    .from_block(0)
+                    .to_block(100)
+                    .query()
+                    .await
+                    .unwrap()
+                {
+                    for _coin in my_coins.clone() {
+                        let coin_position = my_coins
+                            .iter()
+                            .position(|_coin| _coin.nullifier == withdraw_event.nullifier);
+                        match coin_position {
+                            Some(index) => {
+                                my_coins.remove(index);
+                            }
+                            None => {}
+                        }
+
+                        println!(
+                            "YOU SPEND YOUR DEPOSIT! nullifier:{:?}",
+                            withdraw_event.nullifier
+                        );
+                    }
+                }
+
+                let mut ctx = context_coin.lock().unwrap();
+                ctx.coins = my_coins.clone();
+                ctx.tree = tree;
+
+                Json(GetCoinsResponse {
+                    coins: my_coins.clone(),
                 })
             }),
+        )
+        .route(
+            "/withdraw",
+            get(
+                move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
+                    let index = req.index;
+                    let coins = context_withdraw.lock().unwrap().coins.clone();
+                    let merkle_root = context_tree.lock().unwrap().tree.clone();
+                    // Find a coin with the specified index
+                    let filtered_coin = coins.iter().find(|coin| coin.index == index);
+                    match filtered_coin {
+                        Some(coin) => {
+                            let u32_index: u32 = index.low_u32();
+                            let u64_index: u64 = index.low_u64();
+                            // get merkle proof
+                            let merkle_proof = merkle_root.get(u64_index);
+                            // make proof
+                            let proof: std::result::Result<Proof, eyre::Error> = prove(
+                                PARAMS_FILE,
+                                u32_index,
+                                coin.priv_key.secret,
+                                merkle_proof.proof.try_into().unwrap(),
+                            );
+
+                            match proof {
+                                Ok(proof) => Json(GetWithdrawResponse {
+                                    proof,
+                                    token: coin.token,
+                                    amount: coin.amount,
+                                    nullifier: coin.nullifier,
+                                }),
+                                Err(e) => {
+                                    println!("Something wrong while creating proof{:?}", e);
+                                    Json(GetWithdrawResponse {
+                                        proof: Proof::default(),
+                                        token: H160::default(),
+                                        amount: U256::default(),
+                                        nullifier: U256::default(),
+                                    })
+                                }
+                            }
+                        }
+                        None => {
+                            println!("No coin with index {} found", index);
+                            Json(GetWithdrawResponse {
+                                proof: Proof::default(),
+                                token: H160::default(),
+                                amount: U256::default(),
+                                nullifier: U256::default(),
+                            })
+                        }
+                    }
+                },
+            ),
         )
         .route(
             "/stealth",
@@ -100,23 +291,37 @@ async fn serve_wallet(pub_key: PublicKey) -> Result<()> {
                 |extract::Query(req): extract::Query<GetStealthRequest>| async move {
                     let pub_key = PublicKey::from_str(&req.address).unwrap();
                     let (ephemeral, address) = pub_key.derive(&mut rand::thread_rng());
-                    Json(GetStealthResponse { address, ephemeral })
+                    Json(GetStealthResponse {
+                        address: address.point,
+                        ephemeral: ephemeral.point,
+                    })
                 },
             ),
         )
         .route(
             "/info",
-            get(move || async move { Json(GetInfoResponse { address: info_addr }) }),
+            get(move || async move {
+                Json(GetInfoResponse {
+                    address: info_addr,
+                    dive_address: dive_address,
+                    dive_abi: dive_abi,
+                    contract_address: owshen_address,
+                    contract_abi: abi,
+                })
+            }),
         )
         .layer(CorsLayer::permissive());
 
-    const API_PORT: u16 = 8000;
-    let addr = SocketAddr::from(([127, 0, 0, 1], API_PORT));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
 
     let frontend = async {
         task::spawn_blocking(move || {
-            let output = Command::new("npm")
+            let _output = Command::new("npm")
                 .arg("start")
+                .env(
+                    "REACT_APP_OWSHEN_ENDPOINT",
+                    format!("http://127.0.0.1:{}", port),
+                )
                 .current_dir("client")
                 .spawn()
                 .expect("failed to execute process");
@@ -147,35 +352,103 @@ impl Into<OwshenPoint> for Point {
 async fn main() -> Result<()> {
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
 
-    let wallet = std::fs::read_to_string(&wallet_path)
-        .map(|s| {
-            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
-            w
-        })
-        .ok();
-
     let opt = OwshenCliOpt::from_args();
 
     match opt {
-        OwshenCliOpt::Init(InitOpt { endpoint }) => {
+        OwshenCliOpt::Init(InitOpt { endpoint, db }) => {
+            let wallet_path = db.unwrap_or(wallet_path.clone());
+            let wallet = std::fs::read_to_string(&wallet_path)
+                .map(|s| {
+                    let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+                    w
+                })
+                .ok();
             if wallet.is_none() {
+                let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+                let provider = Arc::new(provider);
+                let _token_address: H160 =
+                    H160::from_str("0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6").unwrap();
+
+                println!("Deploying hash function...");
+                let poseidon2_addr = deploy(
+                    provider.clone(),
+                    include_str!("assets/mimc7.abi"),
+                    include_str!("assets/mimc7.evm"),
+                )
+                .await
+                .address();
+
+                let accounts = provider.get_accounts().await.unwrap();
+                let from = accounts[0];
+
+                println!("Deploying DIVE token...");
+                let dive = DiveToken::deploy(
+                    provider.clone(),
+                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                )
+                .unwrap()
+                .legacy()
+                .from(from)
+                .send()
+                .await
+                .unwrap();
+
+                println!("Deploying Owshen contract...");
+                let owshen = Owshen::deploy(provider.clone(), poseidon2_addr)
+                    .unwrap()
+                    .legacy()
+                    .from(from)
+                    .send()
+                    .await
+                    .unwrap();
                 let wallet = Wallet {
                     priv_key: PrivateKey::generate(&mut rand::thread_rng()),
                     endpoint,
+                    owshen_contract_address: owshen.address(),
+                    owshen_contract_abi: owshen.abi().clone(),
+                    dive_contract_address: dive.address(),
+                    dive_contract_abi: dive.abi().clone(),
                 };
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
             }
         }
-        OwshenCliOpt::Wallet(WalletOpt {}) => {
+        OwshenCliOpt::Wallet(WalletOpt { db, port }) => {
+            let wallet_path = db.unwrap_or(wallet_path.clone());
+            let wallet = std::fs::read_to_string(&wallet_path)
+                .map(|s| {
+                    let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+                    w
+                })
+                .ok();
+
             if let Some(wallet) = &wallet {
-                serve_wallet(wallet.priv_key.clone().into()).await?;
+                let provider = Provider::<Http>::try_from(wallet.endpoint.clone()).unwrap();
+                let provider = Arc::new(provider);
+
+                serve_wallet(
+                    provider,
+                    port,
+                    wallet.priv_key.clone(),
+                    wallet.priv_key.clone().into(),
+                    wallet.owshen_contract_address,
+                    wallet.dive_contract_address,
+                    wallet.owshen_contract_abi.clone(),
+                    wallet.dive_contract_abi.clone(),
+                )
+                .await?;
             } else {
                 println!("Wallet is not initialized!");
             }
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
+            let wallet = std::fs::read_to_string(&wallet_path)
+                .map(|s| {
+                    let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+                    w
+                })
+                .ok();
             if let Some(wallet) = &wallet {
                 println!(
                     "Owshen Address: {}",
@@ -190,6 +463,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 use ethers::abi::Abi;
+use ethers::types::H160;
 
 async fn deploy(
     client: Arc<Provider<Http>>,
@@ -312,10 +586,12 @@ mod tests {
         };
         let port = 8545u16;
         let url = format!("http://localhost:{}", port).to_string();
-        let _ganache = Ganache::new().port(port).spawn();
+        //let _ganache = Ganache::new().port(port).spawn();
 
         let provider = Provider::<Http>::try_from(url).unwrap();
         let provider = Arc::new(provider);
+        let token_address: H160 =
+            H160::from_str("0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6").unwrap();
 
         let poseidon2_addr = deploy(
             provider.clone(),
@@ -343,7 +619,14 @@ mod tests {
         assert_eq!(root, smt.root().into());
 
         owshen
-            .deposit(pubkey.point.into(), ephkey.point.into())
+            .deposit(
+                pubkey.point.into(),
+                ephkey.point.into(),
+                token_address,
+                1000.into(),
+                H160::from_str("0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1").unwrap(),
+                owshen.address(),
+            )
             .legacy()
             .from(from)
             .send()
@@ -375,11 +658,15 @@ mod tests {
                     b: zkproof.b.into(),
                     c: zkproof.c.into(),
                 },
+                token_address,
+                1000.into(),
+                H160::from_str("0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1").unwrap(),
             )
             .legacy()
             .from(from)
             .send()
             .await
             .unwrap();
+        let nullifier = stealthpriv.nullifier(0);
     }
 }

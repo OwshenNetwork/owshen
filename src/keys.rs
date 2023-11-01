@@ -4,11 +4,11 @@ use ff::{Field, PrimeField, PrimeFieldBits};
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{Num, Zero};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
 use std::fmt::Display;
 use std::ops::{Add, Mul, Neg, Sub};
 use std::str::FromStr;
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Point {
     pub x: Fp,
@@ -101,7 +101,7 @@ pub struct PrivateKey {
     pub secret: Fp,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PublicKey {
     pub point: Point,
 }
@@ -144,7 +144,7 @@ impl PublicKey {
 }
 
 impl PrivateKey {
-    pub fn generate<R: Rng>(rng: &mut R) -> Self {
+    pub fn generate<R: Rng>(_rng: &mut R) -> Self {
         let rnd = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
         Self {
             secret: Fp::from_str_vartime(rnd.to_string().as_str()).unwrap(),
@@ -210,6 +210,41 @@ impl Display for PublicKey {
             write!(f, "{:02x}", byte)?;
         }
         Ok(())
+    }
+}
+
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+struct PublicKeyStr;
+
+impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<PublicKey, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(PublicKeyStr)
+    }
+}
+
+impl<'de> Visitor<'de> for PublicKeyStr {
+    type Value = PublicKey;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "expecting a string")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        PublicKey::from_str(s).map_err(|_| de::Error::invalid_value(de::Unexpected::Str(s), &self))
     }
 }
 
