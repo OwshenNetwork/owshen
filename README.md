@@ -1,6 +1,12 @@
 # The Owshen 🌊
 
-Owshen is the fanciest privacy solution ever built for Ethereum!
+Owshen is a privacy platform built for EVM-based blockchains. Owshen gathers multiple ideas around cryptocurrency privacy solutions in a single place to provide ultimate privacy.
+
+Using Owshen you can get a ***fixed*** Owshen address and start transacting with users inside/outside of the platform, without exposing:
+
+1. **Source** (Spend your coins using Zcash/TornadoCash-style merkle inclusion proofs, along with nullifiers)
+2. **Destination** (Monero-style stealth-addresses are generated each time you send your coins to someone)
+3. **Token/Amount** (These values are obfuscated and only the sender and receiver, who know a shared-secret, will be able to decode them)
 
 Join our Discord: [https://discord.gg/jMRRmANvf](https://discord.gg/jMRRmANvf)
 
@@ -20,60 +26,41 @@ Join our Discord: [https://discord.gg/jMRRmANvf](https://discord.gg/jMRRmANvf)
  - Initialize your pub/priv keys and deploying dependencies by running  `cargo run -- init --endpoint http://127.0.0.1:8545 --db test.json` (Your keys will be saved in `~/.owshen-wallet.json` - also you can running this command multiple times for testing purpose)
  - Run the wallet (GUI): `cargo run -- wallet --port 9000 --db test.json`
 
-## Abstract
+## How? :thinking_face: 
 
-Owshen is the very first implementation of an ***Anonymity Marketplace***. An Anonymity Marketplace is a market in which users metaphorically sell their identities, by mixing their identity into an anonymity pool. People who use this anonymity pool for the purpose of making their actions private (Buyers) will pay those who join the pool merely for increasing the size of the pool (Sellers). A large number of sellers will bring more buyers to the market (Given that the pool has got bigger thus more private), and a large number of buyers will bring more sellers (Since it gets very profitable to join as a seller). This whitepaper will discuss a practical implementation of such system using the help of zkSNARKs, and will analyze the dynamics of an Anonymity Marketplace.
+Owshen Platform is basically a smart-contract maintaining a Sparse-Merkle-Tree, very similar to TornadoCash, with one big difference. Instead of commitments (Which are hashes of secret values), elliptic-curve points (Public-keys) are stored in the leaves, and one can only spend a coin in case he proves that he knows a private-key $s$, where $s \times G$ ($G$ is a commonly agreed generator point) is a point that exists in the tree (Through a merkle-proof fed in a Zero-Knowledge proof circuit).
 
-Keywords: Privacy, Mixing, zkSNARK
+Fixed addresses are bad for the destination's privacy, a TornadoCash-style pool will only allow you to hide the sender, but everyone watching from outside can see that money is being sent to the receiver. We may solve this problem by requiring the receiver to generate a new address whenever he wants to receive a coin, but this would require the receiver to be online all the time. In case the receiver is someone accepting donations, it's easiest for him to announce a fixed address for receiving the donations.
 
-## Introduction
+Stealth-addresses solve this problem already: instead of requiring the receiver to generate a new address everytime he wants to receive the coin, we will let the sender 
 
-Launched in 2009, Bitcoin was the first cryptocurrency to use a decentralized blockchain to record transactions. Users were identified by alphanumeric addresses, claiming to provide some degree of pseudonymity. While transaction details were visible, the real-world identities of users remained private unless they were voluntarily disclosed. The advance of chain analysis methods made it much easier to find the source and destination of transactions, breaking the privacy guarantees that Bitcoin claimed to have in the first place.
+The sender will generate a random scalar $r$, and will broadcast the point $r \times G$ publicly. In this case, $s \times r \times G$ is a shared-secret between the sender and the receiver (Very similar to Diffie-Hellman key-exchange algorithm).  $s \times r \times G$ is an elliptic curve point, we can convert it to a scalar using a hash function, so that it can be used a private-key. The sender will send the coin to $(hash(s \times r \times G) + s)\times G$ instead of $s \times G$, and then the receiver would be able to detect incoming transactions and derive the corresponding private-keys of stealth-addresses: $hash(s \times r \times G) + s$.
 
-Right after Bitcoin, many cryptocurrency projects were built and introduced, bringing shinier privacy techniques on the table. The essence of many of those privacy techniques were essentially the same. They were trying to gather a lot of transactions together, and mix them into a single, hard to analyze, transaction. This is known as a CoinJoin in UTXO cryptocurrencies like Bitcoin.
+### Owshen's merkle-tree structure :evergreen_tree: 
 
-A significant concern in private cryptocurrencies, is the size of their anonymity sets. An anonymity set refers to the group of users or participants from which a particular transaction can originate, making it challenging to determine the true source of that transaction. The larger the anonymity set, the more difficult it becomes to trace specific transactions back to their origin. On the other hand, if the anonymity set is small, it reduces the effectiveness of privacy measures and increases the risk of transaction tracing. No matter how good and secure the privacy protocol is, if there are very few people using it, there is no privacy. 
+As previosuly said, a Sparse-Merkle-Tree is being maintained in Owshen platform's smart-contract, where each leaf is:
 
-The anonymity set can have different meanings in different privacy-oriented currencies. In case of a CoinJoin, the anonymity set is the users who participate in the CoinJoin. In case of a TornadoCash-style mixing pool on Etheruem, the anonymity-set is the users who have interactions with the pool's smart contract, and in case of a whole private cryptocurrency like Monero, the anonymity set is the users who use Monero.
+$hash({pub}_x,{pub}_y,token,amount)$
 
-Knowing the importance of the anonymity sets in privacy-preserving cryptocurrencies, we tried to design a incentive model that encourages people to join an anonymity-set even when they do not need the privacy guarantees that the pool gives to them. We designed our model as a TornadoCash-style smart contract deployed on a blockchain which has massive number of users. Our implmentation is almost identical with TornadoCash with some key differences:
+One can spend/withdraw a coin in the merkle-tree by proving:
 
-- There will be two kind of people using this platform:
-    - **Buyers**: They want to anonymize their funds.
-    - **Sellers**: They will help others to anonymize their funds.
-- People deposit a fixed amount of tokens to the contract, plus an anonymizing fee. E.g. 1ETH + 0.1ETH (Anonymizing fee)
-    - **NOTE:** Both **Buyers** and **Sellers** deposit same amount of ETH (1.1ETH) to the contract, so they are not distinguishable from the outside)
-    - We will also keep track of the number of deposits: `active_deposits += 1;`
-- The deposit commitments are saved on a sparse merkle tree besides their deposit date (Block number $b$) -> Leaf value: $H(b + H(s | 0))$:
-    - Secret $s$
-    - Commitment: $H(s | 0)$
-    - Nullifier: $H(s | 1)$
-    - Reward Nullifier: $H(s | 2 | m)$ (Where $m$ is the number of months past since the initial deposit)
-- There will be two types of withdrawals:
-    - **Withdrawal:** Prove that you know $s$ (Secret) where $H(s | 0)$ (Commitment to the secret) exists in the tree and its nullifier is $H(s | 1)$ which is not previously withdrawn, you will receive 1.0ETH. After revealing the nullifier, the [nullifier]th leaf of another sparse merkle tree will be flagged true.
-        - The number of active deposits decreases on withdrawals: `active_deposits -= 1;`
-    - **Reward Withdrawal:** Prove that you know $s$ (Secret) where $H(s | 0)$ (Commitment) exists in the tree, which its reward-nullifier is $H(s | 2 | m)$, and coinage is above a threshold, but $H(s | 1)$ (The nullifier of that secret) does not exist in nullifier sparse-merkle-tree (I.e. tokens are held and not withdrawn). Then you will receive `address(this).balance / active_deposits` worth of ETH. Notice that you can request a reward after every month, since a new reward-nullifier gets withdrawable for you per month you keep your funds on the contract. You can deposit once and have an steady stream of rewards which get withdrawable every month.
+ > I know a private key $s$ (Private), where there exists a leaf in tree with public-key $s \times G$, holding $amount$ of $token$.
 
-### Security analysis
+After each send, an event will be emitted, providing the data needed for the receiver to recognize his incoming transactions:
 
- - Input transactions are all 1.1ETH, so people can't tell whether an input is a Buyer or a Seller
- - Majority of output transactions are 1.0ETH, so people can't tell whether an output is a Buyer's output or part of Seller's reward.
- - Some output transactions will be (0.1 + r)ETH, which means that output belongs to an Seller, but people won't know it corresponds to which input.
+```solidity=
+event Sent(
+    Point pub_key, // g^(hash(g^sr) + s)
+    Point ephemeral, // g^r
+    uint256 encoded_token, // token + hash(g^sr)
+    uint256 encoded_amount // amount + hash(g^sr)
+);
+```
 
-## Calculations
+The shared secret between the sender and receiver is $hash(g^{sr})$. We can add the shared-secret to the token-id and amount in order to obfuscate them. ($p$ is the field-size)
 
-Here we provide calculation of Seller profits in case of different number of Buyers and Sellers. 
+${token}_{encoded} = ({token} + hash(g^{sr})) \mod p$
 
-| Buyers |   Sellers   |  Input  | Buyers Output | Anonymizer Reward |
-|--------|-------------|---------|---------------|-------------------|
-|    0   |     100     |   110$  |      0$       |  110/100 = 1.1$   |
-|    1   |      99     |   110$  |      1$       |   109/99 = 1.101$ |
-|   50   |      50     |   110$  |     50$       |    60/50 = 1.2$   |
-|   99   |       1     |   110$  |     99$       |     11/1 = 11.0$  |
-|  100   |       0     |   110$  |    100$       |         N/A       |
+${amount}_{encoded} = ({amount} + hash(g^{sr})) \mod p$
 
-The worst case is when all of the people participating in the protocol are sellers (I.e they are there to get revenue). In this case, they will get 0 reward and they will basically get their original money back.
-
-In case the number of Buyers and Sellers are equal, the profit of a seller is approximately: $\frac{f}{1 + f}$ where $f$ is the anonymizing fee. As an example, if anonymizing fee is 10% of the value deposited, the seller's profit would be: $\frac{0.1}{1+0.1} \simeq  0.091$, around 9%.
-
-And lastly, if the number of Buyers is much higher than the number of Sellers, there will be a big pool of rewards for Sellers to claim. Thus it's in their best interest to join the network as soon as possible and claim those rewards, leading to an increase in the size of the anonymity set, which will make the pool even more private.
+The receiver may subtract the shared secret from token/amount to calculate the leaf's actual token/amount and try to calculate the commitment. If the commitment he has calculated is equal with the commitment submitted on-chain, then 
