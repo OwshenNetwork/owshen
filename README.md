@@ -26,7 +26,7 @@ Join our Discord: [https://discord.gg/jMRRmANvf](https://discord.gg/jMRRmANvf)
  - Initialize your pub/priv keys and deploying dependencies by running  `cargo run -- init --endpoint http://127.0.0.1:8545 --db test.json` (Your keys will be saved in `~/.owshen-wallet.json` - also you can running this command multiple times for testing purpose)
  - Run the wallet (GUI): `cargo run -- wallet --port 9000 --db test.json`
 
-## How? :thinking_face: 
+## How? 🤔
 
 Owshen Platform is basically a smart-contract maintaining a Sparse-Merkle-Tree, very similar to TornadoCash, with one big difference. Instead of commitments (Which are hashes of secret values), elliptic-curve points (Public-keys) are stored in the leaves, and one can only spend a coin in case he proves that he knows a private-key $s$, where $s \times G$ ($G$ is a commonly agreed generator point) is a point that exists in the tree (Through a merkle-proof fed in a Zero-Knowledge proof circuit).
 
