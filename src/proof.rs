@@ -11,7 +11,7 @@ use eyre::Result;
 
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-
+use std::str::FromStr;
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Proof {
     pub a: [U256; 2],
@@ -24,12 +24,22 @@ use std::io::Write;
 use std::path::Path;
 use tempfile::NamedTempFile;
 
-pub fn prove<P: AsRef<Path>>(params: P, index: u32, secret: Fp, proof: [Fp; 32]) -> Result<Proof> {
+pub fn prove<P: AsRef<Path>>(
+    params: P,
+    index: u32,
+    token_address: U256,
+    amount: U256,
+    secret: Fp,
+    proof: [Fp; 32],
+) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
+
     write!(
         inputs_file,
-        "{{ \"index\": \"{:?}\", \"secret\": \"{:?}\", \"proof\": [{}] }}",
+        "{{ \"index\": \"{:?}\", \"token_address\": \"{:?}\", \"amount\": \"{:?}\", \"secret\": \"{:?}\", \"proof\": [{}] }}",
         index,
+        BigUint::from_str(&token_address.to_string()).unwrap(),
+        BigUint::from_str(&amount.to_string()).unwrap(),
         BigUint::from_bytes_le(secret.to_repr().as_ref()),
         proof
             .iter()

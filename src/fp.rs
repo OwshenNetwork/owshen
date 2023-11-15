@@ -1,8 +1,10 @@
 use ethers::prelude::*;
 use ff::PrimeField;
 use num_bigint::BigUint;
+use num_traits::Num;
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(PrimeField)]
 #[PrimeFieldModulus = "21888242871839275222246405745257275088548364400416034343698204186575808495617"]
@@ -17,6 +19,19 @@ impl Into<U256> for Fp {
             16,
         )
         .unwrap()
+    }
+}
+
+impl FromStr for Fp {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let num = BigUint::from_str_radix(s, 10).map_err(|_| ())?;
+        let repr_bytes = num.to_bytes_le();
+        let mut repr = FpRepr::default();
+        let len = repr_bytes.len().min(repr.as_ref().len());
+        repr.as_mut()[..len].copy_from_slice(&repr_bytes[..len]);
+        Ok(Fp::from_repr(repr).unwrap())
     }
 }
 

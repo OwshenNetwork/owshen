@@ -26,14 +26,16 @@ contract Owshen {
         uint256 index,
         uint256 timestamp,
         uint256 _amount,
-        address _tokenAddress
+        address _tokenAddress,
+        uint256 _leaf,
+        uint256 _unit_token_address
     );
+
     event Withdraw(uint256 nullifier);
     event Deposit(Point indexed pub_key, Point ephemeral, uint256 nullifier);
 
     CoinWithdrawVerifier coin_withdraw_verifier;
     mapping(uint256 => bool) nullifiers;
-    mapping(bytes32 => bool) public commitments;
 
     MiMC mimc;
     SparseMerkleTree tree;
@@ -56,7 +58,10 @@ contract Owshen {
         address _from,
         address _to
     ) public payable {
-        uint256 leaf = mimc.hashLeftRight(_pub_key.x, _pub_key.y);
+        uint256 hash1 = mimc.hashLeftRight(_pub_key.x, _pub_key.y);
+        uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
+        uint256 hash2 = mimc.hashLeftRight(_amount, uint_tokenaddress);
+        uint256 leaf = mimc.hashLeftRight(hash1, hash2);
         tree.set(depositIndex, leaf);
         _processDeposit(_from, _to, _tokenAddress, _amount);
         emit Sent(
@@ -65,7 +70,9 @@ contract Owshen {
             depositIndex,
             block.timestamp,
             _amount,
-            _tokenAddress
+            _tokenAddress,
+            leaf,
+            uint_tokenaddress
         );
         depositIndex += 1;
     }
@@ -104,21 +111,6 @@ contract Owshen {
         );
     }
 
-    function send(
-        uint256 nullifier,
-        Proof calldata proof,
-        Point calldata pub_key,
-        Point calldata ephemeral,
-        address _tokenAddress,
-        uint256 _amount,
-        address _from,
-        address _to
-    ) public {
-        spend(nullifier, proof);
-        deposit(pub_key, ephemeral, _tokenAddress, _amount, _from, _to);
-        emit Deposit(pub_key, ephemeral, nullifier);
-    }
-
     function withdraw(
         uint256 nullifier,
         Proof calldata proof,
@@ -151,5 +143,11 @@ contract Owshen {
 
     function root() public view returns (uint256) {
         return tree.root();
+    }
+
+    function getUintTokenAddress(
+        address _token_address
+    ) private pure returns (uint256) {
+        return uint256(uint160(_token_address));
     }
 }

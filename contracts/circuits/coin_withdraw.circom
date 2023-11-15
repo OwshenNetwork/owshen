@@ -16,6 +16,8 @@ template CSwap() {
 
 template CoinWithdraw() {
     signal input index;
+    signal input token_address;
+    signal input amount;
     signal input secret;
     signal input proof[32];
     signal output root;
@@ -28,10 +30,22 @@ template CoinWithdraw() {
     
     component pk = BabyPbk();
     pk.in <== secret;
-    component commiter = Hasher();
-    commiter.left <== pk.Ax;
-    commiter.right <== pk.Ay;
-    inters[0] <== commiter.hash;
+
+    component commiter_hash1 = Hasher();
+    component commiter_hash2 = Hasher();
+
+    commiter_hash1.left <== pk.Ax;
+    commiter_hash1.right <== pk.Ay;
+
+    commiter_hash2.left <== amount;
+    commiter_hash2.right <== token_address;
+
+    component combine_hash = Hasher();
+    
+    combine_hash.left <== commiter_hash1.hash;
+    combine_hash.right <== commiter_hash2.hash;
+
+    inters[0] <== combine_hash.hash;
 
     component nullifier_hasher = Hasher();
     nullifier_hasher.left <== secret;

@@ -1,10 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 * {
-  font-family: "JetBrains Mono", monospace;
-  margin: 0;
-  padding: 0;
-  border: none;
+  font-family: "JetBrains Mono";
 }
-button {
+body {
+  background: #e9e9e9;
+}
+/* button {
   color: inherit;
   text-decoration: inherit;
   border: 2px solid black;
@@ -18,12 +22,8 @@ button:hover {
   background-color: black;
   text-decoration: inherit;
   cursor: pointer;
-}
-input,
-select {
-  background-color: inherit;
-  border: 1px solid black;
-}
+} */
+
 .modal {
   display: none;
   position: fixed;
@@ -33,15 +33,17 @@ select {
   width: 100%;
   height: 100%;
   overflow: auto;
+  backdrop-filter: blur(4px);
+  background: #0000005c;
 }
-.modal-content {
+/* .modal-content {
   border: 2px solid black;
   text-align: center;
   width: 30vw;
   padding: 1em;
   margin: 15% auto;
   background-color: white;
-}
+} */
 .close-btn-container {
   display: flex;
   justify-content: center;

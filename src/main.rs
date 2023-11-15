@@ -8,8 +8,9 @@ mod tree;
 extern crate lazy_static;
 
 use axum::{extract, response::Json, routing::get, Router};
-use bindings::dive_token::DiveToken;
 use bindings::owshen::{Owshen, Point as OwshenPoint, SentFilter, WithdrawFilter};
+use bindings::simple_erc_20::SimpleErc20;
+
 use tower_http::cors::CorsLayer;
 
 use ethers::prelude::*;
@@ -64,10 +65,11 @@ enum OwshenCliOpt {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct GetInfoResponse {
     address: PublicKey,
-    dive_abi: Abi,
-    dive_address: H160,
-    contract_address: H160,
-    contract_abi: Abi,
+    erc20_abi: Abi,
+    dive_contract: H160,
+    owshen_contract: H160,
+    owshen_abi: Abi,
+    token_contracts: Vec<H160>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,6 +92,7 @@ struct GetWithdrawRequest {
 pub struct Coin {
     pub index: U256,
     pub token: H160,
+    pub uint_token: U256,
     pub amount: U256,
     pub priv_key: PrivateKey,
     pub pub_key: PublicKey,
@@ -114,7 +117,8 @@ struct Wallet {
     dive_contract_address: H160,
     owshen_contract_address: H160,
     owshen_contract_abi: Abi,
-    dive_contract_abi: Abi,
+    erc20_abi: Abi,
+    token_contracts: Vec<H160>,
 }
 
 struct Context {
@@ -131,14 +135,15 @@ async fn serve_wallet(
     port: u16,
     priv_key: PrivateKey,
     pub_key: PublicKey,
-    owshen_address: H160,
-    dive_address: H160,
+    owshen_contract: H160,
+    dive_contract: H160,
     abi: Abi,
-    dive_abi: Abi,
+    erc20_abi: Abi,
+    token_contracts: Vec<H160>,
 ) -> Result<()> {
     let info_addr = pub_key.clone();
-    let coins_owshen_address = owshen_address.clone();
-    let div_address = dive_address.clone();
+    let coins_owshen_address = owshen_contract.clone();
+    let div_address = dive_contract.clone();
     let coins_owshen_abi = abi.clone();
     let tree: SparseMerkleTree = SparseMerkleTree::new(32);
     let context = Arc::new(Mutex::new(Context {
@@ -156,12 +161,13 @@ async fn serve_wallet(
         .route(
             "/coins",
             get(move || async move {
-                let mut my_coins = Vec::new();
+                let mut my_coins: Vec<Coin> = Vec::new();
                 let mut tree = SparseMerkleTree::new(32);
                 for sent_event in contract_clone
                     .event::<SentFilter>()
                     .from_block(0)
-                    .to_block(100)
+                    .to_block(1000)
+                    .address(ValueOrArray::Value(contract_clone.address()))
                     .query()
                     .await
                     .unwrap()
@@ -178,16 +184,15 @@ async fn serve_wallet(
                     let stealth_pub: PublicKey = stealth_priv.clone().into();
                     let index: U256 = sent_event.index;
                     let u64_index: u64 = index.low_u64();
-                    tree.set(
-                        u64_index,
-                        crate::hash::hash(stealth_pub.point.x, stealth_pub.point.y),
-                    );
+                    let leaf = Fp::from_str(&U256::to_string(&sent_event.leaf));
+                    tree.set(u64_index, leaf.unwrap());
 
                     if stealth_pub.point == pubkey {
                         println!("ITS FOR US! :O");
                         my_coins.push(Coin {
                             index,
                             token: div_address,
+                            uint_token: sent_event.unit_token_address,
                             amount: sent_event.amount,
                             nullifier: stealth_priv.nullifier(index.low_u32()).into(),
                             priv_key: stealth_priv,
@@ -246,10 +251,13 @@ async fn serve_wallet(
                             let u64_index: u64 = index.low_u64();
                             // get merkle proof
                             let merkle_proof = merkle_root.get(u64_index);
-                            // make proof
+                            let token_address: U256 = coin.uint_token;
+                            let amount: U256 = coin.amount;
                             let proof: std::result::Result<Proof, eyre::Error> = prove(
                                 PARAMS_FILE,
                                 u32_index,
+                                token_address,
+                                amount,
                                 coin.priv_key.secret,
                                 merkle_proof.proof.try_into().unwrap(),
                             );
@@ -303,10 +311,11 @@ async fn serve_wallet(
             get(move || async move {
                 Json(GetInfoResponse {
                     address: info_addr,
-                    dive_address: dive_address,
-                    dive_abi: dive_abi,
-                    contract_address: owshen_address,
-                    contract_abi: abi,
+                    dive_contract,
+                    erc20_abi,
+                    owshen_contract,
+                    owshen_abi: abi,
+                    token_contracts,
                 })
             }),
         )
@@ -366,9 +375,6 @@ async fn main() -> Result<()> {
             if wallet.is_none() {
                 let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
                 let provider = Arc::new(provider);
-                let _token_address: H160 =
-                    H160::from_str("0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6").unwrap();
-
                 println!("Deploying hash function...");
                 let poseidon2_addr = deploy(
                     provider.clone(),
@@ -382,9 +388,43 @@ async fn main() -> Result<()> {
                 let from = accounts[0];
 
                 println!("Deploying DIVE token...");
-                let dive = DiveToken::deploy(
+                let dive = SimpleErc20::deploy(
                     provider.clone(),
-                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                    (
+                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                        String::from_str("dive_token").unwrap(),
+                        String::from_str("DIVE").unwrap(),
+                    ),
+                )
+                .unwrap()
+                .legacy()
+                .from(from)
+                .send()
+                .await
+                .unwrap();
+                println!("Deploying test tokens...");
+                let test_token = SimpleErc20::deploy(
+                    provider.clone(),
+                    (
+                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                        String::from_str("test_token").unwrap(),
+                        String::from_str("TEST").unwrap(),
+                    ),
+                )
+                .unwrap()
+                .legacy()
+                .from(from)
+                .send()
+                .await
+                .unwrap();
+
+                let second_test_token = SimpleErc20::deploy(
+                    provider.clone(),
+                    (
+                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                        String::from_str("test_token").unwrap(),
+                        String::from_str("TEST").unwrap(),
+                    ),
                 )
                 .unwrap()
                 .legacy()
@@ -407,7 +447,8 @@ async fn main() -> Result<()> {
                     owshen_contract_address: owshen.address(),
                     owshen_contract_abi: owshen.abi().clone(),
                     dive_contract_address: dive.address(),
-                    dive_contract_abi: dive.abi().clone(),
+                    erc20_abi: dive.abi().clone(),
+                    token_contracts: vec![test_token.address(), second_test_token.address()],
                 };
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
@@ -435,7 +476,8 @@ async fn main() -> Result<()> {
                     wallet.owshen_contract_address,
                     wallet.dive_contract_address,
                     wallet.owshen_contract_abi.clone(),
-                    wallet.dive_contract_abi.clone(),
+                    wallet.erc20_abi.clone(),
+                    wallet.token_contracts.clone(),
                 )
                 .await?;
             } else {
@@ -487,6 +529,7 @@ mod tests {
     use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
     use ethers::abi::Abi;
     use ethers::utils::Ganache;
+    use k256::elliptic_curve::consts::U25;
     use std::sync::Arc;
 
     use ethers::core::types::Bytes;
@@ -643,6 +686,8 @@ mod tests {
         let zkproof = prove(
             PARAMS_FILE,
             0,
+            U256::from_str("0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1").unwrap(),
+            1000.into(),
             stealthpriv.secret,
             merkle_proof.proof.try_into().unwrap(),
         )

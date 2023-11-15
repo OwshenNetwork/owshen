@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Web3 from "web3";
 import Web3Modal from "web3modal";
+import WalletIcon from "../../pics/icons/account_balance_wallet.svg";
+import CopyIcon from "../../pics/icons/copy.svg";
 
 import "./style.css";
 import { setUserDetails } from "../../store/containerSlice";
@@ -30,6 +32,8 @@ const Web3ModalComponent = () => {
     setAccount(accounts[0]);
     dispatch(setUserDetails({ address: accounts[0] }));
   };
+  const buttonClass =
+    "border w-52 rounded-2xl px-3 py-2 mt-3  ease-in-out duration-300 justify-center flex";
 
   const disconnectWallet = async () => {
     if (provider.close) {
@@ -44,18 +48,35 @@ const Web3ModalComponent = () => {
     setAccount(null);
   };
 
+  function shortenAddress(address) {
+    const firstPart = address.substring(0, 6);
+    const lastPart = address.substring(address.length - 4);
+    return `${firstPart}...${lastPart}`;
+  }
+
   if (!account) {
     return (
-      <button className="connect-btn" onClick={connectWallet}>
-        Connect Wallet
+      <button
+        className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  flex items-center justify-around`}
+        onClick={connectWallet}
+      >
+        <img  src={WalletIcon} width="20px" />
+        <p>Connect Wallet</p>
       </button>
     );
   }
 
   return (
-    <div className="disconnect-container">
-      <p>Account: {account}</p>
-      <button onClick={disconnectWallet}>Disconnect Wallet</button>
+    <div>
+      {/* <div className="border rounded-2xl px-3 py-2 mt-3  bg-[#BBDCFBCC] ease-in-out duration-300  flex">
+        {shortenAddress(account)}
+        <img className="ml-2" src={CopyIcon} /> </div> */}
+      <button
+        className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] `}
+        onClick={disconnectWallet}
+      >
+        Disconnect Wallet
+      </button>
     </div>
   );
 };

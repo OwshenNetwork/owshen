@@ -1,4 +1,5 @@
 import { createSlice, createSelector } from "@reduxjs/toolkit";
+import { toBigInt } from "ethers";
 
 const containerSlice = createSlice({
   name: "container",
@@ -9,7 +10,7 @@ const containerSlice = createSlice({
       image: null,
       nonce: null,
       // network main balances
-      balances: null,
+      owshenBalance: {},
       availableBalances: null,
       chainDetails: null,
       sentCoins: [],
@@ -21,6 +22,8 @@ const containerSlice = createSlice({
       contract_abi: null,
       dive_address: null,
       dive_abi: null,
+      token_contracts: [],
+      selected_token_contract: null,
     },
   },
   reducers: {
@@ -35,15 +38,42 @@ const containerSlice = createSlice({
     },
     setReceivedCoins(state, { payload }) {
       state.user.receivedCoins = payload;
+
+      const seenIndexes = new Set();
+      let totalAmount = 0;
+
+      payload?.forEach((coin) => {
+        const amount = toBigInt(coin.amount).toString();
+        if (!seenIndexes.has(coin.index)) {
+          seenIndexes.add(coin.index);
+          totalAmount += Number(amount);
+          console.log("total amount", totalAmount);
+          state.user.owshenBalance.ETH += totalAmount;
+        }
+      });
     },
-    setOwshen(state, { payload }) {
-      state.owshen = {
-        wallet: payload.wallet,
-        contract_address: payload.contract_address,
-        contract_abi: payload.contract_abi,
-        dive_address: payload.dive_address,
-        dive_abi: payload.dive_abi,
-      };
+
+    setOwshen(state, action) {
+      switch (action.payload.type) {
+        case "SET_OWSHEN":
+          return {
+            ...state,
+            owshen: {
+              ...state.owshen,
+              ...action.payload.payload,
+            },
+          };
+        case "SET_SELECT_TOKEN_CONTRACT":
+          return {
+            ...state,
+            owshen: {
+              ...state.owshen,
+              selected_token_contract: action.payload.payload,
+            },
+          };
+        default:
+          return state;
+      }
     },
   },
 });
@@ -51,6 +81,11 @@ const containerSlice = createSlice({
 export const selectUserAddress = createSelector(
   (state) => state.container.user.address,
   (address) => address
+);
+
+export const selectUserOwshenBalance = createSelector(
+  (state) => state.container.user.owshenBalance,
+  (OB) => OB
 );
 
 export const selectReceivedCoins = createSelector(
