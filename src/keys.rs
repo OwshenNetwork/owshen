@@ -1,5 +1,5 @@
 use crate::fp::Fp;
-use crate::hash::hash;
+use crate::hash::hash4;
 use ff::{Field, PrimeField, PrimeFieldBits};
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{Num, Zero};
@@ -137,9 +137,18 @@ impl PublicKey {
         let r = Fp::random(rng);
         let ephemeral = *BASE * r;
         let shared_secret = self.point * r;
-        let shared_secret_hash = hash(shared_secret.x, shared_secret.y);
+        let shared_secret_hash = hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
         let pub_key = self.point + *BASE * shared_secret_hash;
         (EphemeralKey { point: ephemeral }, Self { point: pub_key })
+    }
+
+    pub fn null() -> Self {
+        Self {
+            point: Point {
+                x: 0.into(),
+                y: 0.into(),
+            },
+        }
     }
 }
 
@@ -152,7 +161,7 @@ impl PrivateKey {
     }
     pub fn derive(&self, eph: EphemeralKey) -> Self {
         let shared_secret = eph.point * self.secret;
-        let shared_secret_hash = hash(shared_secret.x, shared_secret.y);
+        let shared_secret_hash = hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
         let secret = BigUint::from_bytes_le(self.secret.to_repr().as_ref());
         let shared_secret = BigUint::from_bytes_le(shared_secret_hash.to_repr().as_ref());
         let stealth_secret = Fp::from_str_vartime(
@@ -169,7 +178,7 @@ impl PrivateKey {
         cipher.b - cipher.a * self.secret
     }
     pub fn nullifier(&self, index: u32) -> Fp {
-        hash(self.secret, Fp::from(index as u64))
+        hash4([self.secret, Fp::from(index as u64), 0.into(), 0.into()])
     }
 }
 

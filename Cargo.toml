@@ -8,7 +8,7 @@ ff = { version = "0.13", features = ["derive", "derive_bits"] }
 bindings = { path = "./bindings" }
 ethers = { version = "2", default-features = false, features = ["rustls"] }
 eyre = "0.6"
-tokio = { version = "1.30.0", features = ["macros", "rt", "rt-multi-thread"] }
+tokio = { version = "1.30.0", features = ["macros", "rt", "rt-multi-thread", "time"] }
 rand = "0.8"
 num-bigint = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"

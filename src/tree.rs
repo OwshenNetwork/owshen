@@ -1,5 +1,5 @@
 use crate::fp::Fp;
-use crate::hash::hash;
+use crate::hash::hash4;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct SparseMerkleTree {
 #[derive(Debug, Clone)]
 pub struct MerkleProof {
     pub value: Fp,
-    pub proof: Vec<Fp>,
+    pub proof: Vec<[Fp; 3]>,
 }
 
 impl SparseMerkleTree {
@@ -22,7 +22,7 @@ impl SparseMerkleTree {
     pub fn new(depth: usize) -> Self {
         let mut defaults = vec![Fp::from(0)];
         for i in 0..depth {
-            defaults.push(hash(defaults[i], defaults[i]));
+            defaults.push(hash4([defaults[i], defaults[i], defaults[i], defaults[i]]));
         }
         Self {
             defaults,
@@ -37,23 +37,30 @@ impl SparseMerkleTree {
     }
 
     pub fn set(&mut self, mut index: u64, mut value: Fp) {
-        for i in 0..self.depth() + 1 {
-            self.layers[i].insert(index, value);
-            value = if index % 2 == 0 {
-                hash(value, self.get_at_layer(i, index + 1))
-            } else {
-                hash(self.get_at_layer(i, index - 1), value)
-            };
-            index /= 2;
+        for layer in 0..self.depth() + 1 {
+            self.layers[layer].insert(index, value);
+
+            let leftmost_leaf = index - (index % 4);
+            let mut vals = (0..4)
+                .map(|i| self.get_at_layer(layer, leftmost_leaf + i as u64))
+                .collect::<Vec<_>>();
+            vals[(index % 4) as usize] = value;
+            value = hash4(vals.try_into().unwrap());
+            index /= 4;
         }
     }
 
     pub fn get(&self, mut index: u64) -> MerkleProof {
         let value = self.get_at_layer(0, index);
         let mut proof = vec![];
-        for i in 0..self.depth() {
-            proof.push(self.get_at_layer(i, if index % 2 == 0 { index + 1 } else { index - 1 }));
-            index /= 2;
+        for layer in 0..self.depth() {
+            let leftmost_leaf = index - (index % 4);
+            let mut vals = (0..4)
+                .map(|i| self.get_at_layer(layer, leftmost_leaf + i as u64))
+                .collect::<Vec<_>>();
+            vals.remove((index % 4) as usize);
+            proof.push(vals.try_into().unwrap());
+            index /= 4;
         }
         MerkleProof { value, proof }
     }
@@ -67,12 +74,10 @@ impl SparseMerkleTree {
     pub fn verify(root: Fp, mut index: u64, proof: &MerkleProof) -> bool {
         let mut value = proof.value;
         for p in proof.proof.iter() {
-            value = if index % 2 == 0 {
-                hash(value, *p)
-            } else {
-                hash(*p, value)
-            };
-            index /= 2;
+            let mut vals = p.to_vec();
+            vals.insert((index % 4) as usize, value);
+            value = hash4(vals.try_into().unwrap());
+            index /= 4;
         }
         value == root
     }
@@ -85,15 +90,15 @@ mod tests {
 
     #[test]
     fn test_merkle_trees() {
-        let mut tree = SparseMerkleTree::new(32);
+        let mut tree = SparseMerkleTree::new(16);
         tree.set(123, Fp::from(234));
         tree.set(345, Fp::from(456));
-        assert_eq!(
-            tree.root(),
-            Fp::from_str_vartime(
-                "15901536096620855161893017204769913722630450952860564330042326739189738305463"
-            )
-            .unwrap()
-        );
+        let res = tree.get(123);
+        let res2 = tree.get(345);
+        let res3 = tree.get(200);
+        assert!(SparseMerkleTree::verify(tree.root(), 123, &res));
+        assert!(SparseMerkleTree::verify(tree.root(), 345, &res2));
+        assert!(SparseMerkleTree::verify(tree.root(), 200, &res3));
+        assert!(!SparseMerkleTree::verify(tree.root(), 123, &res2));
     }
 }

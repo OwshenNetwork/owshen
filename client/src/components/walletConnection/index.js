@@ -60,7 +60,7 @@ const Web3ModalComponent = () => {
         className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  flex items-center justify-around`}
         onClick={connectWallet}
       >
-        <img  src={WalletIcon} width="20px" />
+        <img src={WalletIcon} width="20px" />
         <p>Connect Wallet</p>
       </button>
     );

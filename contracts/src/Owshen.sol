@@ -9,6 +9,7 @@ import "openzeppelin-contracts/contracts/utils/Strings.sol";
 
 contract Owshen {
     using Strings for uint256;
+
     struct Proof {
         uint256[2] a;
         uint256[2][2] b;
@@ -20,33 +21,32 @@ contract Owshen {
         uint256 y;
     }
 
-    event Sent(
-        Point pub_key,
+    event Sent( // directed or obfuscated
+        // directed or obfuscated
         Point ephemeral,
         uint256 index,
         uint256 timestamp,
-        uint256 _amount,
-        address _tokenAddress,
-        uint256 _leaf,
-        uint256 _unit_token_address
+        uint256 _hint_amount,
+        uint256 _hint_tokenAddress,
+        uint256 _commitment
     );
 
-    event Withdraw(uint256 nullifier);
+    event Spend(uint256 nullifier);
     event Deposit(Point indexed pub_key, Point ephemeral, uint256 nullifier);
 
     CoinWithdrawVerifier coin_withdraw_verifier;
     mapping(uint256 => bool) nullifiers;
 
-    MiMC mimc;
+    IHasher mimc;
     SparseMerkleTree tree;
     uint256 public depositIndex = 0;
 
     /**
-     @dev The constructor
-    */
+     * @dev The constructor
+     */
     constructor(IHasher _hasher) {
         tree = new SparseMerkleTree(_hasher);
-        mimc = new MiMC(_hasher);
+        mimc = _hasher;
         coin_withdraw_verifier = new CoinWithdrawVerifier();
     }
 
@@ -58,54 +58,30 @@ contract Owshen {
         address _from,
         address _to
     ) public payable {
-        uint256 hash1 = mimc.hashLeftRight(_pub_key.x, _pub_key.y);
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
-        uint256 hash2 = mimc.hashLeftRight(_amount, uint_tokenaddress);
-        uint256 leaf = mimc.hashLeftRight(hash1, hash2);
+        uint256 leaf = mimc.poseidon([_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]);
         tree.set(depositIndex, leaf);
         _processDeposit(_from, _to, _tokenAddress, _amount);
-        emit Sent(
-            _pub_key,
-            ephemeral,
-            depositIndex,
-            block.timestamp,
-            _amount,
-            _tokenAddress,
-            leaf,
-            uint_tokenaddress
-        );
+        emit Sent(ephemeral, depositIndex, block.timestamp, _amount, uint_tokenaddress, leaf);
         depositIndex += 1;
     }
 
     function getPointKey(Point memory _pub_key) public pure returns (bytes32) {
-        string memory keyString = string(
-            abi.encodePacked(_pub_key.x.toString(), ",", _pub_key.y.toString())
-        );
+        string memory keyString = string(abi.encodePacked(_pub_key.x.toString(), ",", _pub_key.y.toString()));
         return keccak256(abi.encodePacked(keyString));
     }
 
-    function _processDeposit(
-        address _from,
-        address _to,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(
-            msg.value == 0,
-            "ETH value is supposed to be 0 for ERC20 instance"
-        );
+    function _processDeposit(address _from, address _to, address _token, uint256 _amount) internal {
+        require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
         IERC20(_token).transferFrom(_from, _to, _amount);
     }
 
-    function spend(uint256 nullifier, Proof calldata proof) internal {
+    function spend(uint256 nullifier, Proof calldata proof, uint256 _commitment, uint256 _commitment2) internal {
         require(!nullifiers[nullifier], "Nullifier has been spent");
         nullifiers[nullifier] = true;
         require(
             coin_withdraw_verifier.verifyProof(
-                proof.a,
-                proof.b,
-                proof.c,
-                [root(), nullifier]
+                proof.a, proof.b, proof.c, [root(), nullifier, _commitment, _commitment2]
             ),
             "Invalid proof"
         );
@@ -113,26 +89,66 @@ contract Owshen {
 
     function withdraw(
         uint256 nullifier,
+        Point calldata _ephemeral,
         Proof calldata proof,
         address _tokenAddress,
         uint256 _amount,
-        address _to
+        uint256 _obfuscated_remaining_amount,
+        address _to,
+        uint256 _commitment
     ) public {
-        spend(nullifier, proof);
+        uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
+        uint256 commitment2 = mimc.poseidon([0, 0, _amount, uint_tokenaddress]);
+        spend(nullifier, proof, commitment2, _commitment);
+        tree.set(depositIndex, _commitment);
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
-        emit Withdraw(nullifier);
+        emit Sent(
+            _ephemeral, depositIndex, block.timestamp, _obfuscated_remaining_amount, uint_tokenaddress, _commitment
+        );
+        emit Spend(nullifier);
+        depositIndex += 1;
     }
 
-    /** @dev whether a nullifier is already spent */
+    function send(
+        uint256 nullifier,
+        Proof calldata proof,
+        Point calldata receiver_ephemeral,
+        Point calldata sender_ephemeral,
+        uint256 _commitment1,
+        uint256 _commitment2,
+        uint256 _token_address_hint,
+        uint256 _receiver_amount_hint,
+        uint256 _sender_amount_hint,
+        bool isDualOutput
+    ) public {
+        spend(nullifier, proof, _commitment2, _commitment1);
+        tree.set(depositIndex, _commitment2);
+        emit Sent(
+            receiver_ephemeral, depositIndex, block.timestamp, _receiver_amount_hint, _token_address_hint, _commitment2
+        );
+        depositIndex += 1;
+        if (isDualOutput) {
+            tree.set(depositIndex, _commitment1);
+            emit Sent(
+                sender_ephemeral, depositIndex, block.timestamp, _sender_amount_hint, _token_address_hint, _commitment1
+            );
+            depositIndex += 1;
+        }
+        emit Spend(nullifier);
+    }
+
+    /**
+     * @dev whether a nullifier is already spent
+     */
     function isSpent(uint256 _nullifierHash) public view returns (bool) {
         return nullifiers[_nullifierHash];
     }
 
-    /** @dev whether an array of nullifiers is already spent */
-    function isSpentArray(
-        uint256[] calldata _nullifierHashes
-    ) external view returns (bool[] memory spent) {
+    /**
+     * @dev whether an array of nullifiers is already spent
+     */
+    function isSpentArray(uint256[] calldata _nullifierHashes) external view returns (bool[] memory spent) {
         spent = new bool[](_nullifierHashes.length);
         for (uint256 i = 0; i < _nullifierHashes.length; i++) {
             if (isSpent(_nullifierHashes[i])) {
@@ -145,9 +161,7 @@ contract Owshen {
         return tree.root();
     }
 
-    function getUintTokenAddress(
-        address _token_address
-    ) private pure returns (uint256) {
+    function getUintTokenAddress(address _token_address) private pure returns (uint256) {
         return uint256(uint160(_token_address));
     }
 }

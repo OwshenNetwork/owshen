@@ -1,4 +1,5 @@
 use crate::fp::Fp;
+use crate::keys::PublicKey;
 
 use ff::PrimeField;
 
@@ -29,33 +30,82 @@ pub fn prove<P: AsRef<Path>>(
     index: u32,
     token_address: U256,
     amount: U256,
+    new_amount1: U256,
+    new_amount2: U256,
+    address_1: PublicKey,
+    address_2: PublicKey,
     secret: Fp,
-    proof: [Fp; 32],
+    proof: [[Fp; 3]; 16],
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
 
-    write!(
-        inputs_file,
-        "{{ \"index\": \"{:?}\", \"token_address\": \"{:?}\", \"amount\": \"{:?}\", \"secret\": \"{:?}\", \"proof\": [{}] }}",
+    println!(
+        "proof {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
         index,
         BigUint::from_str(&token_address.to_string()).unwrap(),
         BigUint::from_str(&amount.to_string()).unwrap(),
+        BigUint::from_str(&new_amount1.to_string()).unwrap(),
+        BigUint::from_str(&new_amount2.to_string()).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_1.point.x.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_1.point.y.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_2.point.x.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_2.point.y.into())).unwrap(),
+    );
+
+    let json_input = format!(
+        "{{ \"index\": \"{:?}\", 
+        \"token_address\": \"{:?}\", 
+        \"amount\": \"{:?}\", 
+        \"new_amount1\": \"{:?}\", 
+        \"new_amount2\": \"{:?}\", 
+        \"pk_ax1\": \"{:?}\", 
+        \"pk_ay1\": \"{:?}\", 
+        \"pk_ax2\": \"{:?}\", 
+        \"pk_ay2\": \"{:?}\", 
+        \"secret\": \"{:?}\", 
+        \"proof\": [{}] }}",
+        index,
+        BigUint::from_str(&token_address.to_string()).unwrap(),
+        BigUint::from_str(&amount.to_string()).unwrap(),
+        BigUint::from_str(&new_amount1.to_string()).unwrap(),
+        BigUint::from_str(&new_amount2.to_string()).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_1.point.x.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_1.point.y.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_2.point.x.into())).unwrap(),
+        BigUint::from_str(&U256::to_string(&address_2.point.y.into())).unwrap(),
         BigUint::from_bytes_le(secret.to_repr().as_ref()),
         proof
             .iter()
             .map(|p| format!(
-                "\"{}\"",
-                BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()
+                "[{}]",
+                p.iter()
+                    .map(|p| format!(
+                        "\"{}\"",
+                        BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(",")
             ))
             .collect::<Vec<_>>()
             .join(",")
-    )?;
+    );
+
+    write!(inputs_file, "{}", json_input)?;
 
     let witness_file = NamedTempFile::new()?;
     let wtns_gen_output = Command::new("contracts/circuits/coin_withdraw_cpp/coin_withdraw")
         .arg(inputs_file.path())
         .arg(witness_file.path())
         .output()?;
+
+    println!(
+        "STDOUT: {}",
+        String::from_utf8_lossy(&wtns_gen_output.stdout)
+    );
+    println!(
+        "STDERR: {}",
+        String::from_utf8_lossy(&wtns_gen_output.stderr)
+    );
 
     assert_eq!(wtns_gen_output.stdout.len(), 0);
     assert_eq!(wtns_gen_output.stderr.len(), 0);
@@ -98,6 +148,8 @@ pub fn prove<P: AsRef<Path>>(
         c: data[6..8].try_into()?,
         public: data[8..].to_vec(),
     };
+
+    println!("public {:?}", proof.public);
 
     Ok(proof)
 }

@@ -10,9 +10,9 @@ export const closeSend = () => {
   elem.style.display = "none";
 };
 
-export const getERC20Balance = async (tokenAddress, contractAddress, ABI) => {
+export const getERC20Balance = async (tokenAddress, userAddress, ABI) => {
   const provider = new ethers.BrowserProvider(window.ethereum);
   const contract = new ethers.Contract(tokenAddress, ABI, provider);
-  const balance = await contract.balanceOf(contractAddress);
+  const balance = await contract.balanceOf(userAddress);
   return formatUnits(balance, 18); // Assumes the token has 18 decimal places
 };

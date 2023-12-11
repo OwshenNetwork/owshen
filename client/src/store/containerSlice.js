@@ -15,6 +15,8 @@ const containerSlice = createSlice({
       chainDetails: null,
       sentCoins: [],
       receivedCoins: [],
+      sentCoin: {},
+      receivedCoinsLoading: false,
     },
     owshen: {
       wallet: null,
@@ -36,21 +38,38 @@ const containerSlice = createSlice({
       state.user.availableBalances = payload.availableBalances;
       state.user.chainDetails = payload.chainDetails;
     },
-    setReceivedCoins(state, { payload }) {
-      state.user.receivedCoins = payload;
+    setReceivedCoins(state, action) {
+      switch (action.payload.type) {
+        case "SET_RECEIVED_COINS":
+          return {
+            ...state,
+            user: {
+              ...state.user,
+              receivedCoins: action.payload.payload,
+            },
+          };
+        case "SET_CLOSEST_COIN":
+          const amount = action.payload.payload;
+          let result = {};
+          if (state.user.receivedCoins.length > 0) {
+            result = state.user.receivedCoins?.reduce((prev, curr) => {
+              return Math.abs(curr.amount - Number(amount)) <
+                Math.abs(prev.amount - Number(amount))
+                ? curr
+                : prev;
+            });
+          }
 
-      const seenIndexes = new Set();
-      let totalAmount = 0;
-
-      payload?.forEach((coin) => {
-        const amount = toBigInt(coin.amount).toString();
-        if (!seenIndexes.has(coin.index)) {
-          seenIndexes.add(coin.index);
-          totalAmount += Number(amount);
-          console.log("total amount", totalAmount);
-          state.user.owshenBalance.ETH += totalAmount;
-        }
-      });
+          return {
+            ...state,
+            user: {
+              ...state.user,
+              sentCoin: result,
+            },
+          };
+        default:
+          return state;
+      }
     },
 
     setOwshen(state, action) {
@@ -75,6 +94,9 @@ const containerSlice = createSlice({
           return state;
       }
     },
+    setReceivedCoinsLoading(state, { payload }) {
+      state.user.receivedCoinsLoading = payload;
+    },
   },
 });
 
@@ -97,8 +119,21 @@ export const selectOwshen = createSelector(
   (state) => state.container.owshen,
   (owshen) => owshen
 );
+export const selectReceivedCoinsLoading = createSelector(
+  (state) => state.container.user.receivedCoinsLoading,
+  (loading) => loading
+);
 
-export const { setUserDetails, setReceivedCoins, setOwshen } =
-  containerSlice.actions;
+export const selectSentCoin = createSelector(
+  (state) => state.container.user.sentCoin,
+  (coin) => coin
+);
+
+export const {
+  setUserDetails,
+  setReceivedCoins,
+  setOwshen,
+  setReceivedCoinsLoading,
+} = containerSlice.actions;
 
 export default containerSlice.reducer;

@@ -1,36 +1,52 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { ethers, getAddress } from "ethers";
 import { useSelector } from "react-redux";
 import { toBigInt } from "ethers";
+import { utils } from "web3";
+import { toast } from "react-toastify";
+import { Link } from "react-router-dom";
+import Modal from "../Modal/Modal";
 import SendIcon from "../../pics/icons/send-inside.svg";
 import SwapIcon from "../../pics/icons/swap-inside.svg";
 import {
   selectOwshen,
   selectReceivedCoins,
   selectUserAddress,
+  selectReceivedCoinsLoading,
 } from "../../store/containerSlice";
+import ReactLoading from "react-loading";
 import "./style.css";
+import BackIcon from "../../pics/icons/left_arrow.svg";
+import MergIcon from "../../pics/icons/merge-icon.png";
 
 const ReceivedCoinList = () => {
   const owshen = useSelector(selectOwshen);
   const address = useSelector(selectUserAddress);
   const receivedcoins = useSelector(selectReceivedCoins);
+  const isLoading = useSelector(selectReceivedCoinsLoading);
+  const [isOpen, setIsOpen] = useState(false);
 
   const withdrawal = async (index, owshen, address) => {
     if (!address) return console.log("Connect your wallet first");
     const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
     const options = {
-      gasLimit: 1000000,
+      gasLimit: 5000000,
     };
 
     axios
       .get(`${coreEndpoint}/withdraw`, {
-        params: { index: index },
+        params: {
+          index: index,
+          address: owshen.wallet,
+          desire_amount: "1",
+        },
       })
       .then(async (result) => {
         let abi = owshen.contract_abi;
+        let commitment = result.data.commitment;
         let provider = new ethers.BrowserProvider(window.ethereum);
+
         let contract = new ethers.Contract(
           owshen.contract_address,
           abi,
@@ -46,14 +62,20 @@ const ReceivedCoinList = () => {
           result.data.proof.c,
         ];
 
+        const ax = utils.toBigInt(result.data.ephemeral.x);
+        const ay = utils.toBigInt(result.data.ephemeral.y);
+
+        const ephemeral = [ax, ay];
         try {
-          const amount = result.data.amount;
           const txResponse = await contract.withdraw(
             result.data.nullifier,
+            ephemeral,
             proof,
-            getAddress(owshen.selected_token_contract),
-            toBigInt(amount),
+            result.data.token,
+            toBigInt(1),
+            result.data.obfuscated_remaining_amount,
             address,
+            commitment,
             options
           );
           console.log("Transaction response", txResponse);
@@ -67,32 +89,70 @@ const ReceivedCoinList = () => {
 
   return (
     <div className="received-coins-container mx-52">
-      <h1 className="text-3xl text-left mb-7 font-bold">Coins</h1>
-      <ul className="">
-        {receivedcoins?.map((coin, index) => (
-          <li
-            className=" flex flex-wrap mb-5  border-b-2 border-[#00000033]"
-            key={index}
-          >
-            <p className="w-3/6 text-left font-bold text-lg">
-              {toBigInt(coin.amount).toString() * 10 ** -18} ETH
-            </p>
-            <p className="w-1/6 text-lg">
-              {String(coin.token).substring(0, 10)}
-            </p>
-            <p className="w-1/6 text-lg pl-5"> {coin.index}</p>
-            <div className=" w-1/6">
-              <button onClick={() => withdrawal(coin.index, owshen, address)}>
-                <img alt="" src={SendIcon} />
-              </button>
+      <Modal title="merge coins" isOpen={isOpen} setIsOpen={setIsOpen}>
+        <div>
+          <h3 className="text-xl font-bold mt-5 mb-3">
+            Are you want merge all of your coins?
+          </h3>
+          <p className="bg-yellow-100 text-amber-950 text-lg px-6 m-auto inline-block py-2  border border-amber-950 ">
+            Gas fee = 1 usdt
+          </p>
+        </div>
+        <button className="border border-green-400 bg-green-200 text-green-600 rounded-lg px-6 mt-3 font-bold py-1">
+          {" "}
+          yes
+        </button>
+      </Modal>
+      <Link to={"/"}>
+        <div className="text-left flex mb-5 items-center">
+          <img src={BackIcon} className="mx-5" />
+          <h1 className="text-3xl text-left  font-bold"> Coins</h1>
+        </div>
+      </Link>
+      {isLoading ? (
+        <div className="flex justify-center">
+          <ReactLoading type="bars" color="#2481D7" height={200} width={200} />
+        </div>
+      ) : receivedcoins?.length ? (
+        <ul>
+          {receivedcoins?.map((coin, index) => (
+            <li
+              className=" flex flex-wrap mb-5  border-b-2 border-[#00000033]"
+              key={index}
+            >
+              <p className="w-3/6 text-left font-bold text-lg">
+                {toBigInt(coin.amount).toString()} ETH
+              </p>
+              <p className="w-1/6 text-lg">
+                {String(coin.uint_token).substring(0, 10)}
+              </p>
+              <p className="w-1/6 text-lg pl-5"> {coin.index}</p>
+              <div className=" w-1/6">
+                <button onClick={() => setIsOpen(true)}>
+                  <img
+                    alt=""
+                    width="34px"
+                    className=" border border-gray-300 p-1.5 rounded-3xl"
+                    src={MergIcon}
+                  />
+                </button>
+                <button
+                  className="ml-2"
+                  onClick={() => withdrawal(coin.index, owshen, address)}
+                >
+                  <img alt="" src={SendIcon} />
+                </button>
 
-              <button className="ml-2">
-                <img alt="" src={SwapIcon} />
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+                <button className="ml-2">
+                  <img alt="" src={SwapIcon} />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-4xl font-bold mt-28">No coins yet </p>
+      )}
     </div>
   );
 };
