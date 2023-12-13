@@ -159,11 +159,16 @@ impl PrivateKey {
             secret: Fp::from_str_vartime(rnd.to_string().as_str()).unwrap(),
         }
     }
-    pub fn derive(&self, eph: EphemeralKey) -> Self {
+
+    pub fn shared_secret(&self, eph: EphemeralKey) -> Fp {
         let shared_secret = eph.point * self.secret;
-        let shared_secret_hash = hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
+        hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()])
+    }
+
+    pub fn derive(&self, eph: EphemeralKey) -> Self {
+        let shared_secret = self.shared_secret(eph);
         let secret = BigUint::from_bytes_le(self.secret.to_repr().as_ref());
-        let shared_secret = BigUint::from_bytes_le(shared_secret_hash.to_repr().as_ref());
+        let shared_secret = BigUint::from_bytes_le(shared_secret.to_repr().as_ref());
         let stealth_secret = Fp::from_str_vartime(
             ((secret + shared_secret) % ORDER.clone())
                 .to_string()
@@ -196,8 +201,10 @@ impl FromStr for PublicKey {
             } else {
                 return Err(eyre::Report::msg("Invalid Owshen address!"));
             };
-            let div = (*D * x * x - Fp::ONE).invert().unwrap();
-            let mut y = ((*A * x * x - Fp::ONE) * div).sqrt().unwrap();
+            let div = Option::<Fp>::from((*D * x * x - Fp::ONE).invert())
+                .ok_or(eyre::Report::msg("Invalid point!"))?;
+            let mut y = Option::<Fp>::from(((*A * x * x - Fp::ONE) * div).sqrt())
+                .ok_or(eyre::Report::msg("Invalid point!"))?;
             if Into::<bool>::into(y.is_odd()) != is_odd {
                 y = -y;
             }

@@ -86,7 +86,6 @@ impl SparseMerkleTree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ff::PrimeField;
 
     #[test]
     fn test_merkle_trees() {

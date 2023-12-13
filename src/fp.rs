@@ -1,7 +1,6 @@
 use ethers::prelude::*;
 use ff::PrimeField;
 use num_bigint::BigUint;
-use num_traits::Num;
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::str::FromStr;
@@ -23,15 +22,10 @@ impl Into<U256> for Fp {
 }
 
 impl FromStr for Fp {
-    type Err = ();
+    type Err = eyre::Report;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let num = BigUint::from_str_radix(s, 10).map_err(|_| ())?;
-        let repr_bytes = num.to_bytes_le();
-        let mut repr = FpRepr::default();
-        let len = repr_bytes.len().min(repr.as_ref().len());
-        repr.as_mut()[..len].copy_from_slice(&repr_bytes[..len]);
-        Ok(Fp::from_repr(repr).unwrap())
+        Ok(Fp::from_str_vartime(s).ok_or(eyre::Report::msg("Invalid Fp!"))?)
     }
 }
 

@@ -402,18 +402,18 @@ fn sigma(inp: Fp) -> Fp {
     inp4 * inp
 }
 
-fn ark(mut inp: [Fp; 5], C: &[Fp], r: usize) -> [Fp; 5] {
+fn ark(mut inp: [Fp; 5], c: &[Fp], r: usize) -> [Fp; 5] {
     for i in 0..T {
-        inp[i] += C[i + r];
+        inp[i] += c[i + r];
     }
     inp
 }
 
-fn mix(inp: [Fp; T], M: &Vec<Vec<Fp>>) -> [Fp; T] {
+fn mix(inp: [Fp; T], m: &Vec<Vec<Fp>>) -> [Fp; T] {
     let mut out = [Fp::ZERO; T];
     for i in 0..T {
         for j in 0..T {
-            out[i] += M[j][i] * inp[j];
+            out[i] += m[j][i] * inp[j];
         }
     }
     out

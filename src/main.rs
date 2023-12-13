@@ -233,12 +233,14 @@ async fn serve_wallet(
                 .await
                 .unwrap();
                 for sent_event in sent_events {
-                    let ephemeral = Point {
-                        x: Fp::from_str_vartime(&sent_event.ephemeral.x.to_string()).unwrap(),
-                        y: Fp::from_str_vartime(&sent_event.ephemeral.y.to_string()).unwrap(),
+                    let ephemeral = EphemeralKey {
+                        point: Point {
+                            x: Fp::from_str_vartime(&sent_event.ephemeral.x.to_string()).unwrap(),
+                            y: Fp::from_str_vartime(&sent_event.ephemeral.y.to_string()).unwrap(),
+                        },
                     };
 
-                    let stealth_priv = priv_key.derive(EphemeralKey { point: ephemeral });
+                    let stealth_priv = priv_key.derive(ephemeral);
                     let stealth_pub: PublicKey = stealth_priv.clone().into();
                     let index: U256 = sent_event.index;
                     let hint_amount = sent_event.hint_amount;
@@ -255,9 +257,7 @@ async fn serve_wallet(
                         Fp::from_str(&U256::to_string(&hint_token_address)).unwrap(),
                     ]);
 
-                    let shared_secret = ephemeral * stealth_priv.secret;
-                    let shared_secret_hash =
-                        hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
+                    let shared_secret = stealth_priv.shared_secret(ephemeral);
 
                     if commitment == calc_commitment {
                         println!("ITS MINE");
@@ -274,13 +274,12 @@ async fn serve_wallet(
 
                     // get sends
                     let amount = U256::to_string(
-                        &(Fp::from_str(&U256::to_string(&hint_amount)).unwrap()
-                            - shared_secret_hash)
+                        &(Fp::from_str(&U256::to_string(&hint_amount)).unwrap() - shared_secret)
                             .into(),
                     );
                     let token_address = U256::to_string(
                         &(Fp::from_str(&U256::to_string(&hint_token_address)).unwrap()
-                            - shared_secret_hash)
+                            - shared_secret)
                             .into(),
                     );
 
@@ -361,7 +360,7 @@ async fn serve_wallet(
 
                             let amount: U256 = coin.amount;
                             let str_amount: String = U256::to_string(&amount);
-                            let desire_amount: U256 = U256::from_str(&req.desire_amount).unwrap();
+                            let _desire_amount: U256 = U256::from_str(&req.desire_amount).unwrap();
 
                             let str_amount_num: i64 = str_amount.parse().unwrap();
                             let new_amount_num: i64 = req.desire_amount.parse().unwrap();
@@ -813,11 +812,10 @@ async fn deploy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hash::hash4;
-    use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
+
     use ethers::abi::Abi;
     use ethers::utils::Ganache;
-    use k256::elliptic_curve::consts::U25;
+
     use std::sync::Arc;
 
     use ethers::core::types::Bytes;
