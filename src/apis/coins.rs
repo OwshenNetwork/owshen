@@ -1,36 +1,29 @@
-use axum::{extract, response::Json, routing::get, Router};
-use bindings::owshen::{Owshen, Point as OwshenPoint, SentFilter, SpendFilter};
-use bindings::simple_erc_20::SimpleErc20;
-use std::net::SocketAddr;
-use tokio::time::timeout;
-
-use crate::hash::hash4;
-use tower_http::cors::CorsLayer;
-
+use axum::Json;
+use bindings::owshen::{SentFilter, SpendFilter};
 use ethers::prelude::*;
-
-use crate::keys::{EphemeralKey, PrivateKey, PublicKey};
 use eyre::Result;
 
+use std::str::FromStr;
+use std::sync::Arc;
+use std::sync::Mutex;
+use tokio::time::timeout;
+
+use crate::fp::Fp;
+use crate::hash::hash4;
+use crate::keys::Point;
+use crate::keys::{EphemeralKey, PrivateKey, PublicKey};
 use crate::tree::SparseMerkleTree;
 use crate::u256_to_h160;
 use crate::Coin;
-use crate::GetCoinsResponse;
-use serde::{Deserialize, Serialize};
-use std::process::Command;
-use std::str::FromStr;
-use std::sync::Arc;
-use tokio::task;
-
-use crate::fp::Fp;
-use crate::keys::Point;
 use crate::Context;
-use ff::PrimeField;
-use std::path::PathBuf;
-use std::sync::Mutex;
-use structopt::StructOpt;
+use crate::GetCoinsResponse;
 
-pub async fn coins(context: Arc<Mutex<Context>>, contract: Contract<Provider<Http>>) {
+#[allow(dead_code)]
+pub async fn coins(
+    context_coin: Arc<Mutex<Context>>,
+    contract: Contract<Provider<Http>>,
+    priv_key: PrivateKey,
+) -> Result<Json<GetCoinsResponse>, eyre::Report> {
     let mut my_coins: Vec<Coin> = Vec::new();
     let mut tree = SparseMerkleTree::new(16);
     let sent_events = timeout(std::time::Duration::from_secs(5), async {
@@ -48,8 +41,8 @@ pub async fn coins(context: Arc<Mutex<Context>>, contract: Contract<Provider<Htt
     for sent_event in sent_events {
         let ephemeral = EphemeralKey {
             point: Point {
-                x: Fp::from_str_vartime(&sent_event.ephemeral.x.to_string()).unwrap(),
-                y: Fp::from_str_vartime(&sent_event.ephemeral.y.to_string()).unwrap(),
+                x: Fp::try_from(sent_event.ephemeral.x)?,
+                y: Fp::try_from(sent_event.ephemeral.y)?,
             },
         };
 
@@ -59,14 +52,14 @@ pub async fn coins(context: Arc<Mutex<Context>>, contract: Contract<Provider<Htt
         let hint_amount = sent_event.hint_amount;
         let hint_token_address = sent_event.hint_token_address;
         let u64_index: u64 = index.low_u64();
-        let commitment = Fp::from_str(&U256::to_string(&sent_event.commitment)).unwrap();
+        let commitment = Fp::try_from(sent_event.commitment)?;
         tree.set(u64_index, commitment);
 
         let calc_commitment = hash4([
             stealth_pub.point.x,
             stealth_pub.point.y,
-            Fp::from_str(&U256::to_string(&hint_amount)).unwrap(),
-            Fp::from_str(&U256::to_string(&hint_token_address)).unwrap(),
+            Fp::try_from(hint_amount)?,
+            Fp::try_from(hint_token_address)?,
         ]);
 
         let shared_secret = stealth_priv.shared_secret(ephemeral);
@@ -85,26 +78,23 @@ pub async fn coins(context: Arc<Mutex<Context>>, contract: Contract<Provider<Htt
         }
 
         // get sends
-        let amount = U256::to_string(
-            &(Fp::from_str(&U256::to_string(&hint_amount)).unwrap() - shared_secret).into(),
-        );
-        let token_address = U256::to_string(
-            &(Fp::from_str(&U256::to_string(&hint_token_address)).unwrap() - shared_secret).into(),
-        );
+        let amount = U256::to_string(&(Fp::try_from(hint_amount)? - shared_secret).into());
+        let token_address =
+            U256::to_string(&(Fp::try_from(hint_token_address)? - shared_secret).into());
 
         let calc_commitment_obfuscate = hash4([
             stealth_pub.point.x,
             stealth_pub.point.y,
-            Fp::from_str(&amount).unwrap(),
-            Fp::from_str(&token_address).unwrap(),
+            Fp::from_str(&amount)?,
+            Fp::from_str(&token_address)?,
         ]);
 
         if commitment == calc_commitment_obfuscate {
             println!("I HAVE SOMETHING ");
             my_coins.push(Coin {
                 index,
-                uint_token: u256_to_h160(U256::from_str(&token_address).unwrap()),
-                amount: U256::from_str(&amount).unwrap(),
+                uint_token: u256_to_h160(U256::from_str(&token_address)?),
+                amount: U256::from_str(&amount)?,
                 nullifier: stealth_priv.nullifier(index.low_u32()).into(),
                 priv_key: stealth_priv,
                 pub_key: stealth_pub,
@@ -142,7 +132,7 @@ pub async fn coins(context: Arc<Mutex<Context>>, contract: Contract<Provider<Htt
     ctx.coins = my_coins.clone();
     ctx.tree = tree;
 
-    Json(GetCoinsResponse {
+    Ok(Json(GetCoinsResponse {
         coins: my_coins.clone(),
-    })
+    }))
 }

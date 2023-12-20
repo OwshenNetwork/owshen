@@ -6,36 +6,38 @@ mod poseidon;
 mod proof;
 mod tree;
 
-#[macro_use]
-extern crate lazy_static;
-
-use axum::{extract, response::Json, routing::get, Router};
-use bindings::owshen::{Owshen, Point as OwshenPoint, SentFilter, SpendFilter};
+use axum::{
+    // body::Bytes,
+    body::Body,
+    extract::{self, Query},
+    http::{Response, StatusCode},
+    response::{Html, IntoResponse, Json},
+    routing::{get, get_service},
+    Router,
+};
+use bindings::owshen::{Owshen, Point as OwshenPoint};
 use bindings::simple_erc_20::SimpleErc20;
-use std::net::SocketAddr;
-use tokio::time::timeout;
-
-use hash::hash4;
-use tower_http::cors::CorsLayer;
-
 use ethers::prelude::*;
-
 use eyre::Result;
-use keys::{EphemeralKey, PrivateKey, PublicKey};
-
+use keys::Point;
+use keys::{PrivateKey, PublicKey};
+use proof::Proof;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::fs::read_to_string;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::task;
-use tree::SparseMerkleTree;
-
-use crate::fp::Fp;
-use ff::PrimeField;
-use keys::Point;
-use proof::{prove, Proof};
-use std::path::PathBuf;
 use structopt::StructOpt;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
+use tower_http::cors::CorsLayer;
+use tower_http::services::{ServeDir, ServeFile};
+use tree::SparseMerkleTree;
+use webbrowser;
+
+#[macro_use]
+extern crate lazy_static;
 
 // Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
@@ -53,6 +55,8 @@ pub struct WalletOpt {
     db: Option<PathBuf>,
     #[structopt(long, default_value = "8000")]
     port: u16,
+    #[structopt(long, help = "Enable test mode")]
+    test: bool,
 }
 
 // Show wallet info
@@ -67,35 +71,52 @@ enum OwshenCliOpt {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetInfoResponse {
+pub struct GetInfoResponse {
     address: PublicKey,
     erc20_abi: Abi,
     dive_contract: H160,
     owshen_contract: H160,
     owshen_abi: Abi,
     token_contracts: Vec<TokenInfo>,
+    isTest: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct GetCoinsResponse {
+    coins: Vec<Coin>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetStealthRequest {
+pub struct GetStealthRequest {
     address: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetStealthResponse {
+pub struct GetStealthResponse {
     address: Point,
     ephemeral: Point,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetWithdrawRequest {
+pub struct GetWithdrawRequest {
     index: U256,
     pub address: String,
     pub desire_amount: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetSendRequest {
+pub struct GetWithdrawResponse {
+    proof: Proof,
+    pub token: H160,
+    pub amount: U256,
+    pub obfuscated_remaining_amount: U256,
+    pub nullifier: U256,
+    pub commitment: U256,
+    pub ephemeral: Point,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSendRequest {
     index: U256,
     pub new_amount: String,
     pub receiver_address: String,
@@ -103,7 +124,7 @@ struct GetSendRequest {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetSendResponse {
+pub struct GetSendResponse {
     proof: Proof,
     pub token: H160,
     pub amount: U256,
@@ -132,27 +153,12 @@ pub struct Send {
     pub amount: U256,
     pub commitment: U256,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetWithdrawResponse {
-    proof: Proof,
-    pub token: H160,
-    pub amount: U256,
-    pub obfuscated_remaining_amount: U256,
-    pub nullifier: U256,
-    pub commitment: U256,
-    pub ephemeral: Point,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-struct GetCoinsResponse {
-    coins: Vec<Coin>,
-}
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-struct TokenInfo {
+pub struct TokenInfo {
     token_address: H160,
     symbol: String,
 }
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     priv_key: PrivateKey,
@@ -164,7 +170,7 @@ struct Wallet {
     token_contracts: Vec<TokenInfo>,
 }
 
-struct Context {
+pub struct Context {
     coins: Vec<Coin>,
     tree: SparseMerkleTree,
 }
@@ -185,7 +191,40 @@ fn h160_to_u256(h160_val: H160) -> U256 {
     U256::from_big_endian(&bytes)
 }
 
+fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {
+    match result {
+        Ok(a) => a.into_response(),
+        Err(e) => {
+            let error_message = format!("Internal server error: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_message)).into_response()
+        }
+    }
+}
+
 use std::sync::Mutex;
+
+async fn serve_index() -> impl IntoResponse {
+    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+    let index_path = format!("{}/usr/share/owshen/client/index.html", app_dir_path);
+
+    match read_to_string(index_path) {
+        Ok(contents) => Html(contents),
+        Err(_) => Html("<h1>Error: Unable to read the index file</h1>".to_string()),
+    }
+}
+
+async fn serve_file(file_path: PathBuf) -> impl IntoResponse {
+    if let Ok(file) = File::open(file_path).await {
+        let stream = FramedRead::new(file, BytesCodec::new());
+
+        Response::new(Body::wrap_stream(stream))
+    } else {
+        Response::builder()
+            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .body(Body::from("File not found"))
+            .unwrap()
+    }
+}
 
 async fn serve_wallet(
     provider: Arc<Provider<Http>>,
@@ -197,121 +236,65 @@ async fn serve_wallet(
     abi: Abi,
     erc20_abi: Abi,
     token_contracts: Vec<TokenInfo>,
+    test: bool,
 ) -> Result<()> {
-    let info_addr = pub_key.clone();
-    let coins_owshen_address = owshen_contract.clone();
-    let coins_owshen_abi = abi.clone();
     let tree: SparseMerkleTree = SparseMerkleTree::new(16);
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
         tree,
     }));
 
+    let info_addr: PublicKey = pub_key.clone();
+    let coins_owshen_abi = abi.clone();
+    let coins_owshen_address = owshen_contract.clone();
     let context_coin = context.clone();
-
     let context_tree = context.clone();
     let context_tree_send = context.clone();
     let context_withdraw = context.clone();
     let context_send = context.clone();
     let contract = Contract::new(coins_owshen_address, coins_owshen_abi, provider);
     let contract_clone = contract.clone();
+
+    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
+    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
+
     let app = Router::new()
-        .route("/coins", get(move || async move {}))
+        .route("/", get(serve_index))
+        .route(
+            "/static/*file",
+            get(|params: extract::Path<String>| async move {
+                let file_path = PathBuf::from(static_files_path).join(params.as_str());
+                println!("file path {:?}", file_path);
+                serve_file(file_path).await
+            }),
+        )
+        .route(
+            "/manifest.json",
+            get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
+        )
+        .route(
+            "/asset-manifest.json",
+            get_service(ServeFile::new(format!(
+                "{}/asset-manifest.json",
+                root_files_path
+            ))),
+        )
+        .route(
+            "/robots.txt",
+            get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
+        )
+        .route(
+            "/coins",
+            get(move || async move {
+                handle_error(apis::coins(context_coin, contract_clone, priv_key).await)
+            }),
+        )
         .route(
             "/withdraw",
             get(
                 move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                    let index = req.index;
-                    let coins = context_withdraw.lock().unwrap().coins.clone();
-                    let address = req.address;
-                    let merkle_root = context_tree.lock().unwrap().tree.clone();
-                    // Find a coin with the specified index
-                    let filtered_coin = coins.iter().find(|coin| coin.index == index);
-                    match filtered_coin {
-                        Some(coin) => {
-                            let u32_index: u32 = index.low_u32();
-                            let u64_index: u64 = index.low_u64();
-                            // get merkle proof
-                            let merkle_proof = merkle_root.get(u64_index);
-                            let pub_key = PublicKey::from_str(&address).unwrap();
-                            let (ephemeral, stealth_pub_key) =
-                                pub_key.derive(&mut rand::thread_rng());
-
-                            let amount: U256 = coin.amount;
-                            let str_amount: String = U256::to_string(&amount);
-                            let _desire_amount: U256 = U256::from_str(&req.desire_amount).unwrap();
-
-                            let str_amount_num: i64 = str_amount.parse().unwrap();
-                            let new_amount_num: i64 = req.desire_amount.parse().unwrap();
-
-                            // let remaining_amount = str_amount_num - new_amount_num;s
-                            let obfuscated_remaining_amount = amount - new_amount_num;
-
-                            let min: i64 = str_amount_num - new_amount_num;
-                            let remaining_amount = min.to_string();
-
-                            let hint_token_address = h160_to_u256(coin.uint_token);
-
-                            let calc_commitment = hash4([
-                                stealth_pub_key.point.x,
-                                stealth_pub_key.point.y,
-                                Fp::from_str(&remaining_amount.to_string()).unwrap(),
-                                Fp::from_str(&U256::to_string(&hint_token_address)).unwrap(),
-                            ]);
-                            let u256_calc_commitment = calc_commitment.into();
-
-                            let proof: std::result::Result<Proof, eyre::Error> = prove(
-                                PARAMS_FILE,
-                                u32_index,
-                                hint_token_address,
-                                amount,
-                                new_amount_num.into(),
-                                obfuscated_remaining_amount,
-                                PublicKey::null(),
-                                stealth_pub_key,
-                                coin.priv_key.secret,
-                                merkle_proof.proof.try_into().unwrap(),
-                            );
-                            match proof {
-                                Ok(proof) => Json(GetWithdrawResponse {
-                                    proof,
-                                    token: coin.uint_token,
-                                    amount: coin.amount,
-                                    obfuscated_remaining_amount,
-                                    nullifier: coin.nullifier,
-                                    commitment: u256_calc_commitment,
-                                    ephemeral: ephemeral.point,
-                                }),
-                                Err(e) => {
-                                    println!("Something wrong while creating proof{:?}", e);
-                                    Json(GetWithdrawResponse {
-                                        proof: Proof::default(),
-                                        token: H160::default(),
-                                        amount: U256::default(),
-                                        obfuscated_remaining_amount: U256::default(),
-                                        nullifier: U256::default(),
-                                        commitment: U256::default(),
-                                        ephemeral: ephemeral.point,
-                                    })
-                                }
-                            }
-                        }
-                        None => {
-                            println!("No coin with index {} found", index);
-                            Json(GetWithdrawResponse {
-                                proof: Proof::default(),
-                                token: H160::default(),
-                                amount: U256::default(),
-                                obfuscated_remaining_amount: U256::default(),
-                                nullifier: U256::default(),
-                                commitment: U256::default(),
-                                ephemeral: Point {
-                                    x: Fp::default(),
-                                    y: Fp::default(),
-                                },
-                            })
-                        }
-                    }
+                    handle_error(apis::withdraw(Query(req), context_withdraw, context_tree).await)
                 },
             ),
         )
@@ -319,132 +302,7 @@ async fn serve_wallet(
             "/send",
             get(
                 move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                    let index = req.index;
-                    let new_amount = req.new_amount;
-                    let receiver_address = req.receiver_address;
-                    let address = req.address;
-
-                    let coins = context_send.lock().unwrap().coins.clone();
-                    let merkle_root = context_tree_send.lock().unwrap().tree.clone();
-                    // Find a coin with the specified index
-                    let filtered_coin = coins.iter().find(|coin| coin.index == index);
-
-                    match filtered_coin {
-                        Some(coin) => {
-                            let u32_index: u32 = index.low_u32();
-                            let u64_index: u64 = index.low_u64();
-                            // get merkle proof
-                            let merkle_proof = merkle_root.get(u64_index);
-
-                            let address_pub_key = PublicKey::from_str(&address).unwrap();
-                            let (address_ephemeral, address_stealth_pub_key) =
-                                address_pub_key.derive(&mut rand::thread_rng());
-
-                            let receiver_address_pub_key =
-                                PublicKey::from_str(&receiver_address).unwrap();
-                            let (receiver_address_ephemeral, receiver_address_stealth_pub_key) =
-                                receiver_address_pub_key.derive(&mut rand::thread_rng());
-
-                            let amount: U256 = coin.amount;
-                            let str_amount: String = U256::to_string(&amount);
-
-                            let str_amount_num: i64 = str_amount.parse().unwrap();
-                            let new_amount_num: i64 = new_amount.parse().unwrap();
-
-                            let send_amount = U256::from_str(&new_amount).unwrap();
-
-                            let min = str_amount_num - new_amount_num;
-
-                            let remaining_amount = min.to_string();
-
-                            let obfuscated_remaining_amount = amount - new_amount_num;
-                            let hint_token_address = h160_to_u256(coin.uint_token);
-
-                            // calc commitment one -> its for receiver
-                            let calc_send_commitment = hash4([
-                                receiver_address_stealth_pub_key.point.x,
-                                receiver_address_stealth_pub_key.point.y,
-                                Fp::from_str(&new_amount).unwrap(),
-                                Fp::from_str(&U256::to_string(&hint_token_address)).unwrap(),
-                            ]);
-
-                            let u256_calc_send_commitment = calc_send_commitment.into();
-
-                            // calc commitment two -> its for sender
-                            let calc_sender_commitment: Fp = hash4([
-                                address_stealth_pub_key.point.x,
-                                address_stealth_pub_key.point.y,
-                                Fp::from_str(&remaining_amount).unwrap(),
-                                Fp::from_str(&U256::to_string(&hint_token_address)).unwrap(),
-                            ]);
-
-                            let u256_calc_sender_commitment = calc_sender_commitment.into();
-
-                            let proof: std::result::Result<Proof, eyre::Error> = prove(
-                                PARAMS_FILE,
-                                u32_index,
-                                hint_token_address,
-                                amount,
-                                new_amount_num.into(),
-                                obfuscated_remaining_amount,
-                                receiver_address_stealth_pub_key,
-                                address_stealth_pub_key,
-                                coin.priv_key.secret,
-                                merkle_proof.proof.try_into().unwrap(),
-                            );
-
-                            match proof {
-                                Ok(proof) => Json(GetSendResponse {
-                                    proof,
-                                    token: coin.uint_token,
-                                    amount,
-                                    nullifier: coin.nullifier,
-                                    obfuscated_receiver_amount: send_amount,
-                                    obfuscated_sender_amount: obfuscated_remaining_amount,
-                                    receiver_commitment: u256_calc_send_commitment,
-                                    sender_commitment: u256_calc_sender_commitment,
-                                    sender_ephemeral: address_ephemeral.point,
-                                    receiver_ephemeral: receiver_address_ephemeral.point,
-                                }),
-                                Err(e) => {
-                                    println!("Something wrong while creating proof{:?}", e);
-                                    Json(GetSendResponse {
-                                        proof: Proof::default(),
-                                        token: H160::default(),
-                                        amount: U256::default(),
-                                        nullifier: U256::default(),
-                                        obfuscated_receiver_amount: U256::default(),
-                                        obfuscated_sender_amount: U256::default(),
-                                        receiver_commitment: U256::default(),
-                                        sender_commitment: U256::default(),
-                                        sender_ephemeral: address_ephemeral.point,
-                                        receiver_ephemeral: receiver_address_ephemeral.point,
-                                    })
-                                }
-                            }
-                        }
-                        None => {
-                            println!("No coin with index {} found", index);
-                            Json(GetSendResponse {
-                                proof: Proof::default(),
-                                token: H160::default(),
-                                amount: U256::default(),
-                                nullifier: U256::default(),
-                                obfuscated_receiver_amount: U256::default(),
-                                obfuscated_sender_amount: U256::default(),
-                                receiver_commitment: U256::default(),
-                                sender_commitment: U256::default(),
-                                sender_ephemeral: Point {
-                                    x: Fp::default(),
-                                    y: Fp::default(),
-                                },
-                                receiver_ephemeral: Point {
-                                    x: Fp::default(),
-                                    y: Fp::default(),
-                                },
-                            })
-                        }
-                    }
+                    handle_error(apis::send(Query(req), context_send, context_tree_send).await)
                 },
             ),
         )
@@ -452,55 +310,52 @@ async fn serve_wallet(
             "/stealth",
             get(
                 |extract::Query(req): extract::Query<GetStealthRequest>| async move {
-                    let pub_key = PublicKey::from_str(&req.address).unwrap();
-                    let (ephemeral, address) = pub_key.derive(&mut rand::thread_rng());
-                    Json(GetStealthResponse {
-                        address: address.point,
-                        ephemeral: ephemeral.point,
-                    })
+                    handle_error(apis::stealth(Query(req)).await)
                 },
             ),
         )
         .route(
             "/info",
             get(move || async move {
-                Json(GetInfoResponse {
-                    address: info_addr,
-                    dive_contract,
-                    erc20_abi,
-                    owshen_contract,
-                    owshen_abi: abi,
-                    token_contracts,
-                })
+                handle_error(
+                    apis::info(
+                        info_addr,
+                        dive_contract,
+                        owshen_contract,
+                        token_contracts,
+                        abi,
+                        erc20_abi,
+                        test,
+                    )
+                    .await,
+                )
             }),
         )
         .layer(CorsLayer::permissive());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
 
-    let frontend = async {
-        task::spawn_blocking(move || {
-            let _output = Command::new("npm")
-                .arg("start")
-                .env(
-                    "REACT_APP_OWSHEN_ENDPOINT",
-                    format!("http://127.0.0.1:{}", port),
-                )
-                .current_dir("client")
-                .spawn()
-                .expect("failed to execute process");
-        });
-        Ok::<(), eyre::Error>(())
-    };
-    let backend = async {
-        axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .await?;
-        Ok::<(), eyre::Error>(())
-    };
+    let server = axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal());
 
-    tokio::try_join!(backend, frontend)?;
+    // Attempt to open the web browser
+    if webbrowser::open(&format!("http://{}", addr)).is_err() {
+        println!(
+            "Failed to open web browser. Please navigate to http://{} manually",
+            addr
+        );
+    }
+
+    server.await.map_err(eyre::Report::new)?;
+
     Ok(())
+}
+
+async fn shutdown_signal() {
+    tokio::signal::ctrl_c()
+        .await
+        .expect("failed to listen for event");
 }
 
 impl Into<OwshenPoint> for Point {
@@ -621,7 +476,7 @@ async fn main() -> Result<()> {
                 println!("Wallet is already initialized!");
             }
         }
-        OwshenCliOpt::Wallet(WalletOpt { db, port }) => {
+        OwshenCliOpt::Wallet(WalletOpt { db, port, test }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -644,6 +499,7 @@ async fn main() -> Result<()> {
                     wallet.owshen_contract_abi.clone(),
                     wallet.erc20_abi.clone(),
                     wallet.token_contracts.clone(),
+                    test,
                 )
                 .await?;
             } else {
@@ -691,10 +547,11 @@ async fn deploy(
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::hash::hash4;
+    use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
     use ethers::abi::Abi;
     use ethers::utils::Ganache;
-
+    use k256::elliptic_curve::consts::U25;
     use std::sync::Arc;
 
     use ethers::core::types::Bytes;

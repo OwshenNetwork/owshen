@@ -1,8 +1,8 @@
 import WETHIcon from "../pics/tokens/WETH.png";
-// import DAIIcon from "../assets/img/common/DAI-icon.svg";
-// import USDTIcon from "../assets/img/common/USDT-icon.svg";
+// import DAIIcon from "../assets/img/common/DAI-icon.png";
+// import USDTIcon from "../assets/img/common/USDT-icon.png";
 import USDCIcon from "../pics/tokens/USDC.png";
-import ETHIcon from "../pics/tokens/ETH.svg";
+import ETHIcon from "../pics/tokens/ETH.png";
 export const currencyIcons = {
   WETH: WETHIcon,
   // DAI: DAIIcon,

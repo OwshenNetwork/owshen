@@ -8,7 +8,7 @@ import "react-toastify/dist/ReactToastify.css";
 const App = () => {
   return (
     <div className="h-screen ">
-      <ToastContainer />
+      <ToastContainer theme="colored" />
       <div className="lg:mx-72 p-8 mt-14 h-5/6 min-h-[726px] bg-white rounded-lg shadow-2xl">
         <Main />
       </div>

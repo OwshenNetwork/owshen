@@ -1,5 +1,4 @@
 import { createSlice, createSelector } from "@reduxjs/toolkit";
-import { toBigInt } from "ethers";
 
 const containerSlice = createSlice({
   name: "container",
@@ -27,6 +26,7 @@ const containerSlice = createSlice({
       token_contracts: [],
       selected_token_contract: null,
     },
+    isTest: false,
   },
   reducers: {
     setUserDetails(state, { payload }) {
@@ -97,6 +97,9 @@ const containerSlice = createSlice({
     setReceivedCoinsLoading(state, { payload }) {
       state.user.receivedCoinsLoading = payload;
     },
+    setIsTest(state, { payload }) {
+      state.isTest = payload;
+    },
   },
 });
 
@@ -123,6 +126,10 @@ export const selectReceivedCoinsLoading = createSelector(
   (state) => state.container.user.receivedCoinsLoading,
   (loading) => loading
 );
+export const selectIsTest = createSelector(
+  (state) => state.container.isTest,
+  (isTest) => isTest
+);
 
 export const selectSentCoin = createSelector(
   (state) => state.container.user.sentCoin,
@@ -134,6 +141,7 @@ export const {
   setReceivedCoins,
   setOwshen,
   setReceivedCoinsLoading,
+  setIsTest,
 } = containerSlice.actions;
 
 export default containerSlice.reducer;

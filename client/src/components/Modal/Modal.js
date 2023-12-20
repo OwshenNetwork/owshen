@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import BackArrow from "../../pics/icons/arrow.svg";
+import BackArrow from "../../pics/icons/arrow.png";
 
 const Modal = ({ title, setIsOpen, isOpen, children }) => {
   const ref = useRef(null);
@@ -28,7 +28,10 @@ const Modal = ({ title, setIsOpen, isOpen, children }) => {
         className=" border-2 text-center w-1/4 p-5 my-[10%] mx-auto bg-white rounded-xl"
       >
         <div className="relative">
-          <div className="cursor-pointer w-9 absolute top-2" onClick={() => setIsOpen(!isOpen)}>
+          <div
+            className="cursor-pointer w-9 absolute top-2"
+            onClick={() => setIsOpen(!isOpen)}
+          >
             <img src={BackArrow} />
           </div>
           <h3 className="font-bold text-3xl">{title}</h3>

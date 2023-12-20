@@ -21,6 +21,14 @@ impl Into<U256> for Fp {
     }
 }
 
+impl TryFrom<U256> for Fp {
+    type Error = eyre::Report;
+
+    fn try_from(value: U256) -> Result<Self, Self::Error> {
+        Fp::from_str_vartime(&value.to_string()).ok_or(eyre::Report::msg("Invalid U256 value!"))
+    }
+}
+
 impl FromStr for Fp {
     type Err = eyre::Report;
 

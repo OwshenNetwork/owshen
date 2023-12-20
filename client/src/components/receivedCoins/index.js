@@ -7,8 +7,8 @@ import { utils } from "web3";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import Modal from "../Modal/Modal";
-import SendIcon from "../../pics/icons/send-inside.svg";
-import SwapIcon from "../../pics/icons/swap-inside.svg";
+import SendIcon from "../../pics/icons/send-inside.png";
+import SwapIcon from "../../pics/icons/swap-inside.png";
 import {
   selectOwshen,
   selectReceivedCoins,
@@ -17,7 +17,7 @@ import {
 } from "../../store/containerSlice";
 import ReactLoading from "react-loading";
 import "./style.css";
-import BackIcon from "../../pics/icons/left_arrow.svg";
+import BackIcon from "../../pics/icons/left_arrow.png";
 import MergIcon from "../../pics/icons/merge-icon.png";
 
 const ReceivedCoinList = () => {
@@ -86,6 +86,9 @@ const ReceivedCoinList = () => {
         }
       });
   };
+  const trueAmount = (val) => {
+    return Number(toBigInt(val).toString()) / Math.pow(10, 18);
+  };
 
   return (
     <div className="received-coins-container mx-52">
@@ -117,17 +120,14 @@ const ReceivedCoinList = () => {
         <ul>
           {receivedcoins?.map((coin, index) => (
             <li
-              className=" flex flex-wrap mb-5  border-b-2 border-[#00000033]"
+              className=" flex flex-wrap pb-1 items-center border-b-2 border-[#00000033]"
               key={index}
             >
-              <p className="w-3/6 text-left font-bold text-lg">
-                {toBigInt(coin.amount).toString()} ETH
+              <p className="w-5/6 text-left font-bold text-lg">
+                {trueAmount(coin.amount)} DIVE
               </p>
-              <p className="w-1/6 text-lg">
-                {String(coin.uint_token).substring(0, 10)}
-              </p>
-              <p className="w-1/6 text-lg pl-5"> {coin.index}</p>
-              <div className=" w-1/6">
+
+              <div className=" w-1/6 justify-between flex">
                 <button onClick={() => setIsOpen(true)}>
                   <img
                     alt=""
