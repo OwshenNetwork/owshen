@@ -27,12 +27,12 @@ use std::fs::read_to_string;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use structopt::StructOpt;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tower_http::cors::CorsLayer;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::services::ServeFile;
 use tree::SparseMerkleTree;
 use webbrowser;
 
@@ -55,8 +55,21 @@ pub struct WalletOpt {
     db: Option<PathBuf>,
     #[structopt(long, default_value = "8000")]
     port: u16,
+    #[structopt(long, default_value = "http://127.0.0.1:8545")]
+    endpoint: String,
     #[structopt(long, help = "Enable test mode")]
     test: bool,
+    #[structopt(long)]
+    config: Option<PathBuf>,
+}
+#[derive(StructOpt, Debug)]
+pub struct ConfigOpt {
+    #[structopt(long, default_value = "http://127.0.0.1:8545")]
+    endpoint: String,
+    #[structopt(long)]
+    name: String,
+    #[structopt(long)]
+    config: Option<PathBuf>,
 }
 
 // Show wallet info
@@ -68,6 +81,7 @@ enum OwshenCliOpt {
     Init(InitOpt),
     Info(InfoOpt),
     Wallet(WalletOpt),
+    Config(ConfigOpt),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -162,12 +176,16 @@ pub struct TokenInfo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     priv_key: PrivateKey,
+    token_contracts: Vec<TokenInfo>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Config {
+    name: String,
     endpoint: String,
     dive_contract_address: H160,
     owshen_contract_address: H160,
     owshen_contract_abi: Abi,
     erc20_abi: Abi,
-    token_contracts: Vec<TokenInfo>,
 }
 
 pub struct Context {
@@ -200,8 +218,6 @@ fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoRe
         }
     }
 }
-
-use std::sync::Mutex;
 
 async fn serve_index() -> impl IntoResponse {
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
@@ -367,9 +383,156 @@ impl Into<OwshenPoint> for Point {
     }
 }
 
+async fn initialize_config(endpoint: String, name: String) -> Config {
+    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+    let provider = Arc::new(provider);
+    println!("Deploying hash function...");
+    let poseidon4_addr = deploy(
+        provider.clone(),
+        include_str!("assets/poseidon4.abi"),
+        include_str!("assets/poseidon4.evm"),
+    )
+    .await
+    .address();
+
+    let accounts = provider.get_accounts().await.unwrap();
+    let from = accounts[0];
+
+    println!("Deploying DIVE token...");
+    let dive = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("dive_token").unwrap(),
+            String::from_str("DIVE").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from)
+    .send()
+    .await
+    .unwrap();
+    println!("Deploying test tokens...");
+    let test_token = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("test_token").unwrap(),
+            String::from_str("TEST").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from)
+    .send()
+    .await
+    .unwrap();
+
+    let second_test_token = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("test_token").unwrap(),
+            String::from_str("TEST").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from)
+    .send()
+    .await
+    .unwrap();
+
+    println!("Deploying Owshen contract...");
+    let owshen = Owshen::deploy(provider.clone(), poseidon4_addr)
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
+    let mut token_contracts: Vec<TokenInfo> = Vec::new();
+
+    token_contracts.push(TokenInfo {
+        token_address: test_token.address(),
+        symbol: "WETH".to_string(),
+    });
+    token_contracts.push(TokenInfo {
+        token_address: second_test_token.address(),
+        symbol: "USDC".to_string(),
+    });
+
+    let config = Config {
+        name,
+        endpoint,
+        owshen_contract_address: owshen.address(),
+        owshen_contract_abi: owshen.abi().clone(),
+        dive_contract_address: dive.address(),
+        erc20_abi: dive.abi().clone(),
+    };
+
+    config
+}
+
+async fn initialize_wallet(endpoint: String) -> Wallet {
+    let mut token_contracts: Vec<TokenInfo> = Vec::new();
+    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+    let provider = Arc::new(provider);
+    let accounts = provider.get_accounts().await.unwrap();
+    let from = accounts[0];
+
+    let test_token = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("test_token").unwrap(),
+            String::from_str("TEST").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from)
+    .send()
+    .await
+    .unwrap();
+
+    let second_test_token = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("test_token").unwrap(),
+            String::from_str("TEST").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from)
+    .send()
+    .await
+    .unwrap();
+
+    token_contracts.push(TokenInfo {
+        token_address: test_token.address(),
+        symbol: "WETH".to_string(),
+    });
+    token_contracts.push(TokenInfo {
+        token_address: second_test_token.address(),
+        symbol: "USDC".to_string(),
+    });
+
+    let wallet = Wallet {
+        priv_key: PrivateKey::generate(&mut rand::thread_rng()),
+        token_contracts,
+    };
+
+    wallet
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
+    let config_path = home::home_dir().unwrap().join(".config-wallet.json");
 
     let opt = OwshenCliOpt::from_args();
 
@@ -383,100 +546,38 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if wallet.is_none() {
-                let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
-                let provider = Arc::new(provider);
-                println!("Deploying hash function...");
-                let poseidon4_addr = deploy(
-                    provider.clone(),
-                    include_str!("assets/poseidon4.abi"),
-                    include_str!("assets/poseidon4.evm"),
-                )
-                .await
-                .address();
-
-                let accounts = provider.get_accounts().await.unwrap();
-                let from = accounts[0];
-
-                println!("Deploying DIVE token...");
-                let dive = SimpleErc20::deploy(
-                    provider.clone(),
-                    (
-                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                        String::from_str("dive_token").unwrap(),
-                        String::from_str("DIVE").unwrap(),
-                    ),
-                )
-                .unwrap()
-                .legacy()
-                .from(from)
-                .send()
-                .await
-                .unwrap();
-                println!("Deploying test tokens...");
-                let test_token = SimpleErc20::deploy(
-                    provider.clone(),
-                    (
-                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                        String::from_str("test_token").unwrap(),
-                        String::from_str("TEST").unwrap(),
-                    ),
-                )
-                .unwrap()
-                .legacy()
-                .from(from)
-                .send()
-                .await
-                .unwrap();
-
-                let second_test_token = SimpleErc20::deploy(
-                    provider.clone(),
-                    (
-                        U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                        String::from_str("test_token").unwrap(),
-                        String::from_str("TEST").unwrap(),
-                    ),
-                )
-                .unwrap()
-                .legacy()
-                .from(from)
-                .send()
-                .await
-                .unwrap();
-
-                println!("Deploying Owshen contract...");
-                let owshen = Owshen::deploy(provider.clone(), poseidon4_addr)
-                    .unwrap()
-                    .legacy()
-                    .from(from)
-                    .send()
-                    .await
-                    .unwrap();
-                let mut token_contracts: Vec<TokenInfo> = Vec::new();
-
-                token_contracts.push(TokenInfo {
-                    token_address: test_token.address(),
-                    symbol: "WETH".to_string(),
-                });
-                token_contracts.push(TokenInfo {
-                    token_address: second_test_token.address(),
-                    symbol: "USDC".to_string(),
-                });
-
-                let wallet = Wallet {
-                    priv_key: PrivateKey::generate(&mut rand::thread_rng()),
-                    endpoint,
-                    owshen_contract_address: owshen.address(),
-                    owshen_contract_abi: owshen.abi().clone(),
-                    dive_contract_address: dive.address(),
-                    erc20_abi: dive.abi().clone(),
-                    token_contracts,
-                };
+                let wallet = initialize_wallet(endpoint).await;
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
             }
         }
-        OwshenCliOpt::Wallet(WalletOpt { db, port, test }) => {
+        OwshenCliOpt::Config(ConfigOpt {
+            endpoint,
+            name,
+            config,
+        }) => {
+            let config_path = config.unwrap_or(config_path.clone());
+            let config = std::fs::read_to_string(&config_path)
+                .map(|s| {
+                    let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
+                    c
+                })
+                .ok();
+            if config.is_none() {
+                let config = initialize_config(endpoint, name).await;
+                std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
+            } else {
+                println!("Config is already initialized!");
+            }
+        }
+        OwshenCliOpt::Wallet(WalletOpt {
+            db,
+            port,
+            endpoint,
+            test,
+            config,
+        }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -485,8 +586,16 @@ async fn main() -> Result<()> {
                 })
                 .ok();
 
-            if let Some(wallet) = &wallet {
-                let provider = Provider::<Http>::try_from(wallet.endpoint.clone()).unwrap();
+            let config_path = config.unwrap_or(config_path.clone());
+            let config = std::fs::read_to_string(&config_path)
+                .map(|s| {
+                    let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
+                    c
+                })
+                .ok();
+
+            if let (Some(wallet), Some(config)) = (&wallet, &config) {
+                let provider = Provider::<Http>::try_from(config.endpoint.clone()).unwrap();
                 let provider = Arc::new(provider);
 
                 serve_wallet(
@@ -494,15 +603,21 @@ async fn main() -> Result<()> {
                     port,
                     wallet.priv_key.clone(),
                     wallet.priv_key.clone().into(),
-                    wallet.owshen_contract_address,
-                    wallet.dive_contract_address,
-                    wallet.owshen_contract_abi.clone(),
-                    wallet.erc20_abi.clone(),
+                    config.owshen_contract_address,
+                    config.dive_contract_address,
+                    config.owshen_contract_abi.clone(),
+                    config.erc20_abi.clone(),
                     wallet.token_contracts.clone(),
                     test,
                 )
                 .await?;
             } else {
+                if wallet.is_none() {
+                    let wallet = initialize_wallet(endpoint).await;
+                    std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
+                } else {
+                    println!("Wallet is already initialized!");
+                }
                 println!("Wallet is not initialized!");
             }
         }

@@ -318,23 +318,7 @@ const Main = () => {
       return setTokenAmount(value);
     }
   };
-  const canOpenModal = () => {
-    address ? setIsOpen(true) : toast.error("Connect your wallet first");
-    // setWalletName("");
-    setTokenAmount(0);
-    // setTokenContract("");
-    setDstOwshenWallet("");
-  };
-  const setMaxBalance = async () => {
-    if (tokenContract && address && OwshenWallet.dive_abi) {
-      const value = await getERC20Balance(
-        tokenContract,
-        address,
-        OwshenWallet.dive_abi
-      );
-      return setTokenAmount(value);
-    }
-  };
+
   return (
     <>
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
