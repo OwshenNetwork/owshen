@@ -219,10 +219,15 @@ fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoRe
     }
 }
 
-async fn serve_index() -> impl IntoResponse {
+async fn serve_index(test: bool) -> impl IntoResponse {
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let index_path = format!("{}/usr/share/owshen/client/index.html", app_dir_path);
+    let index_path = if test {
+        "client/build/index.html".to_string()
+    } else {
+        format!("{}/usr/share/owshen/client/index.html", app_dir_path)
+    };
 
+    println!("index path {}", index_path);
     match read_to_string(index_path) {
         Ok(contents) => Html(contents),
         Err(_) => Html("<h1>Error: Unable to read the index file</h1>".to_string()),
@@ -272,11 +277,20 @@ async fn serve_wallet(
     let contract_clone = contract.clone();
 
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
-    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
+    let root_files_path = if test {
+        "client/build".to_string()
+    } else {
+        format!("{}/usr/share/owshen/client", app_dir_path)
+    };
+
+    let static_files_path = if test {
+        "client/build/static".to_string()
+    } else {
+        format!("{}/usr/share/owshen/client/static", app_dir_path)
+    };
 
     let app = Router::new()
-        .route("/", get(serve_index))
+        .route("/", get(move || serve_index(test)))
         .route(
             "/static/*file",
             get(|params: extract::Path<String>| async move {
