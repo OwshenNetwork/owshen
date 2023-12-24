@@ -29,7 +29,8 @@ const ReceivedCoinList = () => {
 
   const withdrawal = async (index, owshen, address) => {
     if (!address) return console.log("Connect your wallet first");
-    const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
+    const coreEndpoint =
+      process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
     const options = {
       gasLimit: 5000000,
     };

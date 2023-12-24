@@ -1,5 +1,7 @@
 use crate::fp::Fp;
 use crate::hash::hash4;
+use bip39::Mnemonic;
+use ethers::signers::coins_bip39::mnemonic;
 use ff::{Field, PrimeField, PrimeFieldBits};
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{Num, Zero};
@@ -106,6 +108,11 @@ pub struct PublicKey {
     pub point: Point,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq)]
+pub struct Entropy {
+    pub value: [u8; 16],
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct EphemeralKey {
     pub point: Point,
@@ -152,12 +159,41 @@ impl PublicKey {
     }
 }
 
+impl Entropy {
+    pub fn generate<R: Rng>(rng: &mut R) -> Self {
+        Self { value: rng.gen() }
+    }
+
+    pub fn to_mnemonic(&self) -> Result<String, bip39::Error> {
+        let mnemonic: Mnemonic = Mnemonic::from_entropy(&self.value)?;
+        let words: Vec<&str> = mnemonic.word_iter().collect::<Vec<&str>>();
+        let phrase: String = words.join(" ");
+
+        Ok(phrase)
+    }
+
+    pub fn from_mnemonic(mnemonic: Mnemonic) -> Entropy {
+        Entropy {
+            value: mnemonic.to_entropy().try_into().unwrap(),
+        }
+    }
+}
+
 impl PrivateKey {
     pub fn generate<R: Rng>(_rng: &mut R) -> Self {
         let rnd = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
         Self {
             secret: Fp::from_str_vartime(rnd.to_string().as_str()).unwrap(),
         }
+    }
+
+    pub fn to_mnemonic(&self) -> Result<String, bip39::Error> {
+        let secret_bytes: Vec<u8> = self.secret.to_repr().as_ref().to_vec();
+        let mnemonic: Mnemonic = Mnemonic::from_entropy(&secret_bytes)?;
+        let words: Vec<&str> = mnemonic.word_iter().collect::<Vec<&str>>();
+        let phrase: String = words.join(" ");
+
+        Ok(phrase)
     }
 
     pub fn shared_secret(&self, eph: EphemeralKey) -> Fp {
@@ -184,6 +220,15 @@ impl PrivateKey {
     }
     pub fn nullifier(&self, index: u32) -> Fp {
         hash4([self.secret, Fp::from(index as u64), 0.into(), 0.into()])
+    }
+}
+
+impl From<Entropy> for PrivateKey {
+    fn from(entropy: Entropy) -> Self {
+        let mnemonic: Mnemonic = Mnemonic::from_entropy(&entropy.value).unwrap();
+        let seed = mnemonic.to_seed("");
+        let secret = Fp::from_bytes(&seed).unwrap();
+        PrivateKey { secret }
     }
 }
 

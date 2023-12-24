@@ -17,6 +17,7 @@ use axum::{
 };
 use bindings::owshen::{Owshen, Point as OwshenPoint};
 use bindings::simple_erc_20::SimpleErc20;
+use bip39::Mnemonic;
 use ethers::prelude::*;
 use eyre::Result;
 use keys::Point;
@@ -46,6 +47,8 @@ pub struct InitOpt {
     endpoint: String,
     #[structopt(long)]
     db: Option<PathBuf>,
+    #[structopt(long)]
+    mnemonic: Option<Mnemonic>,
 }
 
 // Open web wallet interface
@@ -175,7 +178,7 @@ pub struct TokenInfo {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
-    priv_key: PrivateKey,
+    entropy: Entropy,
     token_contracts: Vec<TokenInfo>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -489,7 +492,7 @@ async fn initialize_config(endpoint: String, name: String) -> Config {
     config
 }
 
-async fn initialize_wallet(endpoint: String) -> Wallet {
+async fn initialize_wallet(endpoint: String, mnemonic: Option<Mnemonic>) -> Wallet {
     let mut token_contracts: Vec<TokenInfo> = Vec::new();
     let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
     let provider = Arc::new(provider);
@@ -535,10 +538,17 @@ async fn initialize_wallet(endpoint: String) -> Wallet {
         symbol: "USDC".to_string(),
     });
 
+    let entropy = if let Some(m) = mnemonic {
+        Entropy::from_mnemonic(m)
+    } else {
+        Entropy::generate(&mut rand::thread_rng())
+    };
+
     let wallet = Wallet {
-        priv_key: PrivateKey::generate(&mut rand::thread_rng()),
+        entropy,
         token_contracts,
     };
+    println!("Mnemonic {:?}", wallet.entropy.to_mnemonic().unwrap());
 
     wallet
 }
@@ -551,7 +561,11 @@ async fn main() -> Result<()> {
     let opt = OwshenCliOpt::from_args();
 
     match opt {
-        OwshenCliOpt::Init(InitOpt { endpoint, db }) => {
+        OwshenCliOpt::Init(InitOpt {
+            endpoint,
+            db,
+            mnemonic,
+        }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -560,7 +574,7 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if wallet.is_none() {
-                let wallet = initialize_wallet(endpoint).await;
+                let wallet = initialize_wallet(endpoint, mnemonic).await;
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
@@ -611,12 +625,14 @@ async fn main() -> Result<()> {
             if let (Some(wallet), Some(config)) = (&wallet, &config) {
                 let provider = Provider::<Http>::try_from(config.endpoint.clone()).unwrap();
                 let provider = Arc::new(provider);
+                let priv_key = wallet.entropy.clone().into();
+                let pub_key = PublicKey::from(priv_key);
 
                 serve_wallet(
                     provider,
                     port,
-                    wallet.priv_key.clone(),
-                    wallet.priv_key.clone().into(),
+                    priv_key,
+                    pub_key,
                     config.owshen_contract_address,
                     config.dive_contract_address,
                     config.owshen_contract_abi.clone(),
@@ -627,12 +643,11 @@ async fn main() -> Result<()> {
                 .await?;
             } else {
                 if wallet.is_none() {
-                    let wallet = initialize_wallet(endpoint).await;
+                    let wallet = initialize_wallet(endpoint, None).await;
                     std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
                 } else {
                     println!("Wallet is already initialized!");
                 }
-                println!("Wallet is not initialized!");
             }
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
@@ -645,7 +660,7 @@ async fn main() -> Result<()> {
             if let Some(wallet) = &wallet {
                 println!(
                     "Owshen Address: {}",
-                    PublicKey::from(wallet.priv_key.clone())
+                    PublicKey::from(PrivateKey::from(wallet.entropy.clone()))
                 );
             } else {
                 println!("Wallet is not initialized!");
@@ -657,6 +672,8 @@ async fn main() -> Result<()> {
 }
 use ethers::abi::Abi;
 use ethers::types::H160;
+
+use crate::keys::Entropy;
 
 async fn deploy(
     client: Arc<Provider<Http>>,

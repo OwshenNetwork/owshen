@@ -1,8 +1,10 @@
 use ethers::prelude::*;
 use ff::PrimeField;
 use num_bigint::BigUint;
+use num_traits::{Euclid, Num};
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use std::ops::Div;
 use std::str::FromStr;
 
 #[derive(PrimeField)]
@@ -44,6 +46,17 @@ impl Serialize for Fp {
     {
         let num = BigUint::from_bytes_le(self.to_repr().as_ref()).to_string();
         serializer.serialize_str(&num.to_string())
+    }
+}
+
+impl Fp {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, eyre::Report> {
+        Ok(Fp::from_str(
+            &BigUint::from_bytes_le(bytes)
+                .rem_euclid(&BigUint::from_str_radix(&Fp::MODULUS[2..], 16).unwrap())
+                .to_string(),
+        )
+        .unwrap())
     }
 }
 

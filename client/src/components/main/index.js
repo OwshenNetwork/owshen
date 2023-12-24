@@ -35,7 +35,8 @@ import BackArrow from "../../pics/icons/arrow.png";
 import MetaMaskLogo from "../../pics/icons/metaMask.png";
 
 const Main = () => {
-  const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
+  const coreEndpoint =
+    process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
   const address = useSelector(selectUserAddress);
   const receivedcoins = useSelector(selectReceivedCoins);
   const dispatch = useDispatch();
@@ -70,6 +71,7 @@ const Main = () => {
 
   useEffect(() => {
     axios.get(`${coreEndpoint}/info`).then(({ data }) => {
+      console.log("info", data);
       setOwshenWallet({
         wallet: data.address,
         contract_address: data.owshen_contract,
