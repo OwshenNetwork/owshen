@@ -36,8 +36,7 @@ pub async fn coins(
             .await
             .unwrap()
     })
-    .await
-    .unwrap();
+    .await?;
     for sent_event in sent_events {
         let ephemeral = EphemeralKey {
             point: Point {
@@ -108,8 +107,7 @@ pub async fn coins(
         .from_block(0)
         .to_block(100)
         .query()
-        .await
-        .unwrap()
+        .await?
     {
         for _coin in my_coins.clone() {
             let coin_position = my_coins

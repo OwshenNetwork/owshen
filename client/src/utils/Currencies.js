@@ -3,6 +3,8 @@ import WETHIcon from "../pics/tokens/WETH.png";
 // import USDTIcon from "../assets/img/common/USDT-icon.png";
 import USDCIcon from "../pics/tokens/USDC.png";
 import ETHIcon from "../pics/tokens/ETH.png";
+//TODO: we need to change the currency icons sync with proper token icon
+import DIVEIcon from "../pics/tokens/DIVE.png";
 export const currencyIcons = {
   WETH: WETHIcon,
   // DAI: DAIIcon,
@@ -157,6 +159,30 @@ export const currencies = {
       },
     },
     img: WETHIcon,
+  },
+
+  DIVE: {
+    name: "DIVE Token",
+    decimals: 18,
+    chain: {
+      ethereum: {
+        contract: "",
+      },
+      ethereum_goerli: {
+        contract: "",
+      },
+      arbitrum_goerli: {
+        contract: "",
+      },
+      goerli: {
+        contract: "",
+      },
+      //// mainnet 👇 ////
+      homestead: {
+        contract: "",
+      },
+    },
+    img: DIVEIcon,
   },
 };
 

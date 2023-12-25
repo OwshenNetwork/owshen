@@ -30,7 +30,7 @@ const Tokens = ({ tokensInfo }) => {
               >
                 <li className=" flex flex-wrap mb-5 items-center  border-b-2 border-black">
                   <p className="w-1/12 text-left font-bold text-lg">
-                    <img src={currencies["ETH"].img} className="w-12" />
+                    <img src={currencies["DIVE"].img} className="w-12" />
                     {console.log(tokensInfo)}
                   </p>
                   <div className="w-7/12 text-lg text-left">

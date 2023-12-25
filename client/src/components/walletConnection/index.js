@@ -24,6 +24,7 @@ const Web3ModalComponent = () => {
     { title: "network2", value: "network2" },
   ];
   const isTest = useSelector(selectIsTest);
+  console.log("is test", isTest);
 
   const dispatch = useDispatch();
 
@@ -82,7 +83,7 @@ const Web3ModalComponent = () => {
             Disconnect Wallet
           </button>
 
-          {!isTest && (
+          {isTest && (
             <Dropdown
               label="network1"
               options={netWorkOptions}
