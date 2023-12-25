@@ -11,7 +11,7 @@ pub async fn info(
     token_contracts: Vec<TokenInfo>,
     owshen_abi: Abi,
     erc20_abi: Abi,
-    isTest: bool,
+    is_test: bool,
 ) -> Result<Json<GetInfoResponse>, eyre::Report> {
     Ok(Json(GetInfoResponse {
         address,
@@ -20,6 +20,6 @@ pub async fn info(
         owshen_contract,
         owshen_abi,
         token_contracts,
-        isTest,
+        is_test,
     }))
 }

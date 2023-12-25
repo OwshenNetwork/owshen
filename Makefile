@@ -21,7 +21,8 @@ appimage:
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/applications
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/icons
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/owshen/client
-	
+
+
 	cd target/release && cp ./owshen ~/Owshen-Production.AppDir/usr/bin
 
 	cp -r client/build/* ~/Owshen-Production.AppDir/usr/share/owshen/client
@@ -37,7 +38,7 @@ appimage:
 	@echo 'export LD_LIBRARY_PATH="$${HERE}/usr/lib/:$${LD_LIBRARY_PATH:+:$${LD_LIBRARY_PATH}}"' >> ~/Owshen-Production.AppDir/AppRun
 	@echo 'export XDG_DATA_DIRS="$${HERE}/usr/share/$${XDG_DATA_DIRS:+:$${XDG_DATA_DIRS}}"' >> ~/Owshen-Production.AppDir/AppRun
 	@echo '' >> ~/Owshen-Production.AppDir/AppRun
-	@echo 'exec "$${HERE}/usr/bin/owshen" wallet --db "$${HERE}/usr/share/owshen/client/amir.json"' >> ~/Owshen-Production.AppDir/AppRun
+	@echo 'exec "$${HERE}/usr/bin/owshen" "$$@"' >> ~/Owshen-Production.AppDir/AppRun
 	
 	@chmod +x ~/Owshen-Production.AppDir/AppRun
 	

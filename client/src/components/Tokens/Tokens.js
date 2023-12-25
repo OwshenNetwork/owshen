@@ -22,10 +22,11 @@ const Tokens = ({ tokensInfo }) => {
         <h1 className="text-3xl text-left mb-7 font-bold">Tokens</h1>
         <ul>
           {tokensInfo.map(({ name, symbol }) => {
+            console.log("name and symbo", name, symbol);
             return (
               <Link
-                to={`${isTest ? "/" : `token/${name}`}`}
-                onClick={() => (isTest ? setIsInprogress(true) : "")}
+                to={`${!isTest ? "/" : `token/${name}`}`}
+                onClick={() => (!isTest ? setIsInprogress(true) : "")}
               >
                 <li className=" flex flex-wrap mb-5 items-center  border-b-2 border-black">
                   <p className="w-1/12 text-left font-bold text-lg">
@@ -44,7 +45,7 @@ const Tokens = ({ tokensInfo }) => {
         </ul>
         <p
           className="text-lg font-bold text-blue-600 cursor-pointer inline-block"
-          onClick={() => (isTest ? setIsInprogress(true) : setIsOpen(true))}
+          onClick={() => (!isTest ? setIsInprogress(true) : setIsOpen(true))}
         >
           +import
         </p>

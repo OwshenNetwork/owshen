@@ -18,6 +18,7 @@ use axum::{
 use bindings::owshen::{Owshen, Point as OwshenPoint};
 use bindings::simple_erc_20::SimpleErc20;
 use bip39::Mnemonic;
+use colored::Colorize;
 use ethers::prelude::*;
 use eyre::Result;
 use keys::Point;
@@ -40,15 +41,18 @@ use webbrowser;
 #[macro_use]
 extern crate lazy_static;
 
+const GOERLI_ENDPOINT: &str = "https://ethereum-goerli.publicnode.com";
 // Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
 pub struct InitOpt {
-    #[structopt(long, default_value = "http://127.0.0.1:8545")]
+    #[structopt(long, default_value = GOERLI_ENDPOINT)]
     endpoint: String,
     #[structopt(long)]
     db: Option<PathBuf>,
     #[structopt(long)]
     mnemonic: Option<Mnemonic>,
+    #[structopt(long)]
+    test: bool,
 }
 
 // Open web wallet interface
@@ -58,7 +62,7 @@ pub struct WalletOpt {
     db: Option<PathBuf>,
     #[structopt(long, default_value = "8000")]
     port: u16,
-    #[structopt(long, default_value = "http://127.0.0.1:8545")]
+    #[structopt(long, default_value = GOERLI_ENDPOINT)]
     endpoint: String,
     #[structopt(long, help = "Enable test mode")]
     test: bool,
@@ -67,12 +71,14 @@ pub struct WalletOpt {
 }
 #[derive(StructOpt, Debug)]
 pub struct ConfigOpt {
-    #[structopt(long, default_value = "http://127.0.0.1:8545")]
+    #[structopt(long, default_value = GOERLI_ENDPOINT)]
     endpoint: String,
     #[structopt(long)]
     name: String,
     #[structopt(long)]
     config: Option<PathBuf>,
+    #[structopt(long)]
+    test: bool,
 }
 
 // Show wallet info
@@ -95,7 +101,7 @@ pub struct GetInfoResponse {
     owshen_contract: H160,
     owshen_abi: Abi,
     token_contracts: Vec<TokenInfo>,
-    isTest: bool,
+    is_test: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -191,6 +197,19 @@ struct Config {
     erc20_abi: Abi,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            name: String::new(),
+            endpoint: GOERLI_ENDPOINT.to_string(),
+            dive_contract_address: H160::default(),
+            owshen_contract_address: H160::default(),
+            owshen_contract_abi: Abi::default(),
+            erc20_abi: Abi::default(),
+        }
+    }
+}
+
 pub struct Context {
     coins: Vec<Coin>,
     tree: SparseMerkleTree,
@@ -252,7 +271,7 @@ async fn serve_file(file_path: PathBuf) -> impl IntoResponse {
 
 async fn serve_wallet(
     provider: Arc<Provider<Http>>,
-    port: u16,
+    _port: u16,
     priv_key: PrivateKey,
     pub_key: PublicKey,
     owshen_contract: H160,
@@ -400,143 +419,147 @@ impl Into<OwshenPoint> for Point {
     }
 }
 
-async fn initialize_config(endpoint: String, name: String) -> Config {
-    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
-    let provider = Arc::new(provider);
-    println!("Deploying hash function...");
-    let poseidon4_addr = deploy(
-        provider.clone(),
-        include_str!("assets/poseidon4.abi"),
-        include_str!("assets/poseidon4.evm"),
-    )
-    .await
-    .address();
+async fn initialize_config(endpoint: String, name: String, is_test: bool) -> Config {
+    if is_test {
+        let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+        let provider = Arc::new(provider);
+        println!("Deploying hash function...");
+        let poseidon4_addr = deploy(
+            provider.clone(),
+            include_str!("assets/poseidon4.abi"),
+            include_str!("assets/poseidon4.evm"),
+        )
+        .await
+        .address();
 
-    let accounts = provider.get_accounts().await.unwrap();
-    let from = accounts[0];
+        let accounts = provider.get_accounts().await.unwrap();
+        let from = accounts[0];
 
-    println!("Deploying DIVE token...");
-    let dive = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-            String::from_str("dive_token").unwrap(),
-            String::from_str("DIVE").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from)
-    .send()
-    .await
-    .unwrap();
-    println!("Deploying test tokens...");
-    let test_token = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-            String::from_str("test_token").unwrap(),
-            String::from_str("TEST").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from)
-    .send()
-    .await
-    .unwrap();
-
-    let second_test_token = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-            String::from_str("test_token").unwrap(),
-            String::from_str("TEST").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from)
-    .send()
-    .await
-    .unwrap();
-
-    println!("Deploying Owshen contract...");
-    let owshen = Owshen::deploy(provider.clone(), poseidon4_addr)
+        println!("Deploying DIVE token...");
+        let dive = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("dive_token").unwrap(),
+                String::from_str("DIVE").unwrap(),
+            ),
+        )
         .unwrap()
         .legacy()
         .from(from)
         .send()
         .await
         .unwrap();
-    let mut token_contracts: Vec<TokenInfo> = Vec::new();
+        println!("Deploying test tokens...");
+        let test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-    token_contracts.push(TokenInfo {
-        token_address: test_token.address(),
-        symbol: "WETH".to_string(),
-    });
-    token_contracts.push(TokenInfo {
-        token_address: second_test_token.address(),
-        symbol: "USDC".to_string(),
-    });
+        let second_test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-    let config = Config {
-        name,
-        endpoint,
-        owshen_contract_address: owshen.address(),
-        owshen_contract_abi: owshen.abi().clone(),
-        dive_contract_address: dive.address(),
-        erc20_abi: dive.abi().clone(),
-    };
+        println!("Deploying Owshen contract...");
+        let owshen = Owshen::deploy(provider.clone(), poseidon4_addr)
+            .unwrap()
+            .legacy()
+            .from(from)
+            .send()
+            .await
+            .unwrap();
+        let mut token_contracts: Vec<TokenInfo> = Vec::new();
 
-    config
+        token_contracts.push(TokenInfo {
+            token_address: test_token.address(),
+            symbol: "WETH".to_string(),
+        });
+        token_contracts.push(TokenInfo {
+            token_address: second_test_token.address(),
+            symbol: "USDC".to_string(),
+        });
+
+        return Config {
+            name,
+            endpoint,
+            owshen_contract_address: owshen.address(),
+            owshen_contract_abi: owshen.abi().clone(),
+            dive_contract_address: dive.address(),
+            erc20_abi: dive.abi().clone(),
+        };
+    } else {
+        return Config::default();
+    }
 }
 
-async fn initialize_wallet(endpoint: String, mnemonic: Option<Mnemonic>) -> Wallet {
+async fn initialize_wallet(endpoint: String, mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet {
     let mut token_contracts: Vec<TokenInfo> = Vec::new();
     let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
     let provider = Arc::new(provider);
     let accounts = provider.get_accounts().await.unwrap();
-    let from = accounts[0];
 
-    let test_token = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-            String::from_str("test_token").unwrap(),
-            String::from_str("TEST").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from)
-    .send()
-    .await
-    .unwrap();
+    if is_test {
+        let from = accounts[0];
+        let test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-    let second_test_token = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-            String::from_str("test_token").unwrap(),
-            String::from_str("TEST").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from)
-    .send()
-    .await
-    .unwrap();
+        let second_test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-    token_contracts.push(TokenInfo {
-        token_address: test_token.address(),
-        symbol: "WETH".to_string(),
-    });
-    token_contracts.push(TokenInfo {
-        token_address: second_test_token.address(),
-        symbol: "USDC".to_string(),
-    });
+        token_contracts.push(TokenInfo {
+            token_address: test_token.address(),
+            symbol: "WETH".to_string(),
+        });
+        token_contracts.push(TokenInfo {
+            token_address: second_test_token.address(),
+            symbol: "USDC".to_string(),
+        });
+    }
 
     let entropy = if let Some(m) = mnemonic {
         Entropy::from_mnemonic(m)
@@ -548,7 +571,18 @@ async fn initialize_wallet(endpoint: String, mnemonic: Option<Mnemonic>) -> Wall
         entropy,
         token_contracts,
     };
-    println!("Mnemonic {:?}", wallet.entropy.to_mnemonic().unwrap());
+
+    println!(
+        "{} {}",
+        "Your 12-word mnemonic phrase is:".bright_green(),
+        wallet.entropy.to_mnemonic().unwrap()
+    );
+    println!(
+        "{}",
+        "PLEASE KEEP YOUR MNEMONIC PHRASE IN A SAFE PLACE OR YOU WILL LOSE YOUR FUNDS!"
+            .bold()
+            .bright_red()
+    );
 
     wallet
 }
@@ -558,6 +592,12 @@ async fn main() -> Result<()> {
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
     let config_path = home::home_dir().unwrap().join(".config-wallet.json");
 
+    println!(
+        "{} {}",
+        "Your wallet path:".bright_green(),
+        wallet_path.to_string_lossy()
+    );
+
     let opt = OwshenCliOpt::from_args();
 
     match opt {
@@ -565,6 +605,7 @@ async fn main() -> Result<()> {
             endpoint,
             db,
             mnemonic,
+            test,
         }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
@@ -574,7 +615,7 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if wallet.is_none() {
-                let wallet = initialize_wallet(endpoint, mnemonic).await;
+                let wallet = initialize_wallet(endpoint, mnemonic, test).await;
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
@@ -584,6 +625,7 @@ async fn main() -> Result<()> {
             endpoint,
             name,
             config,
+            test,
         }) => {
             let config_path = config.unwrap_or(config_path.clone());
             let config = std::fs::read_to_string(&config_path)
@@ -593,7 +635,7 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if config.is_none() {
-                let config = initialize_config(endpoint, name).await;
+                let config = initialize_config(endpoint, name, test).await;
                 std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
             } else {
                 println!("Config is already initialized!");
@@ -622,7 +664,8 @@ async fn main() -> Result<()> {
                 })
                 .ok();
 
-            if let (Some(wallet), Some(config)) = (&wallet, &config) {
+            if let Some(wallet) = &wallet {
+                let config = config.clone().unwrap_or_default();
                 let provider = Provider::<Http>::try_from(config.endpoint.clone()).unwrap();
                 let provider = Arc::new(provider);
                 let priv_key = wallet.entropy.clone().into();
@@ -643,7 +686,7 @@ async fn main() -> Result<()> {
                 .await?;
             } else {
                 if wallet.is_none() {
-                    let wallet = initialize_wallet(endpoint, None).await;
+                    let wallet = initialize_wallet(endpoint, None, test).await;
                     std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
                 } else {
                     println!("Wallet is already initialized!");
@@ -693,11 +736,10 @@ async fn deploy(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hash::hash4;
-    use bindings::coin_withdraw_verifier::CoinWithdrawVerifier;
+
     use ethers::abi::Abi;
     use ethers::utils::Ganache;
-    use k256::elliptic_curve::consts::U25;
+
     use std::sync::Arc;
 
     use ethers::core::types::Bytes;

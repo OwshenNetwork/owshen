@@ -67,7 +67,7 @@ const Main = () => {
     { title: "network2", value: "network2" },
   ];
   const [walletName, setWalletName] = useState("");
-  const tokenInfo = [{ name: "owshen", symbol: "DIVE" }];
+  const tokenInfo = [{ name: "Owshen Network", symbol: "DIVE" }];
 
   useEffect(() => {
     axios.get(`${coreEndpoint}/info`).then(({ data }) => {
@@ -80,7 +80,7 @@ const Main = () => {
         dive_abi: data.erc20_abi,
         token_contracts: data.token_contracts,
       });
-      setIsTestHere(data.isTest);
+      setIsTestHere(data.is_test);
       dispatch(
         setOwshen({
           type: "SET_OWSHEN",
@@ -94,7 +94,7 @@ const Main = () => {
           },
         })
       );
-      dispatch(setIsTest(data.isTest));
+      dispatch(setIsTest(data.is_test));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     if (OwshenWallet) {
@@ -141,11 +141,7 @@ const Main = () => {
     OwshenWallet.contract_address,
     OwshenWallet.dive_abi
   );
-  const checkIfTest = () => {
-    if (isTest) {
-      return setIsInprogress(true);
-    }
-  };
+
   const getStealth = async () => {
     if (!address) return toast.error("Connect your wallet first");
     if (!destOwshenWallet) return toast.error("Enter your Destination");
@@ -298,10 +294,10 @@ const Main = () => {
   }
   const copyWalletAddress = () => {
     navigator.clipboard.writeText(OwshenWallet.wallet);
-    toast.success("your wallet address copied");
+    toast.success("Your wallet address has been copied!");
   };
   const canOpenModal = () => {
-    if (isTest) {
+    if (!isTest) {
       return setIsInprogress(true);
     }
     address ? setIsOpen(true) : toast.error("Connect your wallet first");
@@ -400,7 +396,7 @@ const Main = () => {
       </Modal>
       <div style={{ textAlign: "center" }}>
         <div className="mt-10 ">
-          <Tooltip id="copy" place="top" content="copy wallet addres" />
+          <Tooltip id="copy" place="top" content="Copy wallet address" />
           {/* 🌊 Owshen Wallet 🌊 */}
           {OwshenWallet.wallet && (
             <button

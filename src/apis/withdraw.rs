@@ -78,7 +78,7 @@ pub async fn withdraw(
                     commitment: u256_calc_commitment,
                     ephemeral: ephemeral.point,
                 })),
-                Err(e) => Err(eyre::Report::msg(
+                Err(_e) => Err(eyre::Report::msg(
                     "Something wrong while creating proof for withdraw",
                 )),
             }

@@ -108,7 +108,7 @@ pub async fn send(
                     sender_ephemeral: address_ephemeral.point,
                     receiver_ephemeral: receiver_address_ephemeral.point,
                 })),
-                Err(e) => Err(eyre::Report::msg(
+                Err(_e) => Err(eyre::Report::msg(
                     "Something wrong while creating proof for send",
                 )),
             }

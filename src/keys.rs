@@ -1,7 +1,7 @@
 use crate::fp::Fp;
 use crate::hash::hash4;
 use bip39::Mnemonic;
-use ethers::signers::coins_bip39::mnemonic;
+
 use ff::{Field, PrimeField, PrimeFieldBits};
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{Num, Zero};
