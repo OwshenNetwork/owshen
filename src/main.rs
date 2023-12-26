@@ -25,13 +25,14 @@ use keys::Point;
 use keys::{PrivateKey, PublicKey};
 use proof::Proof;
 use serde::{Deserialize, Serialize};
-use std::fs::read_to_string;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::{fs::read_to_string, process::Command};
 use structopt::StructOpt;
 use tokio::fs::File;
+use tokio::task;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeFile;
@@ -299,17 +300,8 @@ async fn serve_wallet(
     let contract_clone = contract.clone();
 
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let root_files_path = if test {
-        "client/build".to_string()
-    } else {
-        format!("{}/usr/share/owshen/client", app_dir_path)
-    };
-
-    let static_files_path = if test {
-        "client/build/static".to_string()
-    } else {
-        format!("{}/usr/share/owshen/client/static", app_dir_path)
-    };
+    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
+    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
 
     let app = Router::new()
         .route("/", get(move || serve_index(test)))
@@ -387,21 +379,46 @@ async fn serve_wallet(
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
 
-    let server = axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal());
+    if test {
+        let frontend = async {
+            task::spawn_blocking(move || {
+                let _output = Command::new("npm")
+                    .arg("start")
+                    .env(
+                        "REACT_APP_OWSHEN_ENDPOINT",
+                        format!("http://127.0.0.1:{}", 9000),
+                    )
+                    .current_dir("client")
+                    .spawn()
+                    .expect("failed to execute process");
+            });
+            Ok::<(), eyre::Error>(())
+        };
+        let backend = async {
+            axum::Server::bind(&addr)
+                .serve(app.into_make_service())
+                .await?;
+            Ok::<(), eyre::Error>(())
+        };
 
-    // Attempt to open the web browser
-    if webbrowser::open(&format!("http://{}", addr)).is_err() {
-        println!(
-            "Failed to open web browser. Please navigate to http://{} manually",
-            addr
-        );
+        tokio::try_join!(backend, frontend)?;
+        Ok(())
+    } else {
+        let server = axum::Server::bind(&addr)
+            .serve(app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal());
+
+        // Attempt to open the web browser
+        if webbrowser::open(&format!("http://{}", addr)).is_err() {
+            println!(
+                "Failed to open web browser. Please navigate to http://{} manually",
+                addr
+            );
+        }
+
+        server.await.map_err(eyre::Report::new)?;
+        Ok(())
     }
-
-    server.await.map_err(eyre::Report::new)?;
-
-    Ok(())
 }
 
 async fn shutdown_signal() {
