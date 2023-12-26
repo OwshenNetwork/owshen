@@ -32,7 +32,7 @@ Owshen Platform is basically a smart-contract maintaining a Sparse-Merkle-Tree, 
 
 Fixed addresses are bad for the destination's privacy, a TornadoCash-style pool will only allow you to hide the sender, but everyone watching from outside can see that money is being sent to the receiver. We may solve this problem by requiring the receiver to generate a new address whenever he wants to receive a coin, but this would require the receiver to be online all the time. In case the receiver is someone accepting donations, it's easiest for him to announce a fixed address for receiving the donations.
 
-Stealth-addresses solve this problem already: instead of requiring the receiver to generate a new address everytime he wants to receive the coin, we will let the sender 
+Stealth-addresses solve this problem already: instead of requiring the receiver to generate a new address everytime he wants to receive the coin, we will let the sender derive stealth public-keys, from the receiver's master public key!
 
 The sender will generate a random scalar $r$, and will broadcast the point $r \times G$ publicly. In this case, $s \times r \times G$ is a shared-secret between the sender and the receiver (Very similar to Diffie-Hellman key-exchange algorithm).  $s \times r \times G$ is an elliptic curve point, we can convert it to a scalar using a hash function, so that it can be used a private-key. The sender will send the coin to $(hash(s \times r \times G) + s)\times G$ instead of $s \times G$, and then the receiver would be able to detect incoming transactions and derive the corresponding private-keys of stealth-addresses: $hash(s \times r \times G) + s$.
 
@@ -63,4 +63,4 @@ ${token}_{encoded} = ({token} + hash(g^{sr})) \mod p$
 
 ${amount}_{encoded} = ({amount} + hash(g^{sr})) \mod p$
 
-The receiver may subtract the shared secret from token/amount to calculate the leaf's actual token/amount and try to calculate the commitment. If the commitment he has calculated is equal with the commitment submitted on-chain, then 
+The receiver may subtract the shared secret from token/amount to calculate the leaf's actual token/amount and try to calculate the commitment. If the commitment he has calculated is equal with the commitment submitted on-chain, then the coin is for him and he can derive the private-key needed for spending that coin.
