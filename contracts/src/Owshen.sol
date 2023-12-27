@@ -39,13 +39,13 @@ contract Owshen {
 
     IHasher mimc;
     SparseMerkleTree tree;
-    uint256 public depositIndex = 0;
+    uint256 public depositIndex = 4 ** 15;
 
     /**
      * @dev The constructor
      */
-    constructor(IHasher _hasher) {
-        tree = new SparseMerkleTree(_hasher);
+    constructor(IHasher _hasher, uint256 _genesis_root) {
+        tree = new SparseMerkleTree(_hasher, _genesis_root);
         mimc = _hasher;
         coin_withdraw_verifier = new CoinWithdrawVerifier();
     }

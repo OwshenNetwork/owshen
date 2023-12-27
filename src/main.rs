@@ -1,5 +1,6 @@
 mod apis;
 mod fp;
+mod genesis;
 mod hash;
 mod keys;
 mod poseidon;
