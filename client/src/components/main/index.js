@@ -21,7 +21,7 @@ import { toast } from "react-toastify";
 import Dropdown from "../dropDown";
 import Modal from "../Modal/Modal";
 import { Tooltip } from "react-tooltip";
-import { getERC20Balance } from "../../utils/helper";
+import { getERC20Balance, trueAmount } from "../../utils/helper";
 import { currencies } from "../../utils/Currencies";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import InProgress from "../Modal/InProgress";
@@ -194,18 +194,16 @@ const Main = () => {
         }
       });
   };
-
+  //TODO: improve this algorithm
   const findMatchingCoin = () => {
     for (let coin of receivedcoins) {
       if (
-        coin.amount > tokenAmount &&
+        trueAmount(coin.amount) > tokenAmount &&
         String(coin.uint_token) === String(tokenContract)
       ) {
         return coin;
       }
     }
-
-    return toast.error("No matching coin is found");
   };
 
   const send = async () => {
@@ -214,7 +212,7 @@ const Main = () => {
     if (!tokenContract) return toast.error("Select your token");
     if (!tokenAmount) return toast.error("enter amount of token");
 
-    const selectedCoint = findMatchingCoin();
+    const selectedCoin = findMatchingCoin();
 
     const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
     const options = {
@@ -222,69 +220,73 @@ const Main = () => {
     };
     const to_wei_token_amount = utils.toWei(Number(tokenAmount), "ether");
 
-    axios
+    if (selectedCoin) {
+      axios
 
-      .get(`${coreEndpoint}/send`, {
-        params: {
-          index: selectedCoint.index,
-          address: OwshenWallet.wallet,
-          new_amount: to_wei_token_amount,
-          receiver_address: destOwshenWallet,
-        },
-      })
-      .then(async (result) => {
-        let abi = OwshenWallet.contract_abi;
-        let commitment1 = result.data.sender_commitment;
-        let commitment2 = result.data.receiver_commitment;
-        let provider = new ethers.BrowserProvider(window.ethereum);
+        .get(`${coreEndpoint}/send`, {
+          params: {
+            index: selectedCoin.index,
+            address: OwshenWallet.wallet,
+            new_amount: to_wei_token_amount,
+            receiver_address: destOwshenWallet,
+          },
+        })
+        .then(async (result) => {
+          let abi = OwshenWallet.contract_abi;
+          let commitment1 = result.data.sender_commitment;
+          let commitment2 = result.data.receiver_commitment;
+          let provider = new ethers.BrowserProvider(window.ethereum);
 
-        let contract = new ethers.Contract(
-          OwshenWallet.contract_address,
-          abi,
-          provider
-        );
-
-        let signer = await provider.getSigner();
-        contract = contract.connect(signer);
-
-        const proof = [
-          result.data.proof.a,
-          result.data.proof.b,
-          result.data.proof.c,
-        ];
-
-        const rax = utils.toBigInt(result.data.receiver_ephemeral.x);
-        const ray = utils.toBigInt(result.data.receiver_ephemeral.y);
-
-        const receiver_ephemeral = [rax, ray];
-
-        const sax = utils.toBigInt(result.data.sender_ephemeral.x);
-        const say = utils.toBigInt(result.data.sender_ephemeral.y);
-
-        const sender_ephemeral = [sax, say];
-
-        try {
-          const txResponse = await contract.send(
-            result.data.nullifier,
-            proof,
-            receiver_ephemeral,
-            sender_ephemeral,
-            commitment1,
-            commitment2,
-            result.data.token,
-            result.data.obfuscated_receiver_amount,
-            result.data.obfuscated_sender_amount,
-            true,
-            options
+          let contract = new ethers.Contract(
+            OwshenWallet.contract_address,
+            abi,
+            provider
           );
-          console.log("Transaction response", txResponse);
-          const txReceipt = await txResponse.wait();
-          console.log("Transaction receipt", txReceipt);
-        } catch (error) {
-          toast.error("Error while getting withdraw flow");
-          console.log(error, "Error while getting withdraw flow");
-        }
-      });
+
+          let signer = await provider.getSigner();
+          contract = contract.connect(signer);
+
+          const proof = [
+            result.data.proof.a,
+            result.data.proof.b,
+            result.data.proof.c,
+          ];
+
+          const rax = utils.toBigInt(result.data.receiver_ephemeral.x);
+          const ray = utils.toBigInt(result.data.receiver_ephemeral.y);
+
+          const receiver_ephemeral = [rax, ray];
+
+          const sax = utils.toBigInt(result.data.sender_ephemeral.x);
+          const say = utils.toBigInt(result.data.sender_ephemeral.y);
+
+          const sender_ephemeral = [sax, say];
+
+          try {
+            const txResponse = await contract.send(
+              result.data.nullifier,
+              proof,
+              receiver_ephemeral,
+              sender_ephemeral,
+              commitment1,
+              commitment2,
+              result.data.token,
+              result.data.obfuscated_receiver_amount,
+              result.data.obfuscated_sender_amount,
+              true,
+              options
+            );
+            console.log("Transaction response", txResponse);
+            const txReceipt = await txResponse.wait();
+            console.log("Transaction receipt", txReceipt);
+          } catch (error) {
+            toast.error("Error while getting withdraw flow");
+            console.log(error, "Error while getting withdraw flow");
+          }
+        });
+    } else {
+      return toast.error("No matching coin is found");
+    }
   };
 
   function shortenAddress(address) {

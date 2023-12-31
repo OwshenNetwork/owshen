@@ -19,6 +19,7 @@ import ReactLoading from "react-loading";
 import "./style.css";
 import BackIcon from "../../pics/icons/left_arrow.png";
 import MergIcon from "../../pics/icons/merge-icon.png";
+import { trueAmount } from "../../utils/helper";
 
 const ReceivedCoinList = () => {
   const owshen = useSelector(selectOwshen);
@@ -86,9 +87,6 @@ const ReceivedCoinList = () => {
           console.log(error, "Error while getting withdraw flow");
         }
       });
-  };
-  const trueAmount = (val) => {
-    return Number(toBigInt(val).toString()) / Math.pow(10, 18);
   };
 
   return (

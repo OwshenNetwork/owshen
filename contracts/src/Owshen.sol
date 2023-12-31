@@ -21,7 +21,8 @@ contract Owshen {
         uint256 y;
     }
 
-    event Sent( // directed or obfuscated
+    event Sent(
+        // directed or obfuscated
         // directed or obfuscated
         Point ephemeral,
         uint256 index,
@@ -59,29 +60,56 @@ contract Owshen {
         address _to
     ) public payable {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
-        uint256 leaf = mimc.poseidon([_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]);
+        uint256 leaf = mimc.poseidon(
+            [_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]
+        );
         tree.set(depositIndex, leaf);
         _processDeposit(_from, _to, _tokenAddress, _amount);
-        emit Sent(ephemeral, depositIndex, block.timestamp, _amount, uint_tokenaddress, leaf);
+        emit Sent(
+            ephemeral,
+            depositIndex,
+            block.timestamp,
+            _amount,
+            uint_tokenaddress,
+            leaf
+        );
         depositIndex += 1;
     }
 
     function getPointKey(Point memory _pub_key) public pure returns (bytes32) {
-        string memory keyString = string(abi.encodePacked(_pub_key.x.toString(), ",", _pub_key.y.toString()));
+        string memory keyString = string(
+            abi.encodePacked(_pub_key.x.toString(), ",", _pub_key.y.toString())
+        );
         return keccak256(abi.encodePacked(keyString));
     }
 
-    function _processDeposit(address _from, address _to, address _token, uint256 _amount) internal {
-        require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
+    function _processDeposit(
+        address _from,
+        address _to,
+        address _token,
+        uint256 _amount
+    ) internal {
+        require(
+            msg.value == 0,
+            "ETH value is supposed to be 0 for ERC20 instance"
+        );
         IERC20(_token).transferFrom(_from, _to, _amount);
     }
 
-    function spend(uint256 nullifier, Proof calldata proof, uint256 _commitment, uint256 _commitment2) internal {
+    function spend(
+        uint256 nullifier,
+        Proof calldata proof,
+        uint256 _commitment,
+        uint256 _commitment2
+    ) internal {
         require(!nullifiers[nullifier], "Nullifier has been spent");
         nullifiers[nullifier] = true;
         require(
             coin_withdraw_verifier.verifyProof(
-                proof.a, proof.b, proof.c, [root(), nullifier, _commitment, _commitment2]
+                proof.a,
+                proof.b,
+                proof.c,
+                [root(), nullifier, _commitment, _commitment2]
             ),
             "Invalid proof"
         );
@@ -104,7 +132,12 @@ contract Owshen {
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
         emit Sent(
-            _ephemeral, depositIndex, block.timestamp, _obfuscated_remaining_amount, uint_tokenaddress, _commitment
+            _ephemeral,
+            depositIndex,
+            block.timestamp,
+            _obfuscated_remaining_amount,
+            uint_tokenaddress,
+            _commitment
         );
         emit Spend(nullifier);
         depositIndex += 1;
@@ -125,13 +158,23 @@ contract Owshen {
         spend(nullifier, proof, _commitment2, _commitment1);
         tree.set(depositIndex, _commitment2);
         emit Sent(
-            receiver_ephemeral, depositIndex, block.timestamp, _receiver_amount_hint, _token_address_hint, _commitment2
+            receiver_ephemeral,
+            depositIndex,
+            block.timestamp,
+            _receiver_amount_hint,
+            _token_address_hint,
+            _commitment2
         );
         depositIndex += 1;
         if (isDualOutput) {
             tree.set(depositIndex, _commitment1);
             emit Sent(
-                sender_ephemeral, depositIndex, block.timestamp, _sender_amount_hint, _token_address_hint, _commitment1
+                sender_ephemeral,
+                depositIndex,
+                block.timestamp,
+                _sender_amount_hint,
+                _token_address_hint,
+                _commitment1
             );
             depositIndex += 1;
         }
@@ -148,7 +191,9 @@ contract Owshen {
     /**
      * @dev whether an array of nullifiers is already spent
      */
-    function isSpentArray(uint256[] calldata _nullifierHashes) external view returns (bool[] memory spent) {
+    function isSpentArray(
+        uint256[] calldata _nullifierHashes
+    ) external view returns (bool[] memory spent) {
         spent = new bool[](_nullifierHashes.length);
         for (uint256 i = 0; i < _nullifierHashes.length; i++) {
             if (isSpent(_nullifierHashes[i])) {
@@ -161,7 +206,9 @@ contract Owshen {
         return tree.root();
     }
 
-    function getUintTokenAddress(address _token_address) private pure returns (uint256) {
+    function getUintTokenAddress(
+        address _token_address
+    ) private pure returns (uint256) {
         return uint256(uint160(_token_address));
     }
 }

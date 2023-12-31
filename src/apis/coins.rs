@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::time::timeout;
 
+use crate::extract_token_amount;
 use crate::fp::Fp;
 use crate::hash::hash4;
 use crate::keys::Point;
@@ -52,53 +53,34 @@ pub async fn coins(
         let hint_token_address = sent_event.hint_token_address;
         let u64_index: u64 = index.low_u64();
         let commitment = Fp::try_from(sent_event.commitment)?;
+        let shared_secret = stealth_priv.shared_secret(ephemeral);
         tree.set(u64_index, commitment);
 
-        let calc_commitment = hash4([
-            stealth_pub.point.x,
-            stealth_pub.point.y,
-            Fp::try_from(hint_amount)?,
-            Fp::try_from(hint_token_address)?,
-        ]);
-
-        let shared_secret = stealth_priv.shared_secret(ephemeral);
-
-        if commitment == calc_commitment {
-            println!("ITS MINE");
-            my_coins.push(Coin {
-                index,
-                uint_token: u256_to_h160(hint_token_address),
-                amount: sent_event.hint_amount,
-                nullifier: stealth_priv.nullifier(index.low_u32()).into(),
-                priv_key: stealth_priv,
-                pub_key: stealth_pub,
-                commitment: sent_event.commitment,
-            });
-        }
-
-        // get sends
-        let amount = U256::to_string(&(Fp::try_from(hint_amount)? - shared_secret).into());
-        let token_address =
-            U256::to_string(&(Fp::try_from(hint_token_address)? - shared_secret).into());
-
-        let calc_commitment_obfuscate = hash4([
-            stealth_pub.point.x,
-            stealth_pub.point.y,
-            Fp::from_str(&amount)?,
-            Fp::from_str(&token_address)?,
-        ]);
-
-        if commitment == calc_commitment_obfuscate {
-            println!("I HAVE SOMETHING ");
-            my_coins.push(Coin {
-                index,
-                uint_token: u256_to_h160(U256::from_str(&token_address)?),
-                amount: U256::from_str(&amount)?,
-                nullifier: stealth_priv.nullifier(index.low_u32()).into(),
-                priv_key: stealth_priv,
-                pub_key: stealth_pub,
-                commitment: commitment.into(),
-            });
+        match extract_token_amount(
+            hint_token_address,
+            hint_amount,
+            shared_secret,
+            commitment,
+            stealth_pub,
+        ) {
+            Ok(Some((fp_hint_token_address, fp_hint_amount))) => {
+                println!("I HAVE SOMETHING");
+                my_coins.push(Coin {
+                    index,
+                    uint_token: u256_to_h160(fp_hint_token_address.into()),
+                    amount: fp_hint_amount.into(),
+                    nullifier: stealth_priv.nullifier(index.low_u32()).into(),
+                    priv_key: stealth_priv,
+                    pub_key: stealth_pub,
+                    commitment: sent_event.commitment,
+                });
+            }
+            Ok(None) => {
+                println!("No coin was found");
+            }
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+            }
         }
     }
 

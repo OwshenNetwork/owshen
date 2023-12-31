@@ -9,6 +9,7 @@ use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::Point;
+use crate::keys::PrivateKey;
 use crate::keys::PublicKey;
 use crate::proof::prove;
 use crate::proof::Proof;
@@ -21,6 +22,7 @@ pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,
     context_withdraw: Arc<Mutex<Context>>,
     context_tree: Arc<Mutex<Context>>,
+    priv_key: PrivateKey,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
     let coins = context_withdraw.lock().unwrap().coins.clone();
@@ -34,27 +36,35 @@ pub async fn withdraw(
             let u64_index: u64 = index.low_u64();
             // get merkle proof
             let merkle_proof = merkle_root.get(u64_index);
-            let pub_key = PublicKey::from_str(&address)?;
+
+            let pub_key: PublicKey = PublicKey::from_str(&address)?;
             let (ephemeral, stealth_pub_key) = pub_key.derive(&mut rand::thread_rng());
+            let stealth_priv: PrivateKey = priv_key.derive(ephemeral);
+            let shared_secret: Fp = stealth_priv.shared_secret(ephemeral);
 
             let amount: U256 = coin.amount;
 
             let new_amount_num: i64 = req.desire_amount.parse()?;
+            let obfuscated_remaining_amount: U256 = amount - new_amount_num;
 
-            let obfuscated_remaining_amount = amount - new_amount_num;
+            let obfuscated_remaining_amount_in_fp: Fp = Fp::try_from(obfuscated_remaining_amount)?;
+
+            let obfuscated_remaining_amount_with_secret: U256 =
+                (obfuscated_remaining_amount_in_fp + shared_secret).into();
 
             let min: U256 = amount - new_amount_num;
-            let remaining_amount = min.to_string();
+            let remaining_amount: String = min.to_string();
 
-            let hint_token_address = h160_to_u256(coin.uint_token);
+            let hint_token_address: U256 = h160_to_u256(coin.uint_token);
 
-            let calc_commitment = hash4([
+            let calc_commitment: Fp = hash4([
                 stealth_pub_key.point.x,
                 stealth_pub_key.point.y,
                 Fp::from_str(&remaining_amount)?,
                 Fp::try_from(hint_token_address)?,
             ]);
-            let u256_calc_commitment = calc_commitment.into();
+
+            let u256_calc_commitment: U256 = calc_commitment.into();
 
             let proof: std::result::Result<Proof, eyre::Error> = prove(
                 PARAMS_FILE,
@@ -73,7 +83,7 @@ pub async fn withdraw(
                     proof,
                     token: coin.uint_token,
                     amount: coin.amount,
-                    obfuscated_remaining_amount,
+                    obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
                     nullifier: coin.nullifier,
                     commitment: u256_calc_commitment,
                     ephemeral: ephemeral.point,

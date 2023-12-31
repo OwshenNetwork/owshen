@@ -21,6 +21,8 @@ use bip39::Mnemonic;
 use colored::Colorize;
 use ethers::prelude::*;
 use eyre::Result;
+use fp::Fp;
+use hash::hash4;
 use keys::Point;
 use keys::{PrivateKey, PublicKey};
 use proof::Proof;
@@ -232,6 +234,61 @@ fn h160_to_u256(h160_val: H160) -> U256 {
     U256::from_big_endian(&bytes)
 }
 
+fn extract_token_amount(
+    hint_token_address: U256,
+    hint_amount: U256,
+    shared_secret: Fp,
+    commitment: Fp,
+    stealth_pub: PublicKey,
+) -> Result<Option<(Fp, Fp)>, eyre::Report> {
+    let amount = Fp::try_from(hint_amount)? - shared_secret;
+    let token_address = Fp::try_from(hint_token_address)? - shared_secret;
+
+    let calc_commitment1 = hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        Fp::try_from(hint_amount)?,
+        Fp::try_from(hint_token_address)?,
+    ]);
+
+    let calc_commitment2 = hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        amount,
+        token_address,
+    ]);
+
+    let calc_commitment3 = hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        amount,
+        Fp::try_from(hint_token_address)?,
+    ]);
+
+    let calc_commitment4 = hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        Fp::try_from(hint_amount)?,
+        token_address,
+    ]);
+
+    if calc_commitment1 == commitment {
+        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
+        let fp_hint_amount = Fp::try_from(hint_amount)?;
+        return Ok(Some((fp_hint_token_address, fp_hint_amount)));
+    } else if calc_commitment2 == commitment {
+        return Ok(Some((token_address, amount)));
+    } else if calc_commitment3 == commitment {
+        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
+        return Ok(Some((fp_hint_token_address, amount)));
+    } else if calc_commitment4 == commitment {
+        let fp_hint_amount = Fp::try_from(hint_amount)?;
+        return Ok(Some((token_address, fp_hint_amount)));
+    }
+
+    Ok(None)
+}
+
 fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {
     match result {
         Ok(a) => a.into_response(),
@@ -338,7 +395,9 @@ async fn serve_wallet(
             "/withdraw",
             get(
                 move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                    handle_error(apis::withdraw(Query(req), context_withdraw, context_tree).await)
+                    handle_error(
+                        apis::withdraw(Query(req), context_withdraw, context_tree, priv_key).await,
+                    )
                 },
             ),
         )
@@ -346,7 +405,9 @@ async fn serve_wallet(
             "/send",
             get(
                 move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                    handle_error(apis::send(Query(req), context_send, context_tree_send).await)
+                    handle_error(
+                        apis::send(Query(req), context_send, context_tree_send, priv_key).await,
+                    )
                 },
             ),
         )

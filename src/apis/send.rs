@@ -9,6 +9,7 @@ use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::Point;
+use crate::keys::PrivateKey;
 use crate::keys::PublicKey;
 use crate::proof::prove;
 use crate::proof::Proof;
@@ -21,12 +22,12 @@ pub async fn send(
     Query(req): Query<GetSendRequest>,
     context_send: Arc<Mutex<Context>>,
     context_tree_send: Arc<Mutex<Context>>,
+    priv_key: PrivateKey,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
     let new_amount = req.new_amount;
     let receiver_address = req.receiver_address;
     let address = req.address;
-
     let coins = context_send.lock().unwrap().coins.clone();
     let merkle_root = context_tree_send.lock().unwrap().tree.clone();
     // Find a coin with the specified index
@@ -47,62 +48,59 @@ pub async fn send(
             let (receiver_address_ephemeral, receiver_address_stealth_pub_key) =
                 receiver_address_pub_key.derive(&mut rand::thread_rng());
 
+            let stealth_priv: PrivateKey = priv_key.derive(address_ephemeral);
+            let sender_shared_secret: Fp = stealth_priv.shared_secret(address_ephemeral);
+            let receiver_shared_secret: Fp = stealth_priv.shared_secret(receiver_address_ephemeral);
+
             let amount: U256 = coin.amount;
-            let str_amount: String = U256::to_string(&amount);
-
-            let str_amount_num: i64 = str_amount.parse()?;
-            let new_amount_num: i64 = new_amount.parse()?;
-
-            let send_amount = U256::from_str(&new_amount)?;
-
-            let min = str_amount_num - new_amount_num;
-
-            let remaining_amount = min.to_string();
-
-            let obfuscated_remaining_amount = amount - new_amount_num;
+            let fp_amount = Fp::try_from(amount)?;
+            let u256_new_amount = U256::from_str(&new_amount)?;
+            let fp_new_amount = Fp::try_from(u256_new_amount)?;
+            let remaining_amount = fp_amount - fp_new_amount;
             let hint_token_address = h160_to_u256(coin.uint_token);
+
+            let obfuscated_sender_remaining_amount_with_secret: U256 =
+                (remaining_amount + sender_shared_secret).into();
+
+            let obfuscated_receiver_remaining_amount_with_secret: U256 =
+                (fp_new_amount + receiver_shared_secret).into();
 
             // calc commitment one -> its for receiver
             let calc_send_commitment = hash4([
                 receiver_address_stealth_pub_key.point.x,
                 receiver_address_stealth_pub_key.point.y,
-                Fp::from_str(&new_amount)?,
+                fp_new_amount,
                 Fp::try_from(hint_token_address)?,
             ]);
-
             let u256_calc_send_commitment = calc_send_commitment.into();
-
             // calc commitment two -> its for sender
             let calc_sender_commitment: Fp = hash4([
                 address_stealth_pub_key.point.x,
                 address_stealth_pub_key.point.y,
-                Fp::from_str(&remaining_amount)?,
+                remaining_amount,
                 Fp::try_from(hint_token_address)?,
             ]);
-
             let u256_calc_sender_commitment = calc_sender_commitment.into();
-
             let proof: std::result::Result<Proof, eyre::Error> = prove(
                 PARAMS_FILE,
                 u32_index,
                 hint_token_address,
                 amount,
-                new_amount_num.into(),
-                obfuscated_remaining_amount,
+                u256_new_amount,
+                remaining_amount.into(),
                 receiver_address_stealth_pub_key,
                 address_stealth_pub_key,
                 coin.priv_key.secret,
                 merkle_proof.proof.try_into().unwrap(),
             );
-
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {
                     proof,
                     token: coin.uint_token,
                     amount,
                     nullifier: coin.nullifier,
-                    obfuscated_receiver_amount: send_amount,
-                    obfuscated_sender_amount: obfuscated_remaining_amount,
+                    obfuscated_receiver_amount: obfuscated_receiver_remaining_amount_with_secret,
+                    obfuscated_sender_amount: obfuscated_sender_remaining_amount_with_secret,
                     receiver_commitment: u256_calc_send_commitment,
                     sender_commitment: u256_calc_sender_commitment,
                     sender_ephemeral: address_ephemeral.point,
