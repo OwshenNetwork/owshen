@@ -1,18 +1,14 @@
 use crate::fp::Fp;
 use crate::keys::PublicKey;
 
-use ff::PrimeField;
-
-use num_bigint::BigUint;
-
-use ethers::prelude::*;
-
-use ethers::abi::ethabi::ethereum_types::FromStrRadixErr;
+use ethers::{abi::ethabi::ethereum_types::FromStrRadixErr, prelude::*};
 use eyre::Result;
-
+use ff::PrimeField;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
-use std::process::Command;
-use std::str::FromStr;
+use std::{io::Write, path::Path, process::Command, str::FromStr};
+use tempfile::NamedTempFile;
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Proof {
     pub a: [U256; 2],
@@ -20,10 +16,6 @@ pub struct Proof {
     pub c: [U256; 2],
     pub public: Vec<U256>,
 }
-
-use std::io::Write;
-use std::path::Path;
-use tempfile::NamedTempFile;
 
 pub fn prove<P: AsRef<Path>>(
     params: P,
@@ -148,8 +140,6 @@ pub fn prove<P: AsRef<Path>>(
         c: data[6..8].try_into()?,
         public: data[8..].to_vec(),
     };
-
-    println!("public {:?}", proof.public);
 
     Ok(proof)
 }

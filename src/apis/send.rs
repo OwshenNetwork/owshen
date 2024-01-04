@@ -1,22 +1,19 @@
-use axum::extract::Query;
-use axum::response::Json;
-use ethers::prelude::*;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
-use crate::keys::Point;
-use crate::keys::PrivateKey;
-use crate::keys::PublicKey;
-use crate::proof::prove;
-use crate::proof::Proof;
+use crate::keys::{Point, PrivateKey, PublicKey};
+use crate::proof::{prove, Proof};
 use crate::Context;
 use crate::GetSendRequest;
 use crate::GetSendResponse;
 use crate::PARAMS_FILE;
+
+use axum::{extract::Query, response::Json};
+use ethers::prelude::*;
+use std::{
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 pub async fn send(
     Query(req): Query<GetSendRequest>,
@@ -42,11 +39,11 @@ pub async fn send(
 
             let address_pub_key = PublicKey::from_str(&address)?;
             let (address_ephemeral, address_stealth_pub_key) =
-                address_pub_key.derive(&mut rand::thread_rng());
+                address_pub_key.derive_random(&mut rand::thread_rng());
 
             let receiver_address_pub_key = PublicKey::from_str(&receiver_address)?;
             let (receiver_address_ephemeral, receiver_address_stealth_pub_key) =
-                receiver_address_pub_key.derive(&mut rand::thread_rng());
+                receiver_address_pub_key.derive_random(&mut rand::thread_rng());
 
             let stealth_priv: PrivateKey = priv_key.derive(address_ephemeral);
             let sender_shared_secret: Fp = stealth_priv.shared_secret(address_ephemeral);

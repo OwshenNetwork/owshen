@@ -1,7 +1,6 @@
 use crate::fp::Fp;
 use crate::poseidon::poseidon;
 
-
 pub fn hash4(vals: [Fp; 4]) -> Fp {
     poseidon(vals)
 }

@@ -1,16 +1,7 @@
-use axum::Json;
-use bindings::owshen::{SentFilter, SpendFilter};
-use ethers::prelude::*;
-use eyre::Result;
-
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::Mutex;
-use tokio::time::timeout;
-
-use crate::extract_token_amount;
 use crate::fp::Fp;
-use crate::hash::hash4;
+use crate::genesis::genesis_events;
+
+use crate::helper::extract_token_amount;
 use crate::keys::Point;
 use crate::keys::{EphemeralKey, PrivateKey, PublicKey};
 use crate::tree::SparseMerkleTree;
@@ -18,15 +9,44 @@ use crate::u256_to_h160;
 use crate::Coin;
 use crate::Context;
 use crate::GetCoinsResponse;
+use crate::WalletCache;
 
-#[allow(dead_code)]
+use axum::Json;
+use bindings::owshen::{SentFilter, SpendFilter};
+use ethers::prelude::*;
+use eyre::Result;
+use std::sync::Arc;
+use std::sync::Mutex;
+use tokio::time::timeout;
+
 pub async fn coins(
     context_coin: Arc<Mutex<Context>>,
+    provider: Arc<Provider<Http>>,
     contract: Contract<Provider<Http>>,
     priv_key: PrivateKey,
 ) -> Result<Json<GetCoinsResponse>, eyre::Report> {
+    let wallet_cache_path = home::home_dir().unwrap().join(".owshen-wallet-cache");
+    let cache: Option<WalletCache> = if let Ok(f) = std::fs::read(&wallet_cache_path) {
+        bincode::deserialize(&f).ok()
+    } else {
+        None
+    };
+
+    let root: U256 = contract.method("root", ())?.call().await?;
+
+    let blk_number = provider.get_block_number().await?.as_u64();
+    if let Some(cache) = cache {
+        if Into::<U256>::into(cache.tree.root()) == root {
+            return Ok(Json(GetCoinsResponse { coins: cache.coins }));
+        }
+    }
+
     let mut my_coins: Vec<Coin> = Vec::new();
+
+    let dive_contract_address = context_coin.lock().unwrap().dive_contract_address.clone();
+
     let mut tree = SparseMerkleTree::new(16);
+
     let sent_events = timeout(std::time::Duration::from_secs(5), async {
         contract
             .event::<SentFilter>()
@@ -38,7 +58,11 @@ pub async fn coins(
             .unwrap()
     })
     .await?;
-    for sent_event in sent_events {
+
+    for sent_event in genesis_events(dive_contract_address)
+        .iter()
+        .chain(sent_events.iter())
+    {
         let ephemeral = EphemeralKey {
             point: Point {
                 x: Fp::try_from(sent_event.ephemeral.x)?,
@@ -108,6 +132,15 @@ pub async fn coins(
             );
         }
     }
+
+    let wallet_cache = WalletCache {
+        coins: my_coins.clone(),
+        tree: tree.clone(),
+        height: blk_number,
+    };
+
+    std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
+
     let mut ctx = context_coin.lock().unwrap();
     ctx.coins = my_coins.clone();
     ctx.tree = tree;

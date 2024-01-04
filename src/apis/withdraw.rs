@@ -1,22 +1,16 @@
-use axum::extract::Query;
-use axum::response::Json;
-use ethers::prelude::*;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::sync::Mutex;
-
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
-use crate::keys::Point;
-use crate::keys::PrivateKey;
-use crate::keys::PublicKey;
-use crate::proof::prove;
-use crate::proof::Proof;
+use crate::keys::{Point, PrivateKey, PublicKey};
+use crate::proof::{prove, Proof};
 use crate::Context;
 use crate::GetWithdrawRequest;
 use crate::GetWithdrawResponse;
 use crate::PARAMS_FILE;
+
+use axum::{extract::Query, response::Json};
+use ethers::prelude::*;
+use std::{str::FromStr, sync::Arc, sync::Mutex};
 
 pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,
@@ -38,7 +32,7 @@ pub async fn withdraw(
             let merkle_proof = merkle_root.get(u64_index);
 
             let pub_key: PublicKey = PublicKey::from_str(&address)?;
-            let (ephemeral, stealth_pub_key) = pub_key.derive(&mut rand::thread_rng());
+            let (ephemeral, stealth_pub_key) = pub_key.derive_random(&mut rand::thread_rng());
             let stealth_priv: PrivateKey = priv_key.derive(ephemeral);
             let shared_secret: Fp = stealth_priv.shared_secret(ephemeral);
 

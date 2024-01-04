@@ -33,3 +33,5 @@ bip39 = "2.0.0"
 webbrowser = "0.6"
 tower-http = { version = "0.4.4", features = ["cors", "fs"] }
 colored = "2.1.0"
+bincode = "1.3.3"
+hex = "0.4"

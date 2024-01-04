@@ -4,7 +4,6 @@ use num_bigint::BigUint;
 use num_traits::{Euclid, Num};
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
-
 use std::str::FromStr;
 
 #[derive(PrimeField)]

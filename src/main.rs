@@ -1,43 +1,52 @@
 mod apis;
 mod fp;
+mod genesis;
 mod hash;
+mod helper;
 mod keys;
 mod poseidon;
 mod proof;
 mod tree;
 
 use axum::{
-    // body::Bytes,
     body::Body,
     extract::{self, Query},
     http::{Response, StatusCode},
     response::{Html, IntoResponse, Json},
-    routing::{get, get_service},
+    routing::{get, get_service, post},
     Router,
 };
-use bindings::owshen::{Owshen, Point as OwshenPoint};
-use bindings::simple_erc_20::SimpleErc20;
+use bindings::{
+    owshen::{Owshen, Point as OwshenPoint},
+    simple_erc_20::SimpleErc20,
+};
 use bip39::Mnemonic;
 use colored::Colorize;
-use ethers::prelude::*;
+use ethers::{
+    abi::Abi,
+    core::k256::{ecdsa::SigningKey, elliptic_curve::SecretKey, Secp256k1},
+    prelude::*,
+    signers::Wallet as wallet,
+    types::H160,
+};
 use eyre::Result;
-use fp::Fp;
-use hash::hash4;
-use keys::Point;
-use keys::{PrivateKey, PublicKey};
+use helper::{h160_to_u256, u256_to_h160};
+use hex::decode as hex_decode;
+use keys::{Entropy, Point, PrivateKey, PublicKey};
 use proof::Proof;
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::{Arc, Mutex};
-use std::{fs::read_to_string, process::Command};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    path::PathBuf,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    {fs::read_to_string, process::Command},
+};
 use structopt::StructOpt;
-use tokio::fs::File;
-use tokio::task;
+use tokio::{fs::File, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tower_http::cors::CorsLayer;
-use tower_http::services::ServeFile;
+use tower_http::{cors::CorsLayer, services::ServeFile};
 use tree::SparseMerkleTree;
 use webbrowser;
 
@@ -45,6 +54,7 @@ use webbrowser;
 extern crate lazy_static;
 
 const GOERLI_ENDPOINT: &str = "https://ethereum-goerli.publicnode.com";
+const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 // Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
 pub struct InitOpt {
@@ -57,7 +67,6 @@ pub struct InitOpt {
     #[structopt(long)]
     test: bool,
 }
-
 // Open web wallet interface
 #[derive(StructOpt, Debug)]
 pub struct WalletOpt {
@@ -73,7 +82,9 @@ pub struct WalletOpt {
     config: Option<PathBuf>,
 }
 #[derive(StructOpt, Debug)]
-pub struct ConfigOpt {
+pub struct DeployOpt {
+    #[structopt(long)]
+    from: Option<String>,
     #[structopt(long, default_value = GOERLI_ENDPOINT)]
     endpoint: String,
     #[structopt(long)]
@@ -83,19 +94,14 @@ pub struct ConfigOpt {
     #[structopt(long)]
     test: bool,
 }
-
 // Show wallet info
 #[derive(StructOpt, Debug)]
 pub struct InfoOpt {}
 
-#[derive(StructOpt, Debug)]
-enum OwshenCliOpt {
-    Init(InitOpt),
-    Info(InfoOpt),
-    Wallet(WalletOpt),
-    Config(ConfigOpt),
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Empty {
+    ok: bool,
 }
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetInfoResponse {
     address: PublicKey,
@@ -103,7 +109,7 @@ pub struct GetInfoResponse {
     dive_contract: H160,
     owshen_contract: H160,
     owshen_abi: Abi,
-    token_contracts: Vec<TokenInfo>,
+    token_contracts: NetworkManager,
     is_test: bool,
 }
 
@@ -139,6 +145,16 @@ pub struct GetWithdrawResponse {
     pub nullifier: U256,
     pub commitment: U256,
     pub ephemeral: Point,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SetNetworkRequest {
+    pub provider_url: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SetNetworkResponse {
+    pub success: Empty,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -186,9 +202,13 @@ pub struct TokenInfo {
     symbol: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NetworkManager {
+    networks: HashMap<String, TokenInfo>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     entropy: Entropy,
-    token_contracts: Vec<TokenInfo>,
+    token_contracts: NetworkManager,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Config {
@@ -198,6 +218,50 @@ struct Config {
     owshen_contract_address: H160,
     owshen_contract_abi: Abi,
     erc20_abi: Abi,
+}
+
+impl NetworkManager {
+    pub fn new() -> NetworkManager {
+        let mut networks: HashMap<String, TokenInfo> = HashMap::new();
+
+        networks.insert(
+            "ethereum_goerli".to_string(),
+            TokenInfo {
+                token_address: H160::from_str("0xAddressForETHUSDT").unwrap(),
+                symbol: "WETH".to_string(),
+            },
+        );
+        NetworkManager { networks }
+    }
+
+    pub fn set(&mut self, data: HashMap<String, TokenInfo>, expand: bool) {
+        if expand {
+            self.networks.extend(data);
+        } else {
+            self.networks = data;
+        }
+    }
+
+    pub fn add_network(&mut self, network: String, token_info: TokenInfo) {
+        self.networks.insert(network, token_info);
+    }
+
+    pub fn get(&self, network: &str) -> Option<&TokenInfo> {
+        self.networks.get(network)
+    }
+
+    pub fn has(&self, network: &str, symbol: &str) -> bool {
+        self.get(network)
+            .map_or(false, |token| token.symbol == symbol)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+enum OwshenCliOpt {
+    Init(InitOpt),
+    Info(InfoOpt),
+    Wallet(WalletOpt),
+    Deploy(DeployOpt),
 }
 
 impl Default for Config {
@@ -214,79 +278,19 @@ impl Default for Config {
 }
 
 pub struct Context {
+    dive_contract_address: H160,
     coins: Vec<Coin>,
     tree: SparseMerkleTree,
+    provider: Option<Arc<Provider<Http>>>,
 }
 
-const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
-
-fn u256_to_h160(u256: U256) -> H160 {
-    let mut bytes: [u8; 32] = [0u8; 32];
-    u256.to_big_endian(&mut bytes);
-    let address_bytes: &[u8] = &bytes[12..32]; // Taking the last 20 bytes for ethereum address
-    H160::from_slice(address_bytes)
-}
-
-fn h160_to_u256(h160_val: H160) -> U256 {
-    let mut bytes = [0u8; 32];
-    bytes[12..32].copy_from_slice(h160_val.as_bytes());
-
-    U256::from_big_endian(&bytes)
-}
-
-fn extract_token_amount(
-    hint_token_address: U256,
-    hint_amount: U256,
-    shared_secret: Fp,
-    commitment: Fp,
-    stealth_pub: PublicKey,
-) -> Result<Option<(Fp, Fp)>, eyre::Report> {
-    let amount = Fp::try_from(hint_amount)? - shared_secret;
-    let token_address = Fp::try_from(hint_token_address)? - shared_secret;
-
-    let calc_commitment1 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        Fp::try_from(hint_amount)?,
-        Fp::try_from(hint_token_address)?,
-    ]);
-
-    let calc_commitment2 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        amount,
-        token_address,
-    ]);
-
-    let calc_commitment3 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        amount,
-        Fp::try_from(hint_token_address)?,
-    ]);
-
-    let calc_commitment4 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        Fp::try_from(hint_amount)?,
-        token_address,
-    ]);
-
-    if calc_commitment1 == commitment {
-        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
-        let fp_hint_amount = Fp::try_from(hint_amount)?;
-        return Ok(Some((fp_hint_token_address, fp_hint_amount)));
-    } else if calc_commitment2 == commitment {
-        return Ok(Some((token_address, amount)));
-    } else if calc_commitment3 == commitment {
-        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
-        return Ok(Some((fp_hint_token_address, amount)));
-    } else if calc_commitment4 == commitment {
-        let fp_hint_amount = Fp::try_from(hint_amount)?;
-        return Ok(Some((token_address, fp_hint_amount)));
-    }
-
-    Ok(None)
+lazy_static! {
+    static ref GLOBAL_CONTEXT: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context {
+        dive_contract_address: H160::default(),
+        coins: vec![],
+        tree: SparseMerkleTree::new(16),
+        provider: None,
+    }));
 }
 
 fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {
@@ -327,8 +331,14 @@ async fn serve_file(file_path: PathBuf) -> impl IntoResponse {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WalletCache {
+    coins: Vec<Coin>,
+    tree: SparseMerkleTree,
+    height: u64,
+}
+
 async fn serve_wallet(
-    provider: Arc<Provider<Http>>,
     _port: u16,
     priv_key: PrivateKey,
     pub_key: PublicKey,
@@ -336,149 +346,175 @@ async fn serve_wallet(
     dive_contract: H160,
     abi: Abi,
     erc20_abi: Abi,
-    token_contracts: Vec<TokenInfo>,
+    token_contracts: NetworkManager,
     test: bool,
 ) -> Result<()> {
-    let tree: SparseMerkleTree = SparseMerkleTree::new(16);
-    let context = Arc::new(Mutex::new(Context {
-        coins: vec![],
-        tree,
-    }));
+    let context = Arc::clone(&GLOBAL_CONTEXT);
 
     let info_addr: PublicKey = pub_key.clone();
     let coins_owshen_abi = abi.clone();
     let coins_owshen_address = owshen_contract.clone();
+    let coins_provider = context.clone();
     let context_coin = context.clone();
     let context_tree = context.clone();
     let context_tree_send = context.clone();
     let context_withdraw = context.clone();
     let context_send = context.clone();
-    let contract = Contract::new(coins_owshen_address, coins_owshen_abi, provider);
-    let contract_clone = contract.clone();
+    let contest_set_network = context.clone();
 
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
-    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
+    let provider = coins_provider.lock().unwrap().provider.clone();
 
-    let app = Router::new()
-        .route("/", get(move || serve_index(test)))
-        .route(
-            "/static/*file",
-            get(|params: extract::Path<String>| async move {
-                let file_path = PathBuf::from(static_files_path).join(params.as_str());
-                println!("file path {:?}", file_path);
-                serve_file(file_path).await
-            }),
-        )
-        .route(
-            "/manifest.json",
-            get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
-        )
-        .route(
-            "/asset-manifest.json",
-            get_service(ServeFile::new(format!(
-                "{}/asset-manifest.json",
-                root_files_path
-            ))),
-        )
-        .route(
-            "/robots.txt",
-            get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
-        )
-        .route(
-            "/coins",
-            get(move || async move {
-                handle_error(apis::coins(context_coin, contract_clone, priv_key).await)
-            }),
-        )
-        .route(
-            "/withdraw",
-            get(
-                move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                    handle_error(
-                        apis::withdraw(Query(req), context_withdraw, context_tree, priv_key).await,
-                    )
-                },
-            ),
-        )
-        .route(
-            "/send",
-            get(
-                move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                    handle_error(
-                        apis::send(Query(req), context_send, context_tree_send, priv_key).await,
-                    )
-                },
-            ),
-        )
-        .route(
-            "/stealth",
-            get(
-                |extract::Query(req): extract::Query<GetStealthRequest>| async move {
-                    handle_error(apis::stealth(Query(req)).await)
-                },
-            ),
-        )
-        .route(
-            "/info",
-            get(move || async move {
-                handle_error(
-                    apis::info(
-                        info_addr,
-                        dive_contract,
-                        owshen_contract,
-                        token_contracts,
-                        abi,
-                        erc20_abi,
-                        test,
-                    )
-                    .await,
-                )
-            }),
-        )
-        .layer(CorsLayer::permissive());
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
-
-    if test {
-        let frontend = async {
-            task::spawn_blocking(move || {
-                let _output = Command::new("npm")
-                    .arg("start")
-                    .env(
-                        "REACT_APP_OWSHEN_ENDPOINT",
-                        format!("http://127.0.0.1:{}", 9000),
-                    )
-                    .current_dir("client")
-                    .spawn()
-                    .expect("failed to execute process");
-            });
-            Ok::<(), eyre::Error>(())
-        };
-        let backend = async {
-            axum::Server::bind(&addr)
-                .serve(app.into_make_service())
-                .await?;
-            Ok::<(), eyre::Error>(())
-        };
-
-        tokio::try_join!(backend, frontend)?;
-        Ok(())
-    } else {
-        let server = axum::Server::bind(&addr)
-            .serve(app.into_make_service())
-            .with_graceful_shutdown(shutdown_signal());
-
-        // Attempt to open the web browser
-        if webbrowser::open(&format!("http://{}", addr)).is_err() {
-            println!(
-                "Failed to open web browser. Please navigate to http://{} manually",
-                addr
+    match provider {
+        Some(provider_arc) => {
+            let contract = Contract::new(
+                coins_owshen_address,
+                coins_owshen_abi,
+                Arc::clone(&provider_arc),
             );
-        }
+            let contract_clone = contract.clone();
+            let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+            let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
+            let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
 
-        server.await.map_err(eyre::Report::new)?;
-        Ok(())
+            let app = Router::new()
+                .route("/", get(move || serve_index(test)))
+                .route(
+                    "/static/*file",
+                    get(|params: extract::Path<String>| async move {
+                        let file_path = PathBuf::from(static_files_path).join(params.as_str());
+                        println!("file path {:?}", file_path);
+                        serve_file(file_path).await
+                    }),
+                )
+                .route(
+                    "/manifest.json",
+                    get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
+                )
+                .route(
+                    "/asset-manifest.json",
+                    get_service(ServeFile::new(format!(
+                        "{}/asset-manifest.json",
+                        root_files_path
+                    ))),
+                )
+                .route(
+                    "/robots.txt",
+                    get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
+                )
+                .route(
+                    "/coins",
+                    get(move || async move {
+                        handle_error(
+                            apis::coins(context_coin, provider_arc, contract_clone, priv_key).await,
+                        )
+                    }),
+                )
+                .route(
+                    "/withdraw",
+                    get(
+                        move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
+                            handle_error(
+                                apis::withdraw(
+                                    Query(req),
+                                    context_withdraw,
+                                    context_tree,
+                                    priv_key,
+                                )
+                                .await,
+                            )
+                        },
+                    ),
+                )
+                .route(
+                    "/send",
+                    get(
+                        move |extract::Query(req): extract::Query<GetSendRequest>| async move {
+                            handle_error(
+                                apis::send(Query(req), context_send, context_tree_send, priv_key)
+                                    .await,
+                            )
+                        },
+                    ),
+                )
+                .route(
+                    "/stealth",
+                    get(
+                        |extract::Query(req): extract::Query<GetStealthRequest>| async move {
+                            handle_error(apis::stealth(Query(req)).await)
+                        },
+                    ),
+                )
+                .route(
+                    "/info",
+                    get(move || async move {
+                        handle_error(
+                            apis::info(
+                                info_addr,
+                                dive_contract,
+                                owshen_contract,
+                                token_contracts,
+                                abi,
+                                erc20_abi,
+                                test,
+                            )
+                            .await,
+                        )
+                    }),
+                )
+                .route(
+                    "/set-network",
+                    post(
+                        move |extract::Query(req): extract::Query<SetNetworkRequest>| async move {
+                            handle_error(apis::set_network(Query(req), contest_set_network).await)
+                        },
+                    ),
+                )
+                .layer(CorsLayer::permissive());
+
+            let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
+
+            if test {
+                let frontend = async {
+                    task::spawn_blocking(move || {
+                        let _output = Command::new("npm")
+                            .arg("start")
+                            .env(
+                                "REACT_APP_OWSHEN_ENDPOINT",
+                                format!("http://127.0.0.1:{}", 9000),
+                            )
+                            .current_dir("client")
+                            .spawn()
+                            .expect("failed to execute process");
+                    });
+                    Ok::<(), eyre::Error>(())
+                };
+                let backend = async {
+                    axum::Server::bind(&addr)
+                        .serve(app.into_make_service())
+                        .await?;
+                    Ok::<(), eyre::Error>(())
+                };
+
+                tokio::try_join!(backend, frontend)?;
+                Ok(())
+            } else {
+                let server = axum::Server::bind(&addr)
+                    .serve(app.into_make_service())
+                    .with_graceful_shutdown(shutdown_signal());
+
+                // Attempt to open the web browser
+                if webbrowser::open(&format!("http://{}", addr)).is_err() {
+                    println!(
+                        "Failed to open web browser. Please navigate to http://{} manually",
+                        addr
+                    );
+                }
+
+                server.await.map_err(eyre::Report::new)?;
+                Ok(())
+            }
+        }
+        None => Ok(println!("The provider is not correct!")),
     }
 }
 
@@ -497,172 +533,155 @@ impl Into<OwshenPoint> for Point {
     }
 }
 
-async fn initialize_config(endpoint: String, name: String, is_test: bool) -> Config {
-    if is_test {
-        let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
-        let provider = Arc::new(provider);
-        println!("Deploying hash function...");
-        let poseidon4_addr = deploy(
-            provider.clone(),
-            include_str!("assets/poseidon4.abi"),
-            include_str!("assets/poseidon4.evm"),
-        )
-        .await
-        .address();
+async fn initialize_config(endpoint: String, from: String, name: String, is_test: bool) -> Config {
+    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+    let provider = Arc::new(provider);
 
+    let from_address = if is_test {
         let accounts = provider.get_accounts().await.unwrap();
-        let from = accounts[0];
+        accounts[0]
+    } else {
+        let private_key_bytes = hex_decode(&from).expect("Invalid hex string for from");
+        let private_key: SecretKey<_> =
+            SecretKey::from_slice(&private_key_bytes).expect("Invalid private key");
+        let wallet = wallet::from(private_key);
+        wallet.address()
+    };
 
-        println!("Deploying DIVE token...");
-        let dive = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                String::from_str("dive_token").unwrap(),
-                String::from_str("DIVE").unwrap(),
-            ),
-        )
-        .unwrap()
-        .legacy()
-        .from(from)
-        .send()
-        .await
-        .unwrap();
-        println!("Deploying test tokens...");
-        let test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                String::from_str("test_token").unwrap(),
-                String::from_str("TEST").unwrap(),
-            ),
-        )
-        .unwrap()
-        .legacy()
-        .from(from)
-        .send()
-        .await
-        .unwrap();
+    println!("Deploying hash function...");
+    let poseidon4_addr = deploy(
+        provider.clone(),
+        include_str!("assets/poseidon4.abi"),
+        include_str!("assets/poseidon4.evm"),
+    )
+    .await
+    .address();
 
-        let second_test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                String::from_str("test_token").unwrap(),
-                String::from_str("TEST").unwrap(),
-            ),
-        )
-        .unwrap()
-        .legacy()
-        .from(from)
-        .send()
-        .await
-        .unwrap();
+    println!("Deploying DIVE token...");
+    let dive = SimpleErc20::deploy(
+        provider.clone(),
+        (
+            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            String::from_str("dive_token").unwrap(),
+            String::from_str("DIVE").unwrap(),
+        ),
+    )
+    .unwrap()
+    .legacy()
+    .from(from_address)
+    .send()
+    .await
+    .unwrap();
 
-        println!("Deploying Owshen contract...");
-        let owshen = Owshen::deploy(provider.clone(), poseidon4_addr)
+    let mut smt = SparseMerkleTree::new(16);
+    genesis::fill_genesis(&mut smt, dive.address());
+
+    println!("Deploying Owshen contract...");
+    let owshen = Owshen::deploy(
+        provider.clone(),
+        (poseidon4_addr, Into::<U256>::into(smt.genesis_root())),
+    )
+    .unwrap()
+    .legacy()
+    .from(from_address)
+    .send()
+    .await
+    .unwrap();
+
+    return Config {
+        name,
+        endpoint,
+        owshen_contract_address: owshen.address(),
+        owshen_contract_abi: owshen.abi().clone(),
+        dive_contract_address: dive.address(),
+        erc20_abi: dive.abi().clone(),
+    };
+}
+
+async fn initialize_wallet(mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet {
+    let mut network_manager = NetworkManager::new();
+    let global_context_clone = GLOBAL_CONTEXT.clone();
+    let context = global_context_clone.lock().unwrap();
+    let provider = context.provider.clone();
+    let entropy = if let Some(m) = mnemonic {
+        Entropy::from_mnemonic(m)
+    } else {
+        Entropy::generate(&mut rand::thread_rng())
+    };
+    if let Some(provider) = provider {
+        let provider = Arc::new(provider);
+
+        if is_test {
+            let accounts = provider.get_accounts().await.unwrap();
+            let from = accounts[0];
+            let test_token = SimpleErc20::deploy(
+                provider.clone(),
+                (
+                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                    String::from_str("test_token").unwrap(),
+                    String::from_str("TEST").unwrap(),
+                ),
+            )
             .unwrap()
             .legacy()
             .from(from)
             .send()
             .await
             .unwrap();
-        let mut token_contracts: Vec<TokenInfo> = Vec::new();
 
-        token_contracts.push(TokenInfo {
-            token_address: test_token.address(),
-            symbol: "WETH".to_string(),
-        });
-        token_contracts.push(TokenInfo {
-            token_address: second_test_token.address(),
-            symbol: "USDC".to_string(),
-        });
+            let second_test_token = SimpleErc20::deploy(
+                provider.clone(),
+                (
+                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                    String::from_str("test_token").unwrap(),
+                    String::from_str("TEST").unwrap(),
+                ),
+            )
+            .unwrap()
+            .legacy()
+            .from(from)
+            .send()
+            .await
+            .unwrap();
 
-        return Config {
-            name,
-            endpoint,
-            owshen_contract_address: owshen.address(),
-            owshen_contract_abi: owshen.abi().clone(),
-            dive_contract_address: dive.address(),
-            erc20_abi: dive.abi().clone(),
+            let token_info1 = TokenInfo {
+                token_address: test_token.address(),
+                symbol: "WETH".to_string(),
+            };
+
+            let token_info2 = TokenInfo {
+                token_address: second_test_token.address(),
+                symbol: "USDC".to_string(),
+            };
+
+            network_manager.add_network("localhost".to_string(), token_info1);
+            network_manager.add_network("localhost".to_string(), token_info2);
+        }
+
+        let wallet = Wallet {
+            entropy,
+            token_contracts: network_manager,
         };
+
+        println!(
+            "{} {}",
+            "Your 12-word mnemonic phrase is:".bright_green(),
+            wallet.entropy.to_mnemonic().unwrap()
+        );
+        println!(
+            "{}",
+            "PLEASE KEEP YOUR MNEMONIC PHRASE IN A SAFE PLACE OR YOU WILL LOSE YOUR FUNDS!"
+                .bold()
+                .bright_red()
+        );
+
+        wallet
     } else {
-        return Config::default();
+        return Wallet {
+            entropy,
+            token_contracts: network_manager,
+        };
     }
-}
-
-async fn initialize_wallet(endpoint: String, mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet {
-    let mut token_contracts: Vec<TokenInfo> = Vec::new();
-    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
-    let provider = Arc::new(provider);
-    let accounts = provider.get_accounts().await.unwrap();
-
-    if is_test {
-        let from = accounts[0];
-        let test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                String::from_str("test_token").unwrap(),
-                String::from_str("TEST").unwrap(),
-            ),
-        )
-        .unwrap()
-        .legacy()
-        .from(from)
-        .send()
-        .await
-        .unwrap();
-
-        let second_test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                String::from_str("test_token").unwrap(),
-                String::from_str("TEST").unwrap(),
-            ),
-        )
-        .unwrap()
-        .legacy()
-        .from(from)
-        .send()
-        .await
-        .unwrap();
-
-        token_contracts.push(TokenInfo {
-            token_address: test_token.address(),
-            symbol: "WETH".to_string(),
-        });
-        token_contracts.push(TokenInfo {
-            token_address: second_test_token.address(),
-            symbol: "USDC".to_string(),
-        });
-    }
-
-    let entropy = if let Some(m) = mnemonic {
-        Entropy::from_mnemonic(m)
-    } else {
-        Entropy::generate(&mut rand::thread_rng())
-    };
-
-    let wallet = Wallet {
-        entropy,
-        token_contracts,
-    };
-
-    println!(
-        "{} {}",
-        "Your 12-word mnemonic phrase is:".bright_green(),
-        wallet.entropy.to_mnemonic().unwrap()
-    );
-    println!(
-        "{}",
-        "PLEASE KEEP YOUR MNEMONIC PHRASE IN A SAFE PLACE OR YOU WILL LOSE YOUR FUNDS!"
-            .bold()
-            .bright_red()
-    );
-
-    wallet
 }
 
 #[tokio::main]
@@ -693,14 +712,15 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if wallet.is_none() {
-                let wallet = initialize_wallet(endpoint, mnemonic, test).await;
+                let wallet = initialize_wallet(mnemonic, test).await;
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
             }
         }
-        OwshenCliOpt::Config(ConfigOpt {
+        OwshenCliOpt::Deploy(DeployOpt {
             endpoint,
+            from,
             name,
             config,
             test,
@@ -713,7 +733,8 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if config.is_none() {
-                let config = initialize_config(endpoint, name, test).await;
+                let config =
+                    initialize_config(endpoint, from.unwrap_or_default(), name, test).await;
                 std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
             } else {
                 println!("Config is already initialized!");
@@ -750,7 +771,6 @@ async fn main() -> Result<()> {
                 let pub_key = PublicKey::from(priv_key);
 
                 serve_wallet(
-                    provider,
                     port,
                     priv_key,
                     pub_key,
@@ -762,13 +782,6 @@ async fn main() -> Result<()> {
                     test,
                 )
                 .await?;
-            } else {
-                if wallet.is_none() {
-                    let wallet = initialize_wallet(endpoint, None, test).await;
-                    std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
-                } else {
-                    println!("Wallet is already initialized!");
-                }
             }
         }
         OwshenCliOpt::Info(InfoOpt {}) => {
@@ -791,10 +804,6 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-use ethers::abi::Abi;
-use ethers::types::H160;
-
-use crate::keys::Entropy;
 
 async fn deploy(
     client: Arc<Provider<Http>>,

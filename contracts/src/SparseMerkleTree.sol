@@ -5,14 +5,20 @@ import "./MiMC.sol";
 
 contract SparseMerkleTree {
     IHasher mimc;
+    uint256 genesis_root;
 
-    constructor(IHasher _hasher) {
+    constructor(IHasher _hasher, uint256 _genesis_root) {
+        genesis_root = _genesis_root;
         mimc = _hasher;
+        set(4 ** 15, 0); // Trigger root-update!
     }
 
     mapping(uint256 => mapping(uint256 => uint256)) layers;
 
     function get_at_layer(uint256 layer, uint256 index) public view returns (uint256) {
+        if(layer == 15 && index == 0) {
+            return genesis_root;
+        }
         uint256 value = layers[layer][index];
         if (value == 0) {
             value = zeros(layer);
@@ -25,6 +31,8 @@ contract SparseMerkleTree {
     }
 
     function set(uint256 index, uint256 value) public {
+        require(index >= 4 ** 15, "Cannot write on genesis root!");
+
         for (uint256 i = 0; i <= 16; i++) {
             layers[i][index] = value;
             uint256 leftmost = index - (index % 4);

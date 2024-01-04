@@ -1,8 +1,9 @@
 use crate::fp::Fp;
 use crate::hash::hash4;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SparseMerkleTree {
     defaults: Vec<Fp>,
     layers: Vec<HashMap<u64, Fp>>,
@@ -37,6 +38,9 @@ impl SparseMerkleTree {
     }
 
     pub fn set(&mut self, mut index: u64, mut value: Fp) {
+        if self.get_at_layer(0, index) == value {
+            return; // Already set! (Optimization)
+        }
         for layer in 0..self.depth() + 1 {
             self.layers[layer].insert(index, value);
 
@@ -65,9 +69,12 @@ impl SparseMerkleTree {
         MerkleProof { value, proof }
     }
 
-    #[allow(dead_code)]
     pub fn root(&self) -> Fp {
         self.get_at_layer(self.depth(), 0)
+    }
+
+    pub fn genesis_root(&self) -> Fp {
+        self.get_at_layer(self.depth() - 1, 0)
     }
 
     #[allow(dead_code)]

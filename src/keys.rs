@@ -1,21 +1,44 @@
 use crate::fp::Fp;
 use crate::hash::hash4;
 use bip39::Mnemonic;
-
 use ff::{Field, PrimeField, PrimeFieldBits};
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{Num, Zero};
 use rand::Rng;
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt;
 use std::fmt::Display;
-use std::ops::{Add, Mul, Neg, Sub};
-use std::str::FromStr;
+use std::{
+    fmt,
+    ops::{Add, Mul, Neg, Sub},
+    str::FromStr,
+};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Point {
     pub x: Fp,
     pub y: Fp,
 }
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PrivateKey {
+    pub secret: Fp,
+}
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PublicKey {
+    pub point: Point,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq)]
+pub struct Entropy {
+    pub value: [u8; 16],
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct EphemeralKey {
+    pub point: Point,
+}
+#[derive(Clone, Debug, Copy, Serialize, Deserialize)]
+pub struct Cipher {
+    a: Point,
+    b: Point,
+}
+struct PublicKeyStr;
 
 lazy_static! {
     pub static ref INF: Point = Point {
@@ -98,38 +121,12 @@ impl Mul<Fp> for Point {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct PrivateKey {
-    pub secret: Fp,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct PublicKey {
-    pub point: Point,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Copy, PartialEq)]
-pub struct Entropy {
-    pub value: [u8; 16],
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct EphemeralKey {
-    pub point: Point,
-}
-
 impl From<PrivateKey> for PublicKey {
     fn from(sk: PrivateKey) -> Self {
         Self {
             point: *BASE * sk.secret,
         }
     }
-}
-
-#[derive(Clone, Debug, Copy, Serialize, Deserialize)]
-pub struct Cipher {
-    a: Point,
-    b: Point,
 }
 
 impl PublicKey {
@@ -140,13 +137,16 @@ impl PublicKey {
         }
     }
 
-    pub fn derive<R: Rng>(&self, rng: &mut R) -> (EphemeralKey, PublicKey) {
-        let r = Fp::random(rng);
+    pub fn derive(&self, r: Fp) -> (EphemeralKey, PublicKey) {
         let ephemeral = *BASE * r;
         let shared_secret = self.point * r;
         let shared_secret_hash = hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
         let pub_key = self.point + *BASE * shared_secret_hash;
         (EphemeralKey { point: ephemeral }, Self { point: pub_key })
+    }
+
+    pub fn derive_random<R: Rng>(&self, rng: &mut R) -> (EphemeralKey, PublicKey) {
+        self.derive(Fp::random(rng))
     }
 
     pub fn null() -> Self {
@@ -181,7 +181,7 @@ impl Entropy {
 
 impl PrivateKey {
     pub fn generate<R: Rng>(_rng: &mut R) -> Self {
-        let rnd = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
+        let rnd: BigUint = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
         Self {
             secret: Fp::from_str_vartime(rnd.to_string().as_str()).unwrap(),
         }
@@ -283,8 +283,6 @@ impl Serialize for PublicKey {
     }
 }
 
-struct PublicKeyStr;
-
 impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> Result<PublicKey, D::Error>
     where
@@ -322,7 +320,7 @@ mod tests {
             .unwrap(),
         };
         let master_pub_key: PublicKey = master_priv_key.into();
-        let (stealth_eph, stealth_pub_key) = master_pub_key.derive(&mut rand::thread_rng());
+        let (stealth_eph, stealth_pub_key) = master_pub_key.derive_random(&mut rand::thread_rng());
         assert!(master_pub_key != stealth_pub_key);
         let stealth_priv_key = master_priv_key.derive(stealth_eph);
         assert_eq!(PublicKey::from(stealth_priv_key), stealth_pub_key);
