@@ -23,10 +23,7 @@ use bindings::{
 use bip39::Mnemonic;
 use colored::Colorize;
 use ethers::{
-    abi::Abi,
-    core::k256::{ecdsa::SigningKey, elliptic_curve::SecretKey, Secp256k1},
-    prelude::*,
-    signers::Wallet as wallet,
+    abi::Abi, core::k256::elliptic_curve::SecretKey, prelude::*, signers::Wallet as wallet,
     types::H160,
 };
 use eyre::Result;
@@ -58,8 +55,6 @@ const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
 // Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
 pub struct InitOpt {
-    #[structopt(long, default_value = GOERLI_ENDPOINT)]
-    endpoint: String,
     #[structopt(long)]
     db: Option<PathBuf>,
     #[structopt(long)]
@@ -74,12 +69,8 @@ pub struct WalletOpt {
     db: Option<PathBuf>,
     #[structopt(long, default_value = "8000")]
     port: u16,
-    #[structopt(long, default_value = GOERLI_ENDPOINT)]
-    endpoint: String,
     #[structopt(long, help = "Enable test mode")]
     test: bool,
-    #[structopt(long)]
-    config: Option<PathBuf>,
 }
 #[derive(StructOpt, Debug)]
 pub struct DeployOpt {
@@ -203,7 +194,7 @@ pub struct TokenInfo {
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkManager {
-    networks: HashMap<String, TokenInfo>,
+    networks: HashMap<String, Vec<TokenInfo>>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
@@ -211,7 +202,7 @@ struct Wallet {
     token_contracts: NetworkManager,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct Config {
+pub struct Config {
     name: String,
     endpoint: String,
     dive_contract_address: H160,
@@ -222,19 +213,21 @@ struct Config {
 
 impl NetworkManager {
     pub fn new() -> NetworkManager {
-        let mut networks: HashMap<String, TokenInfo> = HashMap::new();
+        let mut networks: HashMap<String, Vec<TokenInfo>> = HashMap::new();
 
         networks.insert(
             "ethereum_goerli".to_string(),
-            TokenInfo {
-                token_address: H160::from_str("0xAddressForETHUSDT").unwrap(),
+            vec![TokenInfo {
+                token_address: H160::from_str("0xdD69DB25F6D620A7baD3023c5d32761D353D3De9")
+                    .unwrap(),
                 symbol: "WETH".to_string(),
-            },
+            }],
         );
+
         NetworkManager { networks }
     }
 
-    pub fn set(&mut self, data: HashMap<String, TokenInfo>, expand: bool) {
+    pub fn set(&mut self, data: HashMap<String, Vec<TokenInfo>>, expand: bool) {
         if expand {
             self.networks.extend(data);
         } else {
@@ -242,17 +235,18 @@ impl NetworkManager {
         }
     }
 
-    pub fn add_network(&mut self, network: String, token_info: TokenInfo) {
+    pub fn add_network(&mut self, network: String, token_info: Vec<TokenInfo>) {
         self.networks.insert(network, token_info);
     }
 
-    pub fn get(&self, network: &str) -> Option<&TokenInfo> {
+    pub fn get(&self, network: &str) -> Option<&Vec<TokenInfo>> {
         self.networks.get(network)
     }
 
     pub fn has(&self, network: &str, symbol: &str) -> bool {
-        self.get(network)
-            .map_or(false, |token| token.symbol == symbol)
+        self.get(network).map_or(false, |tokens| {
+            tokens.iter().any(|token_info| token_info.symbol == symbol)
+        })
     }
 }
 
@@ -276,20 +270,23 @@ impl Default for Config {
         }
     }
 }
-
+#[derive(Clone)]
+pub struct Network {
+    pub provider: Arc<Provider<Http>>,
+    pub config: Config,
+}
+#[derive(Clone)]
 pub struct Context {
-    dive_contract_address: H160,
     coins: Vec<Coin>,
     tree: SparseMerkleTree,
-    provider: Option<Arc<Provider<Http>>>,
+    network: Option<Network>,
 }
 
 lazy_static! {
     static ref GLOBAL_CONTEXT: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context {
-        dive_contract_address: H160::default(),
         coins: vec![],
         tree: SparseMerkleTree::new(16),
-        provider: None,
+        network: None,
     }));
 }
 
@@ -342,179 +339,137 @@ async fn serve_wallet(
     _port: u16,
     priv_key: PrivateKey,
     pub_key: PublicKey,
-    owshen_contract: H160,
-    dive_contract: H160,
-    abi: Abi,
-    erc20_abi: Abi,
     token_contracts: NetworkManager,
     test: bool,
 ) -> Result<()> {
     let context = Arc::clone(&GLOBAL_CONTEXT);
 
     let info_addr: PublicKey = pub_key.clone();
-    let coins_owshen_abi = abi.clone();
-    let coins_owshen_address = owshen_contract.clone();
-    let coins_provider = context.clone();
     let context_coin = context.clone();
     let context_tree = context.clone();
     let context_tree_send = context.clone();
     let context_withdraw = context.clone();
     let context_send = context.clone();
+    let context_info = context.clone();
     let contest_set_network = context.clone();
+    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
+    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
 
-    let provider = coins_provider.lock().unwrap().provider.clone();
+    let app = Router::new()
+        .route("/", get(move || serve_index(test)))
+        .route(
+            "/static/*file",
+            get(|params: extract::Path<String>| async move {
+                let file_path = PathBuf::from(static_files_path).join(params.as_str());
+                println!("file path {:?}", file_path);
+                serve_file(file_path).await
+            }),
+        )
+        .route(
+            "/manifest.json",
+            get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
+        )
+        .route(
+            "/asset-manifest.json",
+            get_service(ServeFile::new(format!(
+                "{}/asset-manifest.json",
+                root_files_path
+            ))),
+        )
+        .route(
+            "/robots.txt",
+            get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
+        )
+        .route(
+            "/coins",
+            get(move || async move { handle_error(apis::coins(context_coin, priv_key).await) }),
+        )
+        .route(
+            "/withdraw",
+            get(
+                move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
+                    handle_error(
+                        apis::withdraw(Query(req), context_withdraw, context_tree, priv_key).await,
+                    )
+                },
+            ),
+        )
+        .route(
+            "/send",
+            get(
+                move |extract::Query(req): extract::Query<GetSendRequest>| async move {
+                    handle_error(
+                        apis::send(Query(req), context_send, context_tree_send, priv_key).await,
+                    )
+                },
+            ),
+        )
+        .route(
+            "/stealth",
+            get(
+                |extract::Query(req): extract::Query<GetStealthRequest>| async move {
+                    handle_error(apis::stealth(Query(req)).await)
+                },
+            ),
+        )
+        .route(
+            "/info",
+            get(move || async move {
+                handle_error(apis::info(info_addr, context_info, token_contracts, test).await)
+            }),
+        )
+        .route(
+            "/set-network",
+            post(
+                move |extract::Query(req): extract::Query<SetNetworkRequest>| async move {
+                    handle_error(apis::set_network(Query(req), contest_set_network).await)
+                },
+            ),
+        )
+        .layer(CorsLayer::permissive());
 
-    match provider {
-        Some(provider_arc) => {
-            let contract = Contract::new(
-                coins_owshen_address,
-                coins_owshen_abi,
-                Arc::clone(&provider_arc),
+    let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
+
+    if test {
+        let frontend = async {
+            task::spawn_blocking(move || {
+                let _output = Command::new("npm")
+                    .arg("start")
+                    .env(
+                        "REACT_APP_OWSHEN_ENDPOINT",
+                        format!("http://127.0.0.1:{}", 9000),
+                    )
+                    .current_dir("client")
+                    .spawn()
+                    .expect("failed to execute process");
+            });
+            Ok::<(), eyre::Error>(())
+        };
+        let backend = async {
+            axum::Server::bind(&addr)
+                .serve(app.into_make_service())
+                .await?;
+            Ok::<(), eyre::Error>(())
+        };
+
+        tokio::try_join!(backend, frontend)?;
+        Ok(())
+    } else {
+        let server = axum::Server::bind(&addr)
+            .serve(app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal());
+
+        // Attempt to open the web browser
+        if webbrowser::open(&format!("http://{}", addr)).is_err() {
+            println!(
+                "Failed to open web browser. Please navigate to http://{} manually",
+                addr
             );
-            let contract_clone = contract.clone();
-            let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-            let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
-            let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
-
-            let app = Router::new()
-                .route("/", get(move || serve_index(test)))
-                .route(
-                    "/static/*file",
-                    get(|params: extract::Path<String>| async move {
-                        let file_path = PathBuf::from(static_files_path).join(params.as_str());
-                        println!("file path {:?}", file_path);
-                        serve_file(file_path).await
-                    }),
-                )
-                .route(
-                    "/manifest.json",
-                    get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
-                )
-                .route(
-                    "/asset-manifest.json",
-                    get_service(ServeFile::new(format!(
-                        "{}/asset-manifest.json",
-                        root_files_path
-                    ))),
-                )
-                .route(
-                    "/robots.txt",
-                    get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
-                )
-                .route(
-                    "/coins",
-                    get(move || async move {
-                        handle_error(
-                            apis::coins(context_coin, provider_arc, contract_clone, priv_key).await,
-                        )
-                    }),
-                )
-                .route(
-                    "/withdraw",
-                    get(
-                        move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                            handle_error(
-                                apis::withdraw(
-                                    Query(req),
-                                    context_withdraw,
-                                    context_tree,
-                                    priv_key,
-                                )
-                                .await,
-                            )
-                        },
-                    ),
-                )
-                .route(
-                    "/send",
-                    get(
-                        move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                            handle_error(
-                                apis::send(Query(req), context_send, context_tree_send, priv_key)
-                                    .await,
-                            )
-                        },
-                    ),
-                )
-                .route(
-                    "/stealth",
-                    get(
-                        |extract::Query(req): extract::Query<GetStealthRequest>| async move {
-                            handle_error(apis::stealth(Query(req)).await)
-                        },
-                    ),
-                )
-                .route(
-                    "/info",
-                    get(move || async move {
-                        handle_error(
-                            apis::info(
-                                info_addr,
-                                dive_contract,
-                                owshen_contract,
-                                token_contracts,
-                                abi,
-                                erc20_abi,
-                                test,
-                            )
-                            .await,
-                        )
-                    }),
-                )
-                .route(
-                    "/set-network",
-                    post(
-                        move |extract::Query(req): extract::Query<SetNetworkRequest>| async move {
-                            handle_error(apis::set_network(Query(req), contest_set_network).await)
-                        },
-                    ),
-                )
-                .layer(CorsLayer::permissive());
-
-            let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
-
-            if test {
-                let frontend = async {
-                    task::spawn_blocking(move || {
-                        let _output = Command::new("npm")
-                            .arg("start")
-                            .env(
-                                "REACT_APP_OWSHEN_ENDPOINT",
-                                format!("http://127.0.0.1:{}", 9000),
-                            )
-                            .current_dir("client")
-                            .spawn()
-                            .expect("failed to execute process");
-                    });
-                    Ok::<(), eyre::Error>(())
-                };
-                let backend = async {
-                    axum::Server::bind(&addr)
-                        .serve(app.into_make_service())
-                        .await?;
-                    Ok::<(), eyre::Error>(())
-                };
-
-                tokio::try_join!(backend, frontend)?;
-                Ok(())
-            } else {
-                let server = axum::Server::bind(&addr)
-                    .serve(app.into_make_service())
-                    .with_graceful_shutdown(shutdown_signal());
-
-                // Attempt to open the web browser
-                if webbrowser::open(&format!("http://{}", addr)).is_err() {
-                    println!(
-                        "Failed to open web browser. Please navigate to http://{} manually",
-                        addr
-                    );
-                }
-
-                server.await.map_err(eyre::Report::new)?;
-                Ok(())
-            }
         }
-        None => Ok(println!("The provider is not correct!")),
+
+        server.await.map_err(eyre::Report::new)?;
+        Ok(())
     }
 }
 
@@ -574,7 +529,7 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
     .unwrap();
 
     let mut smt = SparseMerkleTree::new(16);
-    genesis::fill_genesis(&mut smt, dive.address());
+    let total = genesis::fill_genesis(&mut smt, dive.address());
 
     println!("Deploying Owshen contract...");
     let owshen = Owshen::deploy(
@@ -587,6 +542,14 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
     .send()
     .await
     .unwrap();
+    println!("Feeding DIVEs to the Owshen contract...");
+    dive.method::<_, bool>("transfer", (owshen.address(), total))
+        .unwrap()
+        .legacy()
+        .from(from_address)
+        .send()
+        .await
+        .unwrap();
 
     return Config {
         name,
@@ -600,88 +563,78 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
 
 async fn initialize_wallet(mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet {
     let mut network_manager = NetworkManager::new();
-    let global_context_clone = GLOBAL_CONTEXT.clone();
-    let context = global_context_clone.lock().unwrap();
-    let provider = context.provider.clone();
     let entropy = if let Some(m) = mnemonic {
         Entropy::from_mnemonic(m)
     } else {
         Entropy::generate(&mut rand::thread_rng())
     };
-    if let Some(provider) = provider {
-        let provider = Arc::new(provider);
 
-        if is_test {
-            let accounts = provider.get_accounts().await.unwrap();
-            let from = accounts[0];
-            let test_token = SimpleErc20::deploy(
-                provider.clone(),
-                (
-                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                    String::from_str("test_token").unwrap(),
-                    String::from_str("TEST").unwrap(),
-                ),
-            )
-            .unwrap()
-            .legacy()
-            .from(from)
-            .send()
-            .await
-            .unwrap();
+    if is_test {
+        let provider_url = "http://127.0.0.1:8545";
+        let provider = Arc::new(Provider::<Http>::try_from(provider_url).unwrap());
+        let accounts = provider.get_accounts().await.unwrap();
+        let from = accounts[0];
+        let test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-            let second_test_token = SimpleErc20::deploy(
-                provider.clone(),
-                (
-                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                    String::from_str("test_token").unwrap(),
-                    String::from_str("TEST").unwrap(),
-                ),
-            )
-            .unwrap()
-            .legacy()
-            .from(from)
-            .send()
-            .await
-            .unwrap();
+        let second_test_token = SimpleErc20::deploy(
+            provider.clone(),
+            (
+                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                String::from_str("test_token").unwrap(),
+                String::from_str("TEST").unwrap(),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from)
+        .send()
+        .await
+        .unwrap();
 
-            let token_info1 = TokenInfo {
-                token_address: test_token.address(),
-                symbol: "WETH".to_string(),
-            };
-
-            let token_info2 = TokenInfo {
-                token_address: second_test_token.address(),
-                symbol: "USDC".to_string(),
-            };
-
-            network_manager.add_network("localhost".to_string(), token_info1);
-            network_manager.add_network("localhost".to_string(), token_info2);
-        }
-
-        let wallet = Wallet {
-            entropy,
-            token_contracts: network_manager,
+        let token_info1 = TokenInfo {
+            token_address: test_token.address(),
+            symbol: "WETH".to_string(),
         };
 
-        println!(
-            "{} {}",
-            "Your 12-word mnemonic phrase is:".bright_green(),
-            wallet.entropy.to_mnemonic().unwrap()
-        );
-        println!(
-            "{}",
-            "PLEASE KEEP YOUR MNEMONIC PHRASE IN A SAFE PLACE OR YOU WILL LOSE YOUR FUNDS!"
-                .bold()
-                .bright_red()
-        );
-
-        wallet
-    } else {
-        return Wallet {
-            entropy,
-            token_contracts: network_manager,
+        let token_info2 = TokenInfo {
+            token_address: second_test_token.address(),
+            symbol: "USDC".to_string(),
         };
+
+        network_manager.add_network("localhost".to_string(), vec![token_info1, token_info2]);
     }
+
+    let wallet = Wallet {
+        entropy,
+        token_contracts: network_manager,
+    };
+
+    println!(
+        "{} {}",
+        "Your 12-word mnemonic phrase is:".bright_green(),
+        wallet.entropy.to_mnemonic().unwrap()
+    );
+    println!(
+        "{}",
+        "PLEASE KEEP YOUR MNEMONIC PHRASE IN A SAFE PLACE OR YOU WILL LOSE YOUR FUNDS!"
+            .bold()
+            .bright_red()
+    );
+
+    wallet
 }
 
 #[tokio::main]
@@ -698,12 +651,7 @@ async fn main() -> Result<()> {
     let opt = OwshenCliOpt::from_args();
 
     match opt {
-        OwshenCliOpt::Init(InitOpt {
-            endpoint,
-            db,
-            mnemonic,
-            test,
-        }) => {
+        OwshenCliOpt::Init(InitOpt { db, mnemonic, test }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -740,13 +688,7 @@ async fn main() -> Result<()> {
                 println!("Config is already initialized!");
             }
         }
-        OwshenCliOpt::Wallet(WalletOpt {
-            db,
-            port,
-            endpoint,
-            test,
-            config,
-        }) => {
+        OwshenCliOpt::Wallet(WalletOpt { db, port, test }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -755,18 +697,7 @@ async fn main() -> Result<()> {
                 })
                 .ok();
 
-            let config_path = config.unwrap_or(config_path.clone());
-            let config = std::fs::read_to_string(&config_path)
-                .map(|s| {
-                    let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
-                    c
-                })
-                .ok();
-
             if let Some(wallet) = &wallet {
-                let config = config.clone().unwrap_or_default();
-                let provider = Provider::<Http>::try_from(config.endpoint.clone()).unwrap();
-                let provider = Arc::new(provider);
                 let priv_key = wallet.entropy.clone().into();
                 let pub_key = PublicKey::from(priv_key);
 
@@ -774,10 +705,6 @@ async fn main() -> Result<()> {
                     port,
                     priv_key,
                     pub_key,
-                    config.owshen_contract_address,
-                    config.dive_contract_address,
-                    config.owshen_contract_abi.clone(),
-                    config.erc20_abi.clone(),
                     wallet.token_contracts.clone(),
                     test,
                 )

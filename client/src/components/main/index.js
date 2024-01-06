@@ -70,6 +70,18 @@ const Main = () => {
   const tokenInfo = [{ name: "Owshen Network", symbol: "DIVE" }];
 
   useEffect(() => {
+    //TODO: proper flow for set network
+    axios
+      .post(`${coreEndpoint}/set-network`, null, {
+        params: { provider_url: "http://127.0.0.1:8545" },
+      })
+      .then((response) => {
+        console.log("Response:", response.data);
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+      });
+
     axios.get(`${coreEndpoint}/info`).then(({ data }) => {
       console.log("info", data);
       setOwshenWallet({
@@ -98,13 +110,14 @@ const Main = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     if (OwshenWallet) {
-      const newTokenOptions = OwshenWallet.token_contracts?.map(
-        ({ symbol, token_address }, id) => {
-          const img = currencies[symbol].img;
+      const newTokenOptions =
+        OwshenWallet.token_contracts?.networks.localhost.map(
+          ({ symbol, token_address }, id) => {
+            const img = currencies[symbol].img;
 
-          return { title: symbol, value: token_address, img: img };
-        }
-      );
+            return { title: symbol, value: token_address, img: img };
+          }
+        );
       setTokenOptions(newTokenOptions);
     }
   }, [OwshenWallet.wallet, OwshenWallet.contract_address, coreEndpoint]);

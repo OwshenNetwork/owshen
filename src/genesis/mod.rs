@@ -1,3 +1,5 @@
+mod genesis_data;
+
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
@@ -8,16 +10,7 @@ use ethers::types::H160;
 use ethers::types::U256;
 use ff::{Field, PrimeField};
 
-const GENESIS: [(&'static str, u64); 2] = [
-    (
-        "OoOo3091f4b426130e89b9a3101afb0757824903125fce78bc4715f2f7d39cd8bb237",
-        50,
-    ),
-    (
-        "OoOo323ced7b99543843dd171ea87681d4b8cc4e97f1dd38c0e4b872cf5a7791ba91a",
-        50,
-    ),
-];
+use genesis_data::GENESIS;
 
 pub fn genesis_events(dive_token_address: H160) -> Vec<SentFilter> {
     let coeff = Fp::from_str_vartime("1000000000000000000").unwrap();
@@ -46,8 +39,11 @@ pub fn genesis_events(dive_token_address: H160) -> Vec<SentFilter> {
         .collect()
 }
 
-pub fn fill_genesis(smt: &mut SparseMerkleTree, dive_token_address: H160) {
+pub fn fill_genesis(smt: &mut SparseMerkleTree, dive_token_address: H160) -> U256 {
+    let mut total_amount: U256 = U256::default();
     for event in genesis_events(dive_token_address).into_iter() {
         smt.set(event.index.low_u64(), event.commitment.try_into().unwrap());
+        total_amount += event.hint_amount;
     }
+    total_amount
 }
