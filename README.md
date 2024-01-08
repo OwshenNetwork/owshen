@@ -8,7 +8,7 @@ Using Owshen you can get a ***fixed*** Owshen address and start transacting with
 2. **Destination** (Monero-style stealth-addresses are generated each time you send your coins to someone)
 3. **Token/Amount** (These values are obfuscated and only the sender and receiver, who know a shared-secret, will be able to decode them)
 
-Join our Discord: [https://discord.com/invite/brczTyZXbS](https://discord.com/invite/brczTyZXbS)
+Join our Discord: https://discord.gg/owshen
 
 ## Usage
 
