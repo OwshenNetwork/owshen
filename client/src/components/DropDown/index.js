@@ -1,6 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const Dropdown = ({ label, options, select, style, img, onChange }) => {
+const Dropdown = ({
+  label,
+  options,
+  select,
+  style,
+  img,
+  onChange = () => {},
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState(label);
   const ref = useRef(null);
@@ -27,7 +34,10 @@ const Dropdown = ({ label, options, select, style, img, onChange }) => {
     setTitle(title);
     select(val);
     setIsOpen(false);
-    onChange(val);
+
+    if (onChange()) {
+      onChange(val);
+    }
   };
 
   return (
