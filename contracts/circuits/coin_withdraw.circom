@@ -51,6 +51,18 @@ template CoinWithdraw() {
     component pk = BabyPbk();
     pk.in <== secret;
 
+    component gt1 = GreaterEqThan(250);
+
+    gt1.in[0] <== amount;
+    gt1.in[1] <== new_amount1;
+    gt1.out === 1;
+    
+    component gt2 = GreaterEqThan(250);
+
+    gt2.in[0] <== amount;
+    gt2.in[1] <== new_amount2;
+    gt2.out === 1;
+
     amount === new_amount1 + new_amount2;
 
     component commiter_hasher = Poseidon(4);

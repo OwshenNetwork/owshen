@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 
-const Dropdown = ({ label, options, select, style, img }) => {
+const Dropdown = ({ label, options, select, style, img, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState(label);
   const ref = useRef(null);
+
+  useEffect(() => {
+    setTitle(label);
+  }, [label]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -23,6 +27,7 @@ const Dropdown = ({ label, options, select, style, img }) => {
     setTitle(title);
     select(val);
     setIsOpen(false);
+    onChange(val);
   };
 
   return (

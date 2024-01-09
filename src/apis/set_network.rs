@@ -2,27 +2,36 @@ use crate::{Config, Context, Network, SetNetworkRequest, SetNetworkResponse};
 
 use axum::{extract::Query, Json};
 use ethers::providers::{Http, Provider};
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 
 lazy_static! {
-    static ref NETWORK_CONFIG_MAP: HashMap<String, String> =
-        [("http://127.0.0.1:8545".into(), "localhost.json".into())]
-            .into_iter()
-            .collect();
+    static ref NETWORK_CONFIG_MAP: HashMap<String, (String, String)> = [
+        (
+            "1337".into(),
+            ("http://127.0.0.1:8545".into(), "localhost.json".into())
+        ),
+        (
+            "0x5".into(),
+            (
+                "https://ethereum-goerli.publicnode.com".into(),
+                "goerli.json".into()
+            )
+        )
+    ]
+    .into_iter()
+    .collect();
 }
 
 pub async fn set_network(
     Query(req): Query<SetNetworkRequest>,
     ctx: Arc<Mutex<Context>>,
 ) -> Result<Json<SetNetworkResponse>, eyre::Report> {
-    let provider_url = req.provider_url;
+    let chain_id = req.chain_id;
+    let (provider_url, config_path) = NETWORK_CONFIG_MAP.get(&chain_id).unwrap().clone();
     let provider: Arc<Provider<Http>> = Arc::new(Provider::<Http>::try_from(provider_url.clone())?);
-    let mut ctx = ctx.lock().unwrap();
+    let mut ctx = ctx.lock().await;
 
-    let config_path = NETWORK_CONFIG_MAP.get(&provider_url).unwrap().clone();
     let config = std::fs::read_to_string(&config_path)
         .map(|s| {
             let c: Config = serde_json::from_str(&s).expect("Invalid config file!");

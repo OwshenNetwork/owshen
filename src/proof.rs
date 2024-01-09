@@ -31,19 +31,6 @@ pub fn prove<P: AsRef<Path>>(
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
 
-    println!(
-        "proof {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?}",
-        index,
-        BigUint::from_str(&token_address.to_string()).unwrap(),
-        BigUint::from_str(&amount.to_string()).unwrap(),
-        BigUint::from_str(&new_amount1.to_string()).unwrap(),
-        BigUint::from_str(&new_amount2.to_string()).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_1.point.x.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_1.point.y.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_2.point.x.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_2.point.y.into())).unwrap(),
-    );
-
     let json_input = format!(
         "{{ \"index\": \"{:?}\", 
         \"token_address\": \"{:?}\", 
@@ -84,20 +71,26 @@ pub fn prove<P: AsRef<Path>>(
 
     write!(inputs_file, "{}", json_input)?;
 
+    log::info!("Circuit input: {}", json_input);
+
     let witness_file = NamedTempFile::new()?;
     let wtns_gen_output = Command::new("contracts/circuits/coin_withdraw_cpp/coin_withdraw")
         .arg(inputs_file.path())
         .arg(witness_file.path())
         .output()?;
 
-    println!(
-        "STDOUT: {}",
-        String::from_utf8_lossy(&wtns_gen_output.stdout)
-    );
-    println!(
-        "STDERR: {}",
-        String::from_utf8_lossy(&wtns_gen_output.stderr)
-    );
+    if !wtns_gen_output.stdout.is_empty() {
+        log::info!(
+            "Witness generator output: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stdout)
+        );
+    }
+    if !wtns_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating witnesses: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stderr)
+        );
+    }
 
     assert_eq!(wtns_gen_output.stdout.len(), 0);
     assert_eq!(wtns_gen_output.stderr.len(), 0);

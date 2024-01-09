@@ -1,14 +1,5 @@
-import { ethers, formatUnits, toBigInt } from "ethers";
-
-export const openSend = () => {
-  let elem = document.getElementById("send-modal");
-  elem.style.display = "block";
-};
-
-export const closeSend = () => {
-  let elem = document.getElementById("send-modal");
-  elem.style.display = "none";
-};
+import { ethers, formatUnits, toBigInt  } from "ethers";
+import { toast } from "react-toastify";
 
 export const getERC20Balance = async (tokenAddress, userAddress, ABI) => {
   const provider = new ethers.BrowserProvider(window.ethereum);
@@ -17,6 +8,17 @@ export const getERC20Balance = async (tokenAddress, userAddress, ABI) => {
   return formatUnits(balance, 18); // Assumes the token has 18 decimal places
 };
 
+export const shortenAddress = (address) => {
+  const firstPart = address.substring(0, 6);
+  const lastPart = address.substring(address?.length - 4);
+  return `${firstPart}...${lastPart}`;
+};
+
+export const copyWalletAddress = (owshenWalletWallet) => {
+  navigator.clipboard.writeText(owshenWalletWallet);
+  toast.success("your wallet address copied");}
+  
 export const trueAmount = (val) => {
   return Number(toBigInt(val).toString()) / Math.pow(10, 18);
 };
+

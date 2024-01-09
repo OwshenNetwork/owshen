@@ -15,7 +15,7 @@ const containerSlice = createSlice({
       sentCoins: [],
       receivedCoins: [],
       sentCoin: {},
-      receivedCoinsLoading: false,
+      receivedCoinsLoading: Number || null,
     },
     owshen: {
       wallet: null,
@@ -95,6 +95,7 @@ const containerSlice = createSlice({
       }
     },
     setReceivedCoinsLoading(state, { payload }) {
+      console.log("is loading", payload);
       state.user.receivedCoinsLoading = payload;
     },
     setIsTest(state, { payload }) {
@@ -131,6 +132,7 @@ export const selectIsTest = createSelector(
   (isTest) => isTest
 );
 
+
 export const selectSentCoin = createSelector(
   (state) => state.container.user.sentCoin,
   (coin) => coin
@@ -145,3 +147,89 @@ export const {
 } = containerSlice.actions;
 
 export default containerSlice.reducer;
+
+// necessary changes that have side effect
+
+// import { createSlice, createSelector } from "@reduxjs/toolkit";
+// import { toBigInt } from "ethers";
+
+// const initialState = {
+//   userAddress: null,
+//   userName: null,
+//   userImage: null,
+//   userNonce: null,
+//   owshenBalance: {},
+//   availableBalances: null,
+//   chainDetails: null,
+//   sentCoins: [],
+//   receivedCoins: [],
+//   sentCoin: {},
+//   receivedCoinsLoading: false,
+//   owshenWallet: null,
+//   contractAddress: null,
+//   contractAbi: null,
+//   diveAddress: null,
+//   diveAbi: null,
+//   tokenContracts: [],
+//   selectedTokenContract: null,
+//   isTest: false,
+// };
+
+// const containerSlice = createSlice({
+//   name: "container",
+//   initialState,
+//   reducers: {
+//     setUserDetails(state, { payload }) {
+//       state.userAddress = payload.address;
+//       state.userName = payload.name;
+//       state.userImage = payload.image;
+//       state.userNonce = payload.nonce;
+//       state.availableBalances = payload.availableBalances;
+//       state.chainDetails = payload.chainDetails;
+//     },
+//     setReceivedCoins(state, action) {
+//       state.receivedCoins = action.payload;
+//     },
+//     setClosestCoin(state, action) {
+//       const amount = action.payload;
+//       let result = {};
+//       if (state.receivedCoins.length > 0) {
+//         result = state.receivedCoins.reduce((prev, curr) => {
+//           return Math.abs(curr.amount - Number(amount)) <
+//             Math.abs(prev.amount - Number(amount))
+//             ? curr
+//             : prev;
+//         });
+//       }
+//       state.sentCoin = result;
+//     },
+//     setOwshenDetails(state, action) {
+//       state.owshenWallet = action.payload.wallet;
+//       state.contractAddress = action.payload.contract_address;
+//       state.contractAbi = action.payload.contract_abi;
+//       state.diveAddress = action.payload.dive_address;
+//       state.diveAbi = action.payload.dive_abi;
+//     },
+//     setSelectedTokenContract(state, action) {
+//       state.selectedTokenContract = action.payload;
+//     },
+//     setReceivedCoinsLoading(state, { payload }) {
+//       state.receivedCoinsLoading = payload;
+//     },
+//     setIsTest(state, { payload }) {
+//       state.isTest = payload;
+//     },
+//   },
+// });
+
+// export const {
+//   setUserDetails,
+//   setReceivedCoins,
+//   setClosestCoin,
+//   setOwshenDetails,
+//   setSelectedTokenContract,
+//   setReceivedCoinsLoading,
+//   setIsTest
+// } = containerSlice.actions;
+
+// export default containerSlice.reducer;

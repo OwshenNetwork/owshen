@@ -8,21 +8,6 @@
 body {
   background: #e9e9e9;
 }
-/* button {
-  color: inherit;
-  text-decoration: inherit;
-  border: 2px solid black;
-  font-size: 0.5em;
-  padding: 0.5em 2em;
-  margin: 1em;
-  background-color: inherit;
-}
-button:hover {
-  color: white;
-  background-color: black;
-  text-decoration: inherit;
-  cursor: pointer;
-} */
 
 .modal {
   position: fixed;
@@ -35,15 +20,27 @@ button:hover {
   backdrop-filter: blur(4px);
   background: #0000005c;
 }
-/* .modal-content {
-  border: 2px solid black;
-  text-align: center;
-  width: 30vw;
-  padding: 1em;
-  margin: 15% auto;
-  background-color: white;
-} */
+
 .close-btn-container {
   display: flex;
+  justify-content: center;
+}
+.received-coins-container {
+  text-align: center !important;
+  height: 100px !important;
+  scroll-behavior: revert !important;
+}
+
+.list-container {
+  border: 1px solid;
+  height: 250px;
+  overflow-y: auto;
+  width: 390px;
+  margin: 0 auto;
+}
+
+.coin-container {
+  display: flex;
+  margin: 0 auto;
   justify-content: center;
 }

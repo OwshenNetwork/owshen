@@ -27,6 +27,7 @@ use ethers::{
     types::H160,
 };
 use eyre::Result;
+use genesis::Genesis;
 use helper::{h160_to_u256, u256_to_h160};
 use hex::decode as hex_decode;
 use keys::{Entropy, Point, PrivateKey, PublicKey};
@@ -37,10 +38,11 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::Arc,
     {fs::read_to_string, process::Command},
 };
 use structopt::StructOpt;
+use tokio::sync::Mutex;
 use tokio::{fs::File, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tower_http::{cors::CorsLayer, services::ServeFile};
@@ -107,6 +109,7 @@ pub struct GetInfoResponse {
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct GetCoinsResponse {
     coins: Vec<Coin>,
+    syncing: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -140,7 +143,7 @@ pub struct GetWithdrawResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SetNetworkRequest {
-    pub provider_url: String,
+    pub chain_id: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -275,25 +278,24 @@ pub struct Network {
     pub provider: Arc<Provider<Http>>,
     pub config: Config,
 }
-#[derive(Clone)]
 pub struct Context {
     coins: Vec<Coin>,
     tree: SparseMerkleTree,
     network: Option<Network>,
-}
-
-lazy_static! {
-    static ref GLOBAL_CONTEXT: Arc<Mutex<Context>> = Arc::new(Mutex::new(Context {
-        coins: vec![],
-        tree: SparseMerkleTree::new(16),
-        network: None,
-    }));
+    genesis: Genesis,
+    syncing: Arc<std::sync::Mutex<Option<f32>>>,
+    syncing_task: Option<
+        tokio::task::JoinHandle<
+            std::result::Result<(tree::SparseMerkleTree, Vec<Coin>), eyre::Report>,
+        >,
+    >,
 }
 
 fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {
     match result {
         Ok(a) => a.into_response(),
         Err(e) => {
+            log::error!("{}", e);
             let error_message = format!("Internal server error: {}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(error_message)).into_response()
         }
@@ -342,7 +344,20 @@ async fn serve_wallet(
     token_contracts: NetworkManager,
     test: bool,
 ) -> Result<()> {
-    let context = Arc::clone(&GLOBAL_CONTEXT);
+    let genesis: Option<Genesis> = if let Ok(f) = std::fs::read("owshen-genesis.dat") {
+        bincode::deserialize(&f).ok()
+    } else {
+        None
+    };
+
+    let context = Arc::new(Mutex::new(Context {
+        coins: vec![],
+        genesis: genesis.unwrap(),
+        tree: SparseMerkleTree::new(16),
+        network: None,
+        syncing: Arc::new(std::sync::Mutex::new(None)),
+        syncing_task: None,
+    }));
 
     let info_addr: PublicKey = pub_key.clone();
     let context_coin = context.clone();
@@ -362,7 +377,6 @@ async fn serve_wallet(
             "/static/*file",
             get(|params: extract::Path<String>| async move {
                 let file_path = PathBuf::from(static_files_path).join(params.as_str());
-                println!("file path {:?}", file_path);
                 serve_file(file_path).await
             }),
         )
@@ -503,7 +517,7 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
         wallet.address()
     };
 
-    println!("Deploying hash function...");
+    log::info!("Deploying hash function...");
     let poseidon4_addr = deploy(
         provider.clone(),
         include_str!("assets/poseidon4.abi"),
@@ -512,11 +526,11 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
     .await
     .address();
 
-    println!("Deploying DIVE token...");
+    log::info!("Deploying DIVE token...");
     let dive = SimpleErc20::deploy(
         provider.clone(),
         (
-            U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+            U256::from_str_radix("89900000000000000000000", 10).unwrap(),
             String::from_str("dive_token").unwrap(),
             String::from_str("DIVE").unwrap(),
         ),
@@ -528,13 +542,17 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
     .await
     .unwrap();
 
-    let mut smt = SparseMerkleTree::new(16);
-    let total = genesis::fill_genesis(&mut smt, dive.address());
+    log::info!("Filling the genesis tree... (This might take some time)");
+    let genesis = genesis::fill_genesis(16, dive.address());
+    std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis).unwrap()).unwrap();
 
-    println!("Deploying Owshen contract...");
+    log::info!("Deploying Owshen contract...");
     let owshen = Owshen::deploy(
         provider.clone(),
-        (poseidon4_addr, Into::<U256>::into(smt.genesis_root())),
+        (
+            poseidon4_addr,
+            Into::<U256>::into(genesis.smt.genesis_root()),
+        ),
     )
     .unwrap()
     .legacy()
@@ -542,14 +560,18 @@ async fn initialize_config(endpoint: String, from: String, name: String, is_test
     .send()
     .await
     .unwrap();
-    println!("Feeding DIVEs to the Owshen contract...");
-    dive.method::<_, bool>("transfer", (owshen.address(), total))
-        .unwrap()
-        .legacy()
-        .from(from_address)
-        .send()
-        .await
-        .unwrap();
+
+    log::info!("Feeding DIVEs to the Owshen contract...");
+    dive.method::<_, bool>(
+        "transfer",
+        (owshen.address(), Into::<U256>::into(genesis.total)),
+    )
+    .unwrap()
+    .legacy()
+    .from(from_address)
+    .send()
+    .await
+    .unwrap();
 
     return Config {
         name,
@@ -639,10 +661,14 @@ async fn initialize_wallet(mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet 
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
     let config_path = home::home_dir().unwrap().join(".config-wallet.json");
 
-    println!(
+    log::info!(
         "{} {}",
         "Your wallet path:".bright_green(),
         wallet_path.to_string_lossy()

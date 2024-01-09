@@ -3,7 +3,7 @@ use crate::{Context, Network};
 
 use axum::Json;
 use std::sync::Arc;
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 pub async fn info(
     address: PublicKey,
@@ -11,7 +11,7 @@ pub async fn info(
     token_contracts: NetworkManager,
     is_test: bool,
 ) -> Result<Json<GetInfoResponse>, eyre::Report> {
-    let info_arc: Option<Network> = info_context.lock().unwrap().network.clone();
+    let info_arc: Option<Network> = info_context.lock().await.network.clone();
     if let Some(network) = info_arc {
         Ok(Json(GetInfoResponse {
             address,

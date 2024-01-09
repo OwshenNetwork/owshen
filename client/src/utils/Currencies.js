@@ -3,8 +3,7 @@ import WETHIcon from "../pics/tokens/WETH.png";
 // import USDTIcon from "../assets/img/common/USDT-icon.png";
 import USDCIcon from "../pics/tokens/USDC.png";
 import ETHIcon from "../pics/tokens/ETH.png";
-//TODO: we need to change the currency icons sync with proper token icon
-import DIVEIcon from "../pics/tokens/DIVE.png";
+import DIVEIcon from "../pics/tokens/Dive.png"
 export const currencyIcons = {
   WETH: WETHIcon,
   // DAI: DAIIcon,

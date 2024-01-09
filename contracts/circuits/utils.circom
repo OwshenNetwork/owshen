@@ -14,3 +14,26 @@ template BitDecompose(N) {
     }
     total === num;
 }
+
+template LessThan(n) {
+    assert(n <= 252);
+    signal input in[2];
+    signal output out;
+
+    component n2b = BitDecompose(n+1);
+
+    n2b.num <== in[0]+ (1<<n) - in[1];
+
+    out <== 1-n2b.bits[n];
+}
+
+template GreaterEqThan(n) {
+    signal input in[2];
+    signal output out;
+
+    component lt = LessThan(n);
+
+    lt.in[0] <== in[1];
+    lt.in[1] <== in[0]+1;
+    lt.out ==> out;
+}

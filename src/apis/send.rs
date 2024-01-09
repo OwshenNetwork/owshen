@@ -10,10 +10,8 @@ use crate::PARAMS_FILE;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{str::FromStr, sync::Arc};
+use tokio::sync::Mutex;
 
 pub async fn send(
     Query(req): Query<GetSendRequest>,
@@ -25,8 +23,8 @@ pub async fn send(
     let new_amount = req.new_amount;
     let receiver_address = req.receiver_address;
     let address = req.address;
-    let coins = context_send.lock().unwrap().coins.clone();
-    let merkle_root = context_tree_send.lock().unwrap().tree.clone();
+    let coins = context_send.lock().await.coins.clone();
+    let merkle_root = context_tree_send.lock().await.tree.clone();
     // Find a coin with the specified index
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
 
@@ -109,7 +107,7 @@ pub async fn send(
             }
         }
         None => {
-            println!("No coin with index {} found", index);
+            log::warn!("No coin with index {} found", index);
             Ok(Json(GetSendResponse {
                 proof: Proof::default(),
                 token: H160::default(),

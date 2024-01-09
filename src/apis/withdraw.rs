@@ -10,7 +10,8 @@ use crate::PARAMS_FILE;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
-use std::{str::FromStr, sync::Arc, sync::Mutex};
+use std::{str::FromStr, sync::Arc};
+use tokio::sync::Mutex;
 
 pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,
@@ -19,13 +20,14 @@ pub async fn withdraw(
     priv_key: PrivateKey,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
-    let coins = context_withdraw.lock().unwrap().coins.clone();
+    let coins = context_withdraw.lock().await.coins.clone();
     let address = req.address;
-    let merkle_root = context_tree.lock().unwrap().tree.clone();
+    let merkle_root = context_tree.lock().await.tree.clone();
     // Find a coin with the specified index
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
     match filtered_coin {
         Some(coin) => {
+            println!("desss {:?}", req.desire_amount);
             let u32_index: u32 = index.low_u32();
             let u64_index: u64 = index.low_u64();
             // get merkle proof
@@ -37,24 +39,22 @@ pub async fn withdraw(
             let shared_secret: Fp = stealth_priv.shared_secret(ephemeral);
 
             let amount: U256 = coin.amount;
-
-            let new_amount_num: i64 = req.desire_amount.parse()?;
-            let obfuscated_remaining_amount: U256 = amount - new_amount_num;
-
-            let obfuscated_remaining_amount_in_fp: Fp = Fp::try_from(obfuscated_remaining_amount)?;
+            let fp_amount = Fp::try_from(amount)?;
+            let fp_new_amount = Fp::from_str(&req.desire_amount)?;
+            let obfuscated_remaining_amount = fp_amount - fp_new_amount;
+            println!("remaining amount {:?}", obfuscated_remaining_amount);
 
             let obfuscated_remaining_amount_with_secret: U256 =
-                (obfuscated_remaining_amount_in_fp + shared_secret).into();
+                (obfuscated_remaining_amount + shared_secret).into();
 
-            let min: U256 = amount - new_amount_num;
-            let remaining_amount: String = min.to_string();
+            let remaining_amount = obfuscated_remaining_amount;
 
             let hint_token_address: U256 = h160_to_u256(coin.uint_token);
 
             let calc_commitment: Fp = hash4([
                 stealth_pub_key.point.x,
                 stealth_pub_key.point.y,
-                Fp::from_str(&remaining_amount)?,
+                remaining_amount,
                 Fp::try_from(hint_token_address)?,
             ]);
 
@@ -65,8 +65,8 @@ pub async fn withdraw(
                 u32_index,
                 hint_token_address,
                 amount,
-                new_amount_num.into(),
-                obfuscated_remaining_amount,
+                fp_new_amount.into(),
+                obfuscated_remaining_amount.into(),
                 PublicKey::null(),
                 stealth_pub_key,
                 coin.priv_key.secret,
@@ -76,7 +76,7 @@ pub async fn withdraw(
                 Ok(proof) => Ok(Json(GetWithdrawResponse {
                     proof,
                     token: coin.uint_token,
-                    amount: coin.amount,
+                    amount,
                     obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
                     nullifier: coin.nullifier,
                     commitment: u256_calc_commitment,
@@ -88,7 +88,7 @@ pub async fn withdraw(
             }
         }
         None => {
-            println!("No coin with index {} found", index);
+            log::warn!("No coin with index {} found", index);
             Ok(Json(GetWithdrawResponse {
                 proof: Proof::default(),
                 token: H160::default(),

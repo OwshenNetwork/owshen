@@ -2,29 +2,14 @@ import React, { useState, useEffect } from "react";
 import Web3 from "web3";
 import Web3Modal from "web3modal";
 import WalletIcon from "../../pics/icons/account_balance_wallet.png";
-import CopyIcon from "../../pics/icons/copy.png";
-import Dropdown from "../dropDown";
-
-import "./style.css";
+import SelectNetwork from "../SelectNetwork";
 import { setUserDetails } from "../../store/containerSlice";
-import { useDispatch, useSelector, UseSelector } from "react-redux";
-import { selectIsTest } from "../../store/containerSlice";
+import { useDispatch } from "react-redux";
 import InProgress from "../Modal/InProgress";
 const Web3ModalComponent = () => {
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
   const [isInprogress, setIsInprogress] = useState(false);
-  const [selectNetwork, setSelectNetWork] = useState("");
-
-  const netWorkOptions = [
-    {
-      title: "network1",
-      value: "network1",
-    },
-    { title: "network2", value: "network2" },
-  ];
-  const isTest = useSelector(selectIsTest);
-  console.log("is test", isTest);
 
   const dispatch = useDispatch();
 
@@ -65,12 +50,6 @@ const Web3ModalComponent = () => {
     setAccount(null);
   };
 
-  function shortenAddress(address) {
-    const firstPart = address.substring(0, 6);
-    const lastPart = address.substring(address.length - 4);
-    return `${firstPart}...${lastPart}`;
-  }
-
   return (
     <>
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
@@ -83,14 +62,7 @@ const Web3ModalComponent = () => {
             Disconnect Wallet
           </button>
 
-          {isTest && (
-            <Dropdown
-              label="network1"
-              options={netWorkOptions}
-              select={setSelectNetWork}
-              style="!bg-gray-200 !text-white !py-3 !rounded-xl border-0 "
-            />
-          )}
+          <SelectNetwork />
         </>
       ) : (
         <button
@@ -101,6 +73,12 @@ const Web3ModalComponent = () => {
           <p>Connect Wallet</p>
         </button>
       )}
+
+      {/* <Dropdown label={shortenAddress(account)} />
+      <div className="border rounded-2xl px-3 py-2 mt-3  bg-[#BBDCFBCC] ease-in-out duration-300  flex">
+        {shortenAddress(account)}
+        <img className="ml-2" src={CopyIcon} />{" "}
+      </div>{" "} */}
     </>
   );
 };
