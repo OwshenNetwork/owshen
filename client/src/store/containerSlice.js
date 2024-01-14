@@ -15,7 +15,7 @@ const containerSlice = createSlice({
       sentCoins: [],
       receivedCoins: [],
       sentCoin: {},
-      receivedCoinsLoading: Number || null,
+      receivedCoinsLoading: null, //|| ,Number
     },
     owshen: {
       wallet: null,
@@ -27,6 +27,11 @@ const containerSlice = createSlice({
       selected_token_contract: null,
     },
     isTest: false,
+    netWorkDetails: {
+      name: "",
+      chainId: 0,
+      contractName:null
+    },
   },
   reducers: {
     setUserDetails(state, { payload }) {
@@ -95,11 +100,15 @@ const containerSlice = createSlice({
       }
     },
     setReceivedCoinsLoading(state, { payload }) {
-      console.log("is loading", payload);
       state.user.receivedCoinsLoading = payload;
     },
     setIsTest(state, { payload }) {
       state.isTest = payload;
+    },
+    setNetworkDetails(state, { payload }) {
+      state.netWorkDetails.name = payload.name;
+      state.netWorkDetails.chainId = payload.chainId;
+      state.netWorkDetails.contractName=payload.contractName
     },
   },
 });
@@ -132,10 +141,13 @@ export const selectIsTest = createSelector(
   (isTest) => isTest
 );
 
-
 export const selectSentCoin = createSelector(
   (state) => state.container.user.sentCoin,
   (coin) => coin
+);
+export const selectNetwork = createSelector(
+  (state) => state.container.netWorkDetails,
+  (netWorkDetails) => netWorkDetails
 );
 
 export const {
@@ -144,6 +156,7 @@ export const {
   setOwshen,
   setReceivedCoinsLoading,
   setIsTest,
+  setNetworkDetails,
 } = containerSlice.actions;
 
 export default containerSlice.reducer;

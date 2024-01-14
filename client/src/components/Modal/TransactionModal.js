@@ -9,10 +9,12 @@ import {
   selectOwshen,
   setReceivedCoins,
   selectReceivedCoins,
+  selectNetwork,
 } from "../../store/containerSlice";
+import { useAccount } from "wagmi";
 import { getERC20Balance } from "../../utils/helper";
 import { useApprove } from "../../hooks/useApprove";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import Logo from "../../pics/icons/logo.png";
 import MetaMaskLogo from "../../pics/icons/metaMask.png";
 import { toast } from "react-toastify";
@@ -30,16 +32,17 @@ const TransactionModal = ({
 }) => {
   const coreEndpoint =
     process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
-  const dispatch = useDispatch();
   const address = useSelector(selectUserAddress);
   const OwshenWallet = useSelector(selectOwshen);
   const receivedcoins = useSelector(selectReceivedCoins);
-
+  const network = useSelector(selectNetwork);
+  const { chainId } = useAccount();
   const [destOwshenWallet, setDstOwshenWallet] = useState("");
   const [tokenAmount, setTokenAmount] = useState(0);
   const [walletName, setWalletName] = useState("");
   const [tokenOptions, setTokenOptions] = useState([]);
   const [MaxBalanceOfWithdraw, setMaxBalanceOfWithdraw] = useState("");
+  const [selectedContract, setSelectedContract] = useState("");
 
   const walletOptions = [
     {
@@ -50,19 +53,18 @@ const TransactionModal = ({
     { title: "Your Owshen Account", value: "Your Owshen Account", img: Logo },
   ];
   useEffect(() => {
-    console.log(OwshenWallet)
-    if (OwshenWallet) {
-      const newTokenOptions =
-        OwshenWallet.token_contracts?.networks?.localhost.map(
-          ({ symbol, token_address }, id) => {
-            const img = currencies[symbol].img;
+    if (OwshenWallet && chainId) {
+      setContract(chainId);
+      const newTokenOptions = OwshenWallet.token_contracts?.networks?.[
+        selectedContract
+      ].map(({ symbol, token_address }, id) => {
+        const img = currencies[symbol].img;
 
-            return { title: symbol, value: token_address, img: img };
-          }
-        );
+        return { title: symbol, value: token_address, img: img };
+      });
       setTokenOptions(newTokenOptions);
     }
-  }, [OwshenWallet]);
+  }, [OwshenWallet, chainId]);
   useEffect(() => {
     setMaxBalanceOfWithdraw(selectedCoin?.amount);
   }, [selectedCoin]);
@@ -72,6 +74,21 @@ const TransactionModal = ({
     OwshenWallet.contract_address,
     OwshenWallet.dive_abi
   );
+  const setContract = (chainId) => {
+    switch (chainId) {
+      case 1337:
+        setSelectedContract("localhost");
+        break;
+      case 11155111:
+        setSelectedContract("Sepolia");
+        break;
+      case 5:
+        setSelectedContract("ethereum_goerli");
+        break;
+      default:
+        setSelectedContract("Sepolia");
+    }
+  };
   const setMaxBalance = async () => {
     if (tokenContract && address && OwshenWallet.dive_abi) {
       const value = await getERC20Balance(
@@ -84,14 +101,13 @@ const TransactionModal = ({
   };
   const MaxBalanceOfWithdrawHandler = async (maxValue) => {
     const val = trueAmount(maxValue);
-    console.log(val);
     return setTokenAmount(val);
   };
 
   const findMatchingCoin = () => {
     for (let coin of receivedcoins) {
       if (
-        coin.amount > tokenAmount &&
+        trueAmount(coin.amount) > Number(tokenAmount) &&
         String(coin.uint_token) === String(tokenContract)
       ) {
         return coin;
@@ -105,6 +121,10 @@ const TransactionModal = ({
     if (!destOwshenWallet) return toast.error("Enter your Destination");
     if (!tokenContract) return toast.error("Select your token");
     if (!tokenAmount) return toast.error("enter amount of token");
+    if (network.chainId !== chainId)
+      return toast.error(
+        `please change your wallet network to ${network.name}`
+      );
     await axios
       .get(`${coreEndpoint}/stealth`, {
         params: { address: destOwshenWallet },
@@ -150,6 +170,9 @@ const TransactionModal = ({
 
           console.log(error, "Error while getting approve or deposit flow");
         }
+      })
+      .catch((error) => {
+        return toast.error(`internal server error: ${error}`);
       });
   };
   const send = async () => {
@@ -157,6 +180,10 @@ const TransactionModal = ({
     if (!destOwshenWallet) return toast.error("Enter your Destination");
     if (!tokenContract) return toast.error("Select your token");
     if (!tokenAmount) return toast.error("enter amount of token");
+    if (network.chainId !== chainId)
+      return toast.error(
+        `please change your wallet network to ${network.name}`
+      );
 
     const selectedCoint = findMatchingCoin();
 
@@ -227,11 +254,13 @@ const TransactionModal = ({
           toast.error("Error while getting withdraw flow");
           console.log(error, "Error while getting withdraw flow");
         }
+      })
+      .catch((error) => {
+        return toast.error(`internal server error: ${error}`);
       });
   };
 
   const callSend = async () => {
-    console.log("called")
     OwshenWallet.wallet === destOwshenWallet
       ? await getStealth()
       : await send();
@@ -303,6 +332,9 @@ const TransactionModal = ({
           toast.error("Error while getting withdraw flow");
           setIsOpen(false);
         }
+      })
+      .catch((error) => {
+        return toast.error(`internal server error: ${error}`);
       });
   };
   return (

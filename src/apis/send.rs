@@ -16,7 +16,6 @@ use tokio::sync::Mutex;
 pub async fn send(
     Query(req): Query<GetSendRequest>,
     context_send: Arc<Mutex<Context>>,
-    context_tree_send: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
@@ -24,7 +23,7 @@ pub async fn send(
     let receiver_address = req.receiver_address;
     let address = req.address;
     let coins = context_send.lock().await.coins.clone();
-    let merkle_root = context_tree_send.lock().await.tree.clone();
+    let merkle_root = context_send.lock().await.tree.clone();
     // Find a coin with the specified index
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
 
@@ -49,7 +48,7 @@ pub async fn send(
 
             let amount: U256 = coin.amount;
             let fp_amount = Fp::try_from(amount)?;
-            let u256_new_amount = U256::from_str(&new_amount)?;
+            let u256_new_amount = U256::from_dec_str(&new_amount)?;
             let fp_new_amount = Fp::try_from(u256_new_amount)?;
             let remaining_amount = fp_amount - fp_new_amount;
             let hint_token_address = h160_to_u256(coin.uint_token);

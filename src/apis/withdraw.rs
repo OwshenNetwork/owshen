@@ -16,18 +16,16 @@ use tokio::sync::Mutex;
 pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,
     context_withdraw: Arc<Mutex<Context>>,
-    context_tree: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
-    let coins = context_withdraw.lock().await.coins.clone();
     let address = req.address;
-    let merkle_root = context_tree.lock().await.tree.clone();
+    let coins = context_withdraw.lock().await.coins.clone();
+    let merkle_root = context_withdraw.lock().await.tree.clone();
     // Find a coin with the specified index
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
     match filtered_coin {
         Some(coin) => {
-            println!("desss {:?}", req.desire_amount);
             let u32_index: u32 = index.low_u32();
             let u64_index: u64 = index.low_u64();
             // get merkle proof
@@ -42,7 +40,6 @@ pub async fn withdraw(
             let fp_amount = Fp::try_from(amount)?;
             let fp_new_amount = Fp::from_str(&req.desire_amount)?;
             let obfuscated_remaining_amount = fp_amount - fp_new_amount;
-            println!("remaining amount {:?}", obfuscated_remaining_amount);
 
             let obfuscated_remaining_amount_with_secret: U256 =
                 (obfuscated_remaining_amount + shared_secret).into();

@@ -1,25 +1,33 @@
 import { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
-import { useAccount, useEnsName } from "wagmi";
+import { useAccount } from "wagmi";
 import { selectIsTest } from "../../store/containerSlice";
 import Dropdown from "../DropDown";
+import { toast } from "react-toastify";
+import { setNetworkDetails } from "../../store/containerSlice";
 
 const SelectNetwork = () => {
+  const dispatch = useDispatch();
   const coreEndpoint =
     process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
-  const { chainId } = useAccount();
+  const accountData = useAccount();
+  const chainId = accountData ? accountData.chainId : undefined;
   const [network, setNetWork] = useState("select network");
 
   useEffect(() => {}, []);
 
   const isTest = useSelector(selectIsTest);
   const netWorkOptions = [
-    {
+    !isTest && {
       title: "goerli",
       value: "goerli",
     },
-    !isTest ? { title: "localhost", value: "localhost" } : null,
+    {
+      title: "sepolia",
+      value: "sepolia",
+    },
+    !isTest && { title: "localhost", value: "localhost" },
   ];
   useEffect(() => {
     checkNetwork(chainId);
@@ -29,31 +37,45 @@ const SelectNetwork = () => {
     switch (val) {
       case 5:
         setNetWork("goerli");
+        updateNetworkDetails("goerli", 5, "goerli");
         break;
       case 1337:
         setNetWork("localhost");
+        updateNetworkDetails("localhost", 1337, "localhost");
+        break;
+      case 11155111:
+        setNetWork("sepolia");
+        updateNetworkDetails("sepolia", 11155111, "ethereum_sepolia");
         break;
       default:
         setNetWork("select network");
     }
   };
   const handelChangeNetwork = async (val) => {
-    console.log(val);
     switch (val) {
       case "goerli":
-        setChainId(5);
+        setChainId(5, val);
         break;
       case "localhost":
-        setChainId(1337);
+        setChainId(1337, val);
+        break;
+      case "sepolia":
+        setChainId(11155111, val);
         break;
       default:
-        setNetWork("select network");
+        setNetWork(network);
     }
   };
-
-  const setChainId = async (chainId) => {
-    let chain_id = chainId;
-    if (chainId === 5) {
+  const updateNetworkDetails = (name, chainId, contractName) => {
+    dispatch(setNetworkDetails({ name, chainId, contractName }));
+  };
+  const setChainId = async (newChainId, val) => {
+    if (newChainId !== chainId && val) {
+      toast.error(`please change your wallet network to ${val}`);
+    }
+    updateNetworkDetails(val, newChainId);
+    let chain_id = newChainId;
+    if (newChainId === 5) {
       chain_id = "0x5";
     }
     await axios

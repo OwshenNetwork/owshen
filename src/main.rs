@@ -23,7 +23,10 @@ use bindings::{
 use bip39::Mnemonic;
 use colored::Colorize;
 use ethers::{
-    abi::Abi, core::k256::elliptic_curve::SecretKey, prelude::*, signers::Wallet as wallet,
+    abi::Abi,
+    core::k256::{elliptic_curve::SecretKey, Secp256k1},
+    prelude::*,
+    signers::Wallet as wallet,
     types::H160,
 };
 use eyre::Result;
@@ -61,14 +64,14 @@ pub struct InitOpt {
     db: Option<PathBuf>,
     #[structopt(long)]
     mnemonic: Option<Mnemonic>,
-    #[structopt(long)]
-    test: bool,
 }
 // Open web wallet interface
 #[derive(StructOpt, Debug)]
 pub struct WalletOpt {
     #[structopt(long)]
     db: Option<PathBuf>,
+    #[structopt(long)]
+    config: Option<PathBuf>,
     #[structopt(long, default_value = "8000")]
     port: u16,
     #[structopt(long, help = "Enable test mode")]
@@ -86,6 +89,16 @@ pub struct DeployOpt {
     config: Option<PathBuf>,
     #[structopt(long)]
     test: bool,
+    #[structopt(long, default_value = "1337")]
+    id: String,
+    #[structopt(long)]
+    deploy_dive: bool,
+    #[structopt(long)]
+    deploy_hash_function: bool,
+    #[structopt(long)]
+    deploy_owshen: bool,
+    #[structopt(long)]
+    genesis: bool,
 }
 // Show wallet info
 #[derive(StructOpt, Debug)]
@@ -202,7 +215,6 @@ pub struct NetworkManager {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Wallet {
     entropy: Entropy,
-    token_contracts: NetworkManager,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -212,6 +224,8 @@ pub struct Config {
     owshen_contract_address: H160,
     owshen_contract_abi: Abi,
     erc20_abi: Abi,
+    token_contracts: NetworkManager,
+    poseidon_contract_address: H160,
 }
 
 impl NetworkManager {
@@ -270,6 +284,8 @@ impl Default for Config {
             owshen_contract_address: H160::default(),
             owshen_contract_abi: Abi::default(),
             erc20_abi: Abi::default(),
+            token_contracts: NetworkManager::new(),
+            poseidon_contract_address: H160::default(),
         }
     }
 }
@@ -361,8 +377,6 @@ async fn serve_wallet(
 
     let info_addr: PublicKey = pub_key.clone();
     let context_coin = context.clone();
-    let context_tree = context.clone();
-    let context_tree_send = context.clone();
     let context_withdraw = context.clone();
     let context_send = context.clone();
     let context_info = context.clone();
@@ -403,9 +417,7 @@ async fn serve_wallet(
             "/withdraw",
             get(
                 move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                    handle_error(
-                        apis::withdraw(Query(req), context_withdraw, context_tree, priv_key).await,
-                    )
+                    handle_error(apis::withdraw(Query(req), context_withdraw, priv_key).await)
                 },
             ),
         )
@@ -413,9 +425,7 @@ async fn serve_wallet(
             "/send",
             get(
                 move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                    handle_error(
-                        apis::send(Query(req), context_send, context_tree_send, priv_key).await,
-                    )
+                    handle_error(apis::send(Query(req), context_send, priv_key).await)
                 },
             ),
         )
@@ -502,93 +512,151 @@ impl Into<OwshenPoint> for Point {
     }
 }
 
-async fn initialize_config(endpoint: String, from: String, name: String, is_test: bool) -> Config {
+async fn initialize_config(
+    endpoint: String,
+    from: String,
+    name: String,
+    is_test: bool,
+    chain_id: String,
+    config: Option<Config>,
+    deploy_dive: bool,
+    deploy_hash_function: bool,
+    deploy_owshen: bool,
+    genesis_feed: bool,
+) -> Config {
+    let mut network_manager = NetworkManager::new();
     let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
     let provider = Arc::new(provider);
+    let private_key_bytes = hex_decode(&from).expect("Invalid hex string for from");
+    let private_key: SecretKey<_> =
+        SecretKey::from_slice(&private_key_bytes).expect("Invalid private key");
+    let chain_id: u64 = chain_id.parse().expect("Invalid chain ID");
+    let wallet = wallet::from(private_key.clone()).with_chain_id(chain_id);
 
     let from_address = if is_test {
         let accounts = provider.get_accounts().await.unwrap();
         accounts[0]
     } else {
-        let private_key_bytes = hex_decode(&from).expect("Invalid hex string for from");
-        let private_key: SecretKey<_> =
-            SecretKey::from_slice(&private_key_bytes).expect("Invalid private key");
-        let wallet = wallet::from(private_key);
         wallet.address()
     };
 
-    log::info!("Deploying hash function...");
-    let poseidon4_addr = deploy(
-        provider.clone(),
-        include_str!("assets/poseidon4.abi"),
-        include_str!("assets/poseidon4.evm"),
-    )
-    .await
-    .address();
-
-    log::info!("Deploying DIVE token...");
-    let dive = SimpleErc20::deploy(
-        provider.clone(),
-        (
-            U256::from_str_radix("89900000000000000000000", 10).unwrap(),
-            String::from_str("dive_token").unwrap(),
-            String::from_str("DIVE").unwrap(),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from_address)
-    .send()
-    .await
-    .unwrap();
-
-    log::info!("Filling the genesis tree... (This might take some time)");
-    let genesis = genesis::fill_genesis(16, dive.address());
-    std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis).unwrap()).unwrap();
-
-    log::info!("Deploying Owshen contract...");
-    let owshen = Owshen::deploy(
-        provider.clone(),
-        (
-            poseidon4_addr,
-            Into::<U256>::into(genesis.smt.genesis_root()),
-        ),
-    )
-    .unwrap()
-    .legacy()
-    .from(from_address)
-    .send()
-    .await
-    .unwrap();
-
-    log::info!("Feeding DIVEs to the Owshen contract...");
-    dive.method::<_, bool>(
-        "transfer",
-        (owshen.address(), Into::<U256>::into(genesis.total)),
-    )
-    .unwrap()
-    .legacy()
-    .from(from_address)
-    .send()
-    .await
-    .unwrap();
-
-    return Config {
-        name,
-        endpoint,
-        owshen_contract_address: owshen.address(),
-        owshen_contract_abi: owshen.abi().clone(),
-        dive_contract_address: dive.address(),
-        erc20_abi: dive.abi().clone(),
-    };
-}
-
-async fn initialize_wallet(mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet {
-    let mut network_manager = NetworkManager::new();
-    let entropy = if let Some(m) = mnemonic {
-        Entropy::from_mnemonic(m)
+    let poseidon4_addr = if deploy_hash_function {
+        log::info!("Deploying hash function...");
+        deploy(
+            provider.clone(),
+            include_str!("assets/poseidon4.abi"),
+            include_str!("assets/poseidon4.evm"),
+            private_key.clone(),
+            from_address,
+            is_test,
+            chain_id,
+        )
+        .await
     } else {
-        Entropy::generate(&mut rand::thread_rng())
+        if let Some(c) = &config {
+            c.poseidon_contract_address
+        } else {
+            panic!("No config file!");
+        }
+    };
+    println!("posidon address {:?}", poseidon4_addr);
+
+    let client = Arc::new(SignerMiddleware::new(provider.clone(), wallet));
+    let nonce = provider
+        .get_transaction_count(from_address, None)
+        .await
+        .unwrap();
+
+    println!("correct from address {:?}", from_address);
+    let dive_contract_address = if deploy_dive {
+        log::info!("Deploying DIVE token...");
+        SimpleErc20::deploy(
+            client.clone(),
+            (
+                U256::from_str_radix("89900000000000000000000", 10).unwrap(),
+                String::from("dive_token"),
+                String::from("DIVE"),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from_address)
+        .nonce(nonce)
+        .send()
+        .await
+        .unwrap()
+        .address()
+    } else {
+        if let Some(c) = &config {
+            c.dive_contract_address
+        } else {
+            panic!("No config file!");
+        }
+    };
+    println!("dive address {:?}", dive_contract_address);
+
+    let erc20_abi = serde_json::from_str::<Abi>(include_str!("assets/erc20.abi")).unwrap();
+    let dive_contract = Contract::new(dive_contract_address, erc20_abi, client.clone());
+
+    let genesis = if genesis_feed {
+        log::info!("Filling the genesis tree... (This might take some time)");
+        let genesis = genesis::fill_genesis(16, dive_contract_address);
+        std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis).unwrap()).unwrap();
+        Some(genesis)
+    } else {
+        log::info!("Loading existing genesis tree...");
+        if let Ok(f) = std::fs::read("owshen-genesis.dat") {
+            bincode::deserialize(&f).ok()
+        } else {
+            log::warn!("No existing genesis data found. Proceeding without it.");
+            None
+        }
+    };
+
+    let genesis = match genesis {
+        Some(ref g) => g,
+        None => panic!("Genesis data is required but not available"),
+    };
+
+    let new_nonce = provider
+        .get_transaction_count(from_address, None)
+        .await
+        .unwrap();
+
+    let (owshen_contract_address, owshen_contract_abi) = if deploy_owshen {
+        log::info!("Deploying Owshen contract...");
+        let o = Owshen::deploy(
+            client,
+            (
+                poseidon4_addr,
+                Into::<U256>::into(genesis.smt.genesis_root()),
+            ),
+        )
+        .unwrap()
+        .legacy()
+        .from(from_address)
+        .nonce(new_nonce)
+        .send()
+        .await
+        .unwrap();
+
+        log::info!("Feeding DIVEs to the Owshen contract...");
+        dive_contract
+            .method::<_, bool>("transfer", (o.address(), Into::<U256>::into(genesis.total)))
+            .unwrap()
+            .legacy()
+            .from(from_address)
+            .send()
+            .await
+            .unwrap();
+
+        (o.address(), o.abi().clone())
+    } else {
+        if let Some(c) = &config {
+            (c.owshen_contract_address, c.owshen_contract_abi.clone())
+        } else {
+            panic!("No config file!");
+        }
     };
 
     if is_test {
@@ -636,13 +704,44 @@ async fn initialize_wallet(mnemonic: Option<Mnemonic>, is_test: bool) -> Wallet 
             symbol: "USDC".to_string(),
         };
 
-        network_manager.add_network("localhost".to_string(), vec![token_info1, token_info2]);
+        let dive_info = TokenInfo {
+            token_address: dive_contract_address,
+            symbol: "DIVE".to_string(),
+        };
+
+        network_manager.add_network(
+            "localhost".to_string(),
+            vec![token_info1, token_info2, dive_info],
+        );
     }
 
-    let wallet = Wallet {
-        entropy,
-        token_contracts: network_manager,
+    let dive_info = TokenInfo {
+        token_address: dive_contract_address,
+        symbol: "DIVE".to_string(),
     };
+
+    network_manager.add_network(name.clone(), vec![dive_info]);
+
+    return Config {
+        name,
+        endpoint,
+        owshen_contract_address,
+        owshen_contract_abi,
+        dive_contract_address,
+        erc20_abi: dive_contract.abi().clone(),
+        token_contracts: network_manager,
+        poseidon_contract_address: poseidon4_addr.clone(),
+    };
+}
+
+async fn initialize_wallet(mnemonic: Option<Mnemonic>) -> Wallet {
+    let entropy = if let Some(m) = mnemonic {
+        Entropy::from_mnemonic(m)
+    } else {
+        Entropy::generate(&mut rand::thread_rng())
+    };
+
+    let wallet = Wallet { entropy };
 
     println!(
         "{} {}",
@@ -677,7 +776,7 @@ async fn main() -> Result<()> {
     let opt = OwshenCliOpt::from_args();
 
     match opt {
-        OwshenCliOpt::Init(InitOpt { db, mnemonic, test }) => {
+        OwshenCliOpt::Init(InitOpt { db, mnemonic }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -686,7 +785,7 @@ async fn main() -> Result<()> {
                 })
                 .ok();
             if wallet.is_none() {
-                let wallet = initialize_wallet(mnemonic, test).await;
+                let wallet = initialize_wallet(mnemonic).await;
                 std::fs::write(wallet_path, serde_json::to_string(&wallet).unwrap()).unwrap();
             } else {
                 println!("Wallet is already initialized!");
@@ -698,24 +797,44 @@ async fn main() -> Result<()> {
             name,
             config,
             test,
+            id,
+            deploy_dive,
+            deploy_hash_function,
+            deploy_owshen,
+            genesis,
         }) => {
             let config_path = config.unwrap_or(config_path.clone());
-            let config = std::fs::read_to_string(&config_path)
+            let config: Option<Config> = std::fs::read_to_string(&config_path)
                 .map(|s| {
                     let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
                     c
                 })
                 .ok();
-            if config.is_none() {
-                let config =
-                    initialize_config(endpoint, from.unwrap_or_default(), name, test).await;
-                std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
-            } else {
-                println!("Config is already initialized!");
-            }
+
+            let config = initialize_config(
+                endpoint,
+                from.unwrap_or_default(),
+                name,
+                test,
+                id,
+                config,
+                deploy_dive,
+                deploy_hash_function,
+                deploy_owshen,
+                genesis,
+            )
+            .await;
+            std::fs::write(config_path, serde_json::to_string(&config).unwrap()).unwrap();
         }
-        OwshenCliOpt::Wallet(WalletOpt { db, port, test }) => {
+        OwshenCliOpt::Wallet(WalletOpt {
+            db,
+            config,
+            port,
+            test,
+        }) => {
             let wallet_path = db.unwrap_or(wallet_path.clone());
+            let config_path = config.unwrap_or(config_path.clone());
+            println!("config path {:?}", config_path);
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
                     let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
@@ -723,7 +842,14 @@ async fn main() -> Result<()> {
                 })
                 .ok();
 
-            if let Some(wallet) = &wallet {
+            let config = std::fs::read_to_string(&config_path)
+                .map(|s| {
+                    let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
+                    c
+                })
+                .ok();
+
+            if let (Some(wallet), Some(config)) = (&wallet, &config) {
                 let priv_key = wallet.entropy.clone().into();
                 let pub_key = PublicKey::from(priv_key);
 
@@ -731,7 +857,7 @@ async fn main() -> Result<()> {
                     port,
                     priv_key,
                     pub_key,
-                    wallet.token_contracts.clone(),
+                    config.token_contracts.clone(),
                     test,
                 )
                 .await?;
@@ -762,15 +888,28 @@ async fn deploy(
     client: Arc<Provider<Http>>,
     abi: &str,
     bytecode: &str,
-) -> ContractInstance<Arc<Provider<Http>>, Provider<Http>> {
-    let from = client.get_accounts().await.unwrap()[0];
+    private_key: SecretKey<Secp256k1>,
+    from_address: H160, // Use private key instead of from address
+    is_test: bool,
+    chain_id: u64,
+) -> H160 {
+    let wallet = wallet::from(private_key).with_chain_id(chain_id);
+    let client_with_signer = SignerMiddleware::new(client, wallet);
+
     let abi = serde_json::from_str::<Abi>(abi).unwrap();
     let bytecode = Bytes::from_str(bytecode).unwrap();
-    let factory = ContractFactory::new(abi, bytecode, client);
-    let mut deployer = factory.deploy(()).unwrap().legacy();
-    deployer.tx.set_from(from);
-    let contract = deployer.send().await.unwrap();
-    contract
+
+    let factory = ContractFactory::new(abi, bytecode, Arc::new(client_with_signer));
+
+    let contract = if is_test {
+        factory.deploy(()).unwrap().legacy().send().await.unwrap()
+    } else {
+        let mut deployer = factory.deploy(()).unwrap().legacy();
+        deployer.tx.set_from(from_address);
+        deployer.send().await.unwrap()
+    };
+
+    contract.address()
 }
 
 #[cfg(test)]

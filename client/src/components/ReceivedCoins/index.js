@@ -1,39 +1,38 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import { ethers, getAddress } from "ethers";
+import React, { useState } from "react";
 import { useSelector } from "react-redux";
 import { toBigInt } from "ethers";
-import { utils } from "web3";
-import { Link } from "react-router-dom";
 import Modal from "../Modal/Modal";
 import Main from "../Main";
 import {
-  selectOwshen,
   selectReceivedCoins,
-  selectUserAddress,
+  selectIsTest,
   selectReceivedCoinsLoading,
 } from "../../store/containerSlice";
 import ReactLoading from "react-loading";
 import TransactionModal from "../Modal/TransactionModal";
+import InProgress from "../Modal/InProgress";
 
-import BackIcon from "../../pics/icons/left_arrow.png";
 import MergIcon from "../../pics/icons/merge-icon.png";
 import SendIcon from "../../pics/icons/send-inside.png";
 import SwapIcon from "../../pics/icons/swap-inside.png";
 
 const ReceivedCoinList = () => {
-  const address = useSelector(selectUserAddress);
   const receivedcoins = useSelector(selectReceivedCoins);
   const isLoading = useSelector(selectReceivedCoinsLoading);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCoin, SetSelectedCoin] = useState("");
   const [isOpenWithdraw, setIsOpenWithdraw] = useState(false);
   const [isDataSet, setIsDataSet] = useState(false);
+  const [isInprogress, setIsInprogress] = useState(false);
+  const isTest = useSelector(selectIsTest);
 
   const trueAmount = (val) => {
     return Number(toBigInt(val).toString()) / Math.pow(10, 18);
   };
-  const callIt = (coin) => {
+  const withdrawHandler = (coin) => {
+    if (isTest) {
+      return setIsInprogress(true);
+    }
     SetSelectedCoin(coin);
     setIsOpenWithdraw(true);
     setIsDataSet(true);
@@ -41,6 +40,7 @@ const ReceivedCoinList = () => {
 
   return (
     <Main>
+      <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
       <TransactionModal
         transactionType="Withdraw"
         isOpen={isOpenWithdraw}
@@ -73,7 +73,10 @@ const ReceivedCoinList = () => {
                 width={200}
               />
             </div>
-            <div>{Number(isLoading * 100).toFixed(2) + "%"}</div>
+            <div>
+              {Number(isLoading * 100).toFixed(2) + "% "}
+              loading...
+            </div>
           </div>
         ) : receivedcoins?.length ? (
           <ul>
@@ -92,7 +95,12 @@ const ReceivedCoinList = () => {
               {coin.index}
               </p> */}
                 <div className=" w-1/6 justify-between flex">
-                  <button onClick={() => setIsOpen(true)}>
+                  <button
+                    onClick={
+                      () => setIsInprogress(true)
+                      // setIsOpen(true)
+                    }
+                  >
                     <img
                       alt=""
                       width="34px"
@@ -102,7 +110,7 @@ const ReceivedCoinList = () => {
                   </button>
                   <button
                     className="ml-2"
-                    // onClick={() => {
+                    onClick={() => setIsInprogress(true)}
                     //   withdrawal(coin.index, owshen, address);
                     //   SetSelectedCoin(coin.index);
                     //   setIsOpenWithdraw(true);
@@ -111,7 +119,10 @@ const ReceivedCoinList = () => {
                     <img alt="" src={SendIcon} />
                   </button>
 
-                  <button onClick={() => callIt(coin)} className="ml-2">
+                  <button
+                    onClick={() => withdrawHandler(coin)}
+                    className="ml-2"
+                  >
                     <img alt="" src={SwapIcon} />
                   </button>
                 </div>

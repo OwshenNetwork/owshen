@@ -58,6 +58,8 @@ pub async fn coins(
         let contract_height = contract.method("depositIndex", ())?.call().await?;
         if let Some(cache) = &cache {
             if Into::<U256>::into(cache.tree.root()) == root && cache.height == contract_height {
+                prov.coins = cache.coins.clone();
+                prov.tree = cache.tree.clone();
                 return Ok(Json(GetCoinsResponse {
                     coins: cache.coins.clone(),
                     syncing: None,
@@ -73,8 +75,8 @@ pub async fn coins(
         let sent_events = timeout(std::time::Duration::from_secs(5), async {
             contract
                 .event::<SentFilter>()
-                .from_block(0)
-                .to_block(1000)
+                .from_block(5084838)
+                .to_block(5084838 + 1000)
                 .address(ValueOrArray::Value(contract.address()))
                 .query()
                 .await
@@ -93,8 +95,8 @@ pub async fn coins(
 
         let spent_events = contract
             .event::<SpendFilter>()
-            .from_block(0)
-            .to_block(100)
+            .from_block(5084838)
+            .to_block(5084838 + 1000)
             .query()
             .await?;
 
@@ -178,6 +180,7 @@ pub async fn coins(
                 tree: tree_task.clone(),
                 height: contract_height,
             };
+            println!("my coins in after wallet cache {:?}", my_coins.clone());
             std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
             Ok::<(SparseMerkleTree, Vec<Coin>), eyre::Report>((tree_task, my_coins))
         });

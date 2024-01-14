@@ -17,6 +17,13 @@ lazy_static! {
                 "https://ethereum-goerli.publicnode.com".into(),
                 "goerli.json".into()
             )
+        ),
+        (
+            "11155111".into(),
+            (
+                "https://sepolia.infura.io/v3/9a3232615858434ba4a89bc1ae5d8826".into(),
+                "sepolia.json".into()
+            )
         )
     ]
     .into_iter()
