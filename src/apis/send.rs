@@ -17,6 +17,7 @@ pub async fn send(
     Query(req): Query<GetSendRequest>,
     context_send: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
+    witness_gen_path: String,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
     let new_amount = req.new_amount;
@@ -86,6 +87,7 @@ pub async fn send(
                 address_stealth_pub_key,
                 coin.priv_key.secret,
                 merkle_proof.proof.try_into().unwrap(),
+                witness_gen_path,
             );
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {

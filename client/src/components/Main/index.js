@@ -8,6 +8,7 @@ import {
   setIsTest,
   selectOwshen,
   selectIsTest,
+  selectReceivedCoins,
 } from "../../store/containerSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { useAccount } from "wagmi";
@@ -15,7 +16,11 @@ import { toast } from "react-toastify";
 import { Tooltip } from "react-tooltip";
 import InProgress from "../Modal/InProgress";
 import TransactionModal from "../Modal/TransactionModal";
-import { shortenAddress, copyWalletAddress } from "../../utils/helper";
+import {
+  shortenAddress,
+  copyWalletAddress,
+  trueAmount,
+} from "../../utils/helper";
 
 import "../../styles/main.css";
 import CopyIcon from "../../pics/icons/copy.png";
@@ -30,6 +35,7 @@ const Main = ({ children }) => {
   const chainId = accountData ? accountData.chainId : undefined;
   const OwshenWallet = useSelector(selectOwshen);
   const isTest = useSelector(selectIsTest);
+  const receivedCoins = useSelector(selectReceivedCoins);
   const dispatch = useDispatch();
 
   const [tokenContract, setTokenContract] = useState("");
@@ -120,6 +126,13 @@ const Main = ({ children }) => {
     }
     address ? setIsOpen(true) : toast.error("Connect your wallet first");
   };
+  const diveAmount = () => {
+    let totalAmount = 0;
+    for (let i = 0; i < receivedCoins.length; i++) {
+      totalAmount = +trueAmount(receivedCoins[i]?.amount);
+    }
+    return totalAmount;
+  };
 
   return (
     <>
@@ -154,7 +167,9 @@ const Main = ({ children }) => {
             </button>
           )}
 
-          <div className="text-3xl font-bold mt-4">0.0 DIVE</div>
+          <div className="text-3xl font-bold mt-4">
+            {receivedCoins ? diveAmount() : "0.0 "} DIVE
+          </div>
           <div className="text-lg mt-4">$? USD</div>
           <div className="my-8 flex justify-around w-32 mx-auto">
             <Tooltip id="send" place="bottom" content="send" />

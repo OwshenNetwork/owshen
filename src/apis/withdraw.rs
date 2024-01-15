@@ -17,6 +17,7 @@ pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,
     context_withdraw: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
+    witness_gen_path: String,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
     let address = req.address;
@@ -68,6 +69,7 @@ pub async fn withdraw(
                 stealth_pub_key,
                 coin.priv_key.secret,
                 merkle_proof.proof.try_into().unwrap(),
+                witness_gen_path,
             );
             match proof {
                 Ok(proof) => Ok(Json(GetWithdrawResponse {

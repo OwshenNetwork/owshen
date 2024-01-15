@@ -3,7 +3,7 @@ import WETHIcon from "../pics/tokens/WETH.png";
 // import USDTIcon from "../assets/img/common/USDT-icon.png";
 import USDCIcon from "../pics/tokens/USDC.png";
 import ETHIcon from "../pics/tokens/ETH.png";
-import DIVEIcon from "../pics/tokens/Dive.png"
+import DIVEIcon from "../pics/tokens/Dive.png";
 export const currencyIcons = {
   WETH: WETHIcon,
   // DAI: DAIIcon,
@@ -161,7 +161,7 @@ export const currencies = {
   },
 
   DIVE: {
-    name: "DIVE Token",
+    name: "DIVE",
     decimals: 18,
     chain: {
       ethereum: {
@@ -210,4 +210,27 @@ export function getNetworkCurrency(network, ticker) {
 
 export function getCurrencyKeys() {
   return Object.keys(currencies);
+}
+
+export function getLogoByContractAddress(contractAddress) {
+  for (const currency of Object.values(currencies)) {
+    for (const chainInfo of Object.values(currency.chain)) {
+      if (chainInfo.contract === contractAddress) {
+        return currency.img;
+      }
+    }
+  }
+
+  return DIVEIcon;
+}
+
+export function getNameByContractAddress(contractAddress) {
+  for (const [_, currency] of Object.entries(currencies)) {
+    for (const chainInfo of Object.values(currency.chain)) {
+      if (chainInfo.contract === contractAddress) {
+        return currency.name;
+      }
+    }
+  }
+  return "DIVE";
 }

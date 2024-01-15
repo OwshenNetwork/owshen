@@ -359,8 +359,25 @@ async fn serve_wallet(
     pub_key: PublicKey,
     token_contracts: NetworkManager,
     test: bool,
+    config: Config,
 ) -> Result<()> {
-    let genesis: Option<Genesis> = if let Ok(f) = std::fs::read("owshen-genesis.dat") {
+    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+    let genesis_path = if test {
+        "owshen-genesis.dat".to_string()
+    } else {
+        format!(
+            "{}/usr/share/genesis/{}-owshen-genesis.dat",
+            app_dir_path, config.name
+        )
+    };
+    let witness_gen_path = if test {
+        "contracts/circuits/coin_withdraw_cpp/coin_withdraw".into()
+    } else {
+        format!("{}/usr/bin/coin_withdraw", app_dir_path).to_string()
+    };
+
+    let send_witness_gen_path = witness_gen_path.clone();
+    let genesis: Option<Genesis> = if let Ok(f) = std::fs::read(genesis_path) {
         bincode::deserialize(&f).ok()
     } else {
         None
@@ -381,7 +398,6 @@ async fn serve_wallet(
     let context_send = context.clone();
     let context_info = context.clone();
     let contest_set_network = context.clone();
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
     let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
     let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
 
@@ -417,7 +433,15 @@ async fn serve_wallet(
             "/withdraw",
             get(
                 move |extract::Query(req): extract::Query<GetWithdrawRequest>| async move {
-                    handle_error(apis::withdraw(Query(req), context_withdraw, priv_key).await)
+                    handle_error(
+                        apis::withdraw(
+                            Query(req),
+                            context_withdraw,
+                            priv_key,
+                            witness_gen_path.clone(),
+                        )
+                        .await,
+                    )
                 },
             ),
         )
@@ -425,7 +449,9 @@ async fn serve_wallet(
             "/send",
             get(
                 move |extract::Query(req): extract::Query<GetSendRequest>| async move {
-                    handle_error(apis::send(Query(req), context_send, priv_key).await)
+                    handle_error(
+                        apis::send(Query(req), context_send, priv_key, send_witness_gen_path).await,
+                    )
                 },
             ),
         )
@@ -447,7 +473,7 @@ async fn serve_wallet(
             "/set-network",
             post(
                 move |extract::Query(req): extract::Query<SetNetworkRequest>| async move {
-                    handle_error(apis::set_network(Query(req), contest_set_network).await)
+                    handle_error(apis::set_network(Query(req), contest_set_network, test).await)
                 },
             ),
         )
@@ -832,8 +858,15 @@ async fn main() -> Result<()> {
             port,
             test,
         }) => {
+            let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+            let config_path = if test {
+                println!("here");
+                config.unwrap_or_else(|| config_path.clone())
+            } else {
+                println!("or rhere");
+                PathBuf::from(format!("{}/usr/share/networks/Sepolia.json", app_dir_path))
+            };
             let wallet_path = db.unwrap_or(wallet_path.clone());
-            let config_path = config.unwrap_or(config_path.clone());
             println!("config path {:?}", config_path);
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
@@ -859,6 +892,7 @@ async fn main() -> Result<()> {
                     pub_key,
                     config.token_contracts.clone(),
                     test,
+                    config.clone(),
                 )
                 .await?;
             }

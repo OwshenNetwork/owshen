@@ -21,7 +21,8 @@ appimage:
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/applications
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/icons
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/owshen/client
-
+	mkdir -p ~/Owshen-Production.AppDir/usr/share/networks
+	mkdir -p ~/Owshen-Production.AppDir/usr/share/genesis
 
 	cd target/release && cp ./owshen ~/Owshen-Production.AppDir/usr/bin
 
@@ -29,6 +30,10 @@ appimage:
 
 	cd client/src/pics/icons && cp ./owshen.png ~/Owshen-Production.AppDir
 
+	cp -r ./Sepolia.json ~/Owshen-Production.AppDir/usr/share/networks
+	cp -r ./Sepolia-owshen-genesis.dat ~/Owshen-Production.AppDir/usr/share/genesis
+	cp -r ./contracts/circuits/coin_withdraw_cpp/coin_withdraw ~/Owshen-Production.AppDir/usr/bin
+	
 	echo "[Desktop Entry]\nType=Application\nName=Owshen\nIcon=owshen\nExec=owshen\nCategories=Utility;" > ~/Owshen-Production.AppDir/owshen.desktop
 	
 	@echo '#!/bin/sh' > ~/Owshen-Production.AppDir/AppRun

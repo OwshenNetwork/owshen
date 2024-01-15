@@ -28,6 +28,7 @@ pub fn prove<P: AsRef<Path>>(
     address_2: PublicKey,
     secret: Fp,
     proof: [[Fp; 3]; 16],
+    witness_gen_path: String,
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
 
@@ -74,7 +75,7 @@ pub fn prove<P: AsRef<Path>>(
     log::info!("Circuit input: {}", json_input);
 
     let witness_file = NamedTempFile::new()?;
-    let wtns_gen_output = Command::new("contracts/circuits/coin_withdraw_cpp/coin_withdraw")
+    let wtns_gen_output = Command::new(witness_gen_path)
         .arg(inputs_file.path())
         .arg(witness_file.path())
         .output()?;
