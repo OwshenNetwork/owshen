@@ -56,8 +56,6 @@ use webbrowser;
 extern crate lazy_static;
 
 const GOERLI_ENDPOINT: &str = "https://ethereum-goerli.publicnode.com";
-const PARAMS_FILE: &str = "contracts/circuits/coin_withdraw_0001.zkey";
-// Initialize wallet, TODO: let secret be derived from a BIP-39 mnemonic code
 #[derive(StructOpt, Debug)]
 pub struct InitOpt {
     #[structopt(long)]
@@ -362,6 +360,13 @@ async fn serve_wallet(
     config: Config,
 ) -> Result<()> {
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+
+    let params_file: String = if test {
+        "contracts/circuits/coin_withdraw_0001.zkey".to_string()
+    } else {
+        format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path)
+    };
+    let send_params_file = params_file.clone();
     let genesis_path = if test {
         "owshen-genesis.dat".to_string()
     } else {
@@ -438,7 +443,8 @@ async fn serve_wallet(
                             Query(req),
                             context_withdraw,
                             priv_key,
-                            witness_gen_path.clone(),
+                            witness_gen_path,
+                            params_file,
                         )
                         .await,
                     )
@@ -450,7 +456,14 @@ async fn serve_wallet(
             get(
                 move |extract::Query(req): extract::Query<GetSendRequest>| async move {
                     handle_error(
-                        apis::send(Query(req), context_send, priv_key, send_witness_gen_path).await,
+                        apis::send(
+                            Query(req),
+                            context_send,
+                            priv_key,
+                            send_witness_gen_path,
+                            send_params_file,
+                        )
+                        .await,
                     )
                 },
             ),

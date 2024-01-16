@@ -6,7 +6,6 @@ use crate::proof::{prove, Proof};
 use crate::Context;
 use crate::GetWithdrawRequest;
 use crate::GetWithdrawResponse;
-use crate::PARAMS_FILE;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
@@ -18,6 +17,7 @@ pub async fn withdraw(
     context_withdraw: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
     witness_gen_path: String,
+    params_file: String,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
     let address = req.address;
@@ -59,7 +59,7 @@ pub async fn withdraw(
             let u256_calc_commitment: U256 = calc_commitment.into();
 
             let proof: std::result::Result<Proof, eyre::Error> = prove(
-                PARAMS_FILE,
+                params_file,
                 u32_index,
                 hint_token_address,
                 amount,

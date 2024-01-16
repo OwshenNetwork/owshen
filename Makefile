@@ -33,6 +33,7 @@ appimage:
 	cp -r ./Sepolia.json ~/Owshen-Production.AppDir/usr/share/networks
 	cp -r ./Sepolia-owshen-genesis.dat ~/Owshen-Production.AppDir/usr/share/genesis
 	cp -r ./contracts/circuits/coin_withdraw_cpp/coin_withdraw ~/Owshen-Production.AppDir/usr/bin
+	cp -r ./contracts/circuits/coin_withdraw_0001.zkey ~/Owshen-Production.AppDir/usr/bin
 	
 	echo "[Desktop Entry]\nType=Application\nName=Owshen\nIcon=owshen\nExec=owshen\nCategories=Utility;" > ~/Owshen-Production.AppDir/owshen.desktop
 	

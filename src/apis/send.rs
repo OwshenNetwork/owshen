@@ -6,7 +6,6 @@ use crate::proof::{prove, Proof};
 use crate::Context;
 use crate::GetSendRequest;
 use crate::GetSendResponse;
-use crate::PARAMS_FILE;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
@@ -18,6 +17,7 @@ pub async fn send(
     context_send: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
     witness_gen_path: String,
+    params_fils: String,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
     let new_amount = req.new_amount;
@@ -77,7 +77,7 @@ pub async fn send(
             ]);
             let u256_calc_sender_commitment = calc_sender_commitment.into();
             let proof: std::result::Result<Proof, eyre::Error> = prove(
-                PARAMS_FILE,
+                params_fils,
                 u32_index,
                 hint_token_address,
                 amount,
