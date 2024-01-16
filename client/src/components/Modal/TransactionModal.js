@@ -341,8 +341,8 @@ const TransactionModal = ({
     <Modal title={transactionType} isOpen={isOpen} setIsOpen={setIsOpen}>
       <p className="mt-5">
         {transactionType === "Withdraw"
-          ? "Privately Withdraw tokens to Owshen users!"
-          : "Privately send ERC-20 tokens to Owshen users!"}
+          ? "Privately withdraw ERC-20 tokens from your Owshen address!"
+          : "Privately send ERC-20 tokens to other Owshen users!"}
       </p>
       {transactionType !== "Withdraw" && (
         <>
@@ -362,7 +362,7 @@ const TransactionModal = ({
               <b>From: </b>
             </label>
             <Dropdown
-              label="choose your wallet"
+              label="Source wallet"
               options={walletOptions}
               select={setWalletName}
               style="py-5"
@@ -372,7 +372,7 @@ const TransactionModal = ({
       )}
       <div className="px-3 flex justify-between items-center mt-3">
         <label>
-          <b>token: </b>
+          <b>Token: </b>
         </label>
         <Dropdown
           label={isDataSet ? "DIVE" : "choose your token"}

@@ -143,7 +143,7 @@ const Main = ({ children }) => {
         setIsOpen={setIsOpenWithdraw}
       />
       <TransactionModal
-        transactionType="send"
+        transactionType="Send"
         tokenContract={tokenContract}
         setTokenContract={setTokenContract}
         isOpen={isOpen}
@@ -172,8 +172,8 @@ const Main = ({ children }) => {
           </div>
           <div className="text-lg mt-4">$? USD</div>
           <div className="my-8 flex justify-around w-32 mx-auto">
-            <Tooltip id="send" place="bottom" content="send" />
-            <button data-tooltip-id="send" onClick={canOpenModal}>
+            <Tooltip id="Send" place="bottom" content="Send" />
+            <button data-tooltip-id="Send" onClick={canOpenModal}>
               <img src={SendIcon} />
             </button>
             <Tooltip id="swap" place="bottom" content="swap" />

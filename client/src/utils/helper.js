@@ -1,4 +1,4 @@
-import { ethers, formatUnits, toBigInt  } from "ethers";
+import { ethers, formatUnits, toBigInt } from "ethers";
 import { toast } from "react-toastify";
 
 export const getERC20Balance = async (tokenAddress, userAddress, ABI) => {
@@ -16,9 +16,9 @@ export const shortenAddress = (address) => {
 
 export const copyWalletAddress = (owshenWalletWallet) => {
   navigator.clipboard.writeText(owshenWalletWallet);
-  toast.success("your wallet address copied");}
-  
+  toast.success("You wallet address has been copied!");
+};
+
 export const trueAmount = (val) => {
   return Number(toBigInt(val).toString()) / Math.pow(10, 18);
 };
-
