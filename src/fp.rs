@@ -1,7 +1,7 @@
 use ethers::prelude::*;
 use ff::PrimeField;
 use num_bigint::BigUint;
-use num_traits::{Euclid, Num};
+use num_traits::{Euclid, Num, ToBytes};
 use serde::{de, de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::str::FromStr;
@@ -12,13 +12,14 @@ use std::str::FromStr;
 #[PrimeFieldReprEndianness = "little"]
 pub struct Fp([u64; 4]);
 
+lazy_static! {
+    pub static ref FP_REMAINDER_BIGUINT: BigUint =
+        BigUint::from_str_radix(&Fp::MODULUS[2..], 16).unwrap();
+}
+
 impl Into<U256> for Fp {
     fn into(self) -> U256 {
-        U256::from_str_radix(
-            &BigUint::from_bytes_le(self.to_repr().as_ref()).to_str_radix(16),
-            16,
-        )
-        .unwrap()
+        U256::from_little_endian(self.to_repr().as_ref())
     }
 }
 
@@ -26,7 +27,15 @@ impl TryFrom<U256> for Fp {
     type Error = eyre::Report;
 
     fn try_from(value: U256) -> Result<Self, Self::Error> {
-        Fp::from_str_vartime(&value.to_string()).ok_or(eyre::Report::msg("Invalid U256 value!"))
+        let u64s = value
+            .as_ref()
+            .to_vec()
+            .into_iter()
+            .map(|u| u.to_le_bytes())
+            .flatten()
+            .collect::<Vec<_>>();
+        Into::<Option<Fp>>::into(Fp::from_repr(FpRepr(u64s.try_into().unwrap())))
+            .ok_or(eyre::Report::msg("Invalid Fp!"))
     }
 }
 
@@ -49,13 +58,14 @@ impl Serialize for Fp {
 }
 
 impl Fp {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, eyre::Report> {
-        Ok(Fp::from_str(
-            &BigUint::from_bytes_le(bytes)
-                .rem_euclid(&BigUint::from_str_radix(&Fp::MODULUS[2..], 16).unwrap())
-                .to_string(),
-        )
-        .unwrap())
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let mut bytes = BigUint::from_bytes_le(bytes)
+            .rem_euclid(&FP_REMAINDER_BIGUINT)
+            .to_le_bytes();
+        while bytes.len() < 32 {
+            bytes.push(0);
+        }
+        Fp::from_repr(FpRepr(bytes.try_into().unwrap())).unwrap()
     }
 }
 

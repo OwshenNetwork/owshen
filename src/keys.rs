@@ -227,7 +227,7 @@ impl From<Entropy> for PrivateKey {
     fn from(entropy: Entropy) -> Self {
         let mnemonic: Mnemonic = Mnemonic::from_entropy(&entropy.value).unwrap();
         let seed = mnemonic.to_seed("");
-        let secret = Fp::from_bytes(&seed).unwrap();
+        let secret = Fp::from_bytes(&seed);
         PrivateKey { secret }
     }
 }
