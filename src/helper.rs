@@ -10,48 +10,48 @@ pub fn extract_token_amount(
     commitment: Fp,
     stealth_pub: PublicKey,
 ) -> Result<Option<(Fp, Fp)>, eyre::Report> {
-    let amount = Fp::try_from(hint_amount)? - shared_secret;
-    let token_address = Fp::try_from(hint_token_address)? - shared_secret;
+    let fp_hint_token_address = Fp::try_from(hint_token_address)?;
+    let fp_hint_amount = Fp::try_from(hint_amount)?;
+    let amount = fp_hint_amount - shared_secret;
+    let token_address = fp_hint_token_address - shared_secret;
 
-    let calc_commitment1 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        Fp::try_from(hint_amount)?,
-        Fp::try_from(hint_token_address)?,
-    ]);
-
-    let calc_commitment2 = hash4([
+    if hash4([
         stealth_pub.point.x,
         stealth_pub.point.y,
         amount,
         token_address,
-    ]);
-
-    let calc_commitment3 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        amount,
-        Fp::try_from(hint_token_address)?,
-    ]);
-
-    let calc_commitment4 = hash4([
-        stealth_pub.point.x,
-        stealth_pub.point.y,
-        Fp::try_from(hint_amount)?,
-        token_address,
-    ]);
-
-    if calc_commitment1 == commitment {
-        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
-        let fp_hint_amount = Fp::try_from(hint_amount)?;
-        return Ok(Some((fp_hint_token_address, fp_hint_amount)));
-    } else if calc_commitment2 == commitment {
+    ]) == commitment
+    {
         return Ok(Some((token_address, amount)));
-    } else if calc_commitment3 == commitment {
-        let fp_hint_token_address = Fp::try_from(hint_token_address)?;
+    }
+
+    if hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        fp_hint_amount,
+        fp_hint_token_address,
+    ]) == commitment
+    {
+        return Ok(Some((fp_hint_token_address, fp_hint_amount)));
+    }
+
+    if hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        amount,
+        fp_hint_token_address,
+    ]) == commitment
+    {
         return Ok(Some((fp_hint_token_address, amount)));
-    } else if calc_commitment4 == commitment {
-        let fp_hint_amount = Fp::try_from(hint_amount)?;
+    }
+
+    if hash4([
+        stealth_pub.point.x,
+        stealth_pub.point.y,
+        fp_hint_amount,
+        token_address,
+    ]) == commitment
+    {
         return Ok(Some((token_address, fp_hint_amount)));
     }
 
