@@ -29,10 +29,23 @@ pub struct PublicKey {
 pub struct Entropy {
     pub value: [u8; 16],
 }
+
+pub struct EphemeralPrivKey {
+    pub secret: Fp,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct EphemeralKey {
+pub struct EphemeralPubKey {
     pub point: Point,
 }
+
+impl EphemeralPrivKey {
+    pub fn shared_secret(&self, pk: PublicKey) -> Fp {
+        let shared_secret = pk.point * self.secret;
+        hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()])
+    }
+}
+
 #[derive(Clone, Debug, Copy, Serialize, Deserialize)]
 pub struct Cipher {
     a: Point,
@@ -137,15 +150,22 @@ impl PublicKey {
         }
     }
 
-    pub fn derive(&self, r: Fp) -> (EphemeralKey, PublicKey) {
+    pub fn derive(&self, r: Fp) -> (EphemeralPrivKey, EphemeralPubKey, PublicKey) {
         let ephemeral = *BASE * r;
         let shared_secret = self.point * r;
         let shared_secret_hash = hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()]);
         let pub_key = self.point + *BASE * shared_secret_hash;
-        (EphemeralKey { point: ephemeral }, Self { point: pub_key })
+        (
+            EphemeralPrivKey { secret: r },
+            EphemeralPubKey { point: ephemeral },
+            Self { point: pub_key },
+        )
     }
 
-    pub fn derive_random<R: Rng>(&self, rng: &mut R) -> (EphemeralKey, PublicKey) {
+    pub fn derive_random<R: Rng>(
+        &self,
+        rng: &mut R,
+    ) -> (EphemeralPrivKey, EphemeralPubKey, PublicKey) {
         self.derive(Fp::random(rng))
     }
 
@@ -196,12 +216,12 @@ impl PrivateKey {
         Ok(phrase)
     }
 
-    pub fn shared_secret(&self, eph: EphemeralKey) -> Fp {
+    pub fn shared_secret(&self, eph: EphemeralPubKey) -> Fp {
         let shared_secret = eph.point * self.secret;
         hash4([shared_secret.x, shared_secret.y, 0.into(), 0.into()])
     }
 
-    pub fn derive(&self, eph: EphemeralKey) -> Self {
+    pub fn derive(&self, eph: EphemeralPubKey) -> Self {
         let shared_secret = self.shared_secret(eph);
         let secret = BigUint::from_bytes_le(self.secret.to_repr().as_ref());
         let shared_secret = BigUint::from_bytes_le(shared_secret.to_repr().as_ref());
@@ -320,9 +340,10 @@ mod tests {
             .unwrap(),
         };
         let master_pub_key: PublicKey = master_priv_key.into();
-        let (stealth_eph, stealth_pub_key) = master_pub_key.derive_random(&mut rand::thread_rng());
+        let (stealth_eph_priv_key, stealth_eph_pub_key, stealth_pub_key) =
+            master_pub_key.derive_random(&mut rand::thread_rng());
         assert!(master_pub_key != stealth_pub_key);
-        let stealth_priv_key = master_priv_key.derive(stealth_eph);
+        let stealth_priv_key = master_priv_key.derive(stealth_eph_pub_key);
         assert_eq!(PublicKey::from(stealth_priv_key), stealth_pub_key);
     }
 

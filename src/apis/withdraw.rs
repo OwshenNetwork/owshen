@@ -33,7 +33,7 @@ pub async fn withdraw(
             let merkle_proof = merkle_root.get(u64_index);
 
             let pub_key: PublicKey = PublicKey::from_str(&address)?;
-            let (ephemeral, stealth_pub_key) = pub_key.derive_random(&mut rand::thread_rng());
+            let (_, ephemeral, stealth_pub_key) = pub_key.derive_random(&mut rand::thread_rng());
             let stealth_priv: PrivateKey = priv_key.derive(ephemeral);
             let shared_secret: Fp = stealth_priv.shared_secret(ephemeral);
 

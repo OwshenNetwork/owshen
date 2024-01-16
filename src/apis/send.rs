@@ -36,16 +36,20 @@ pub async fn send(
             let merkle_proof = merkle_root.get(u64_index);
 
             let address_pub_key = PublicKey::from_str(&address)?;
-            let (address_ephemeral, address_stealth_pub_key) =
+            let (_, address_ephemeral, address_stealth_pub_key) =
                 address_pub_key.derive_random(&mut rand::thread_rng());
 
             let receiver_address_pub_key = PublicKey::from_str(&receiver_address)?;
-            let (receiver_address_ephemeral, receiver_address_stealth_pub_key) =
-                receiver_address_pub_key.derive_random(&mut rand::thread_rng());
+            let (
+                receiver_address_priv_ephemeral,
+                receiver_address_pub_ephemeral,
+                receiver_address_stealth_pub_key,
+            ) = receiver_address_pub_key.derive_random(&mut rand::thread_rng());
 
             let stealth_priv: PrivateKey = priv_key.derive(address_ephemeral);
             let sender_shared_secret: Fp = stealth_priv.shared_secret(address_ephemeral);
-            let receiver_shared_secret: Fp = stealth_priv.shared_secret(receiver_address_ephemeral);
+            let receiver_shared_secret: Fp =
+                receiver_address_priv_ephemeral.shared_secret(receiver_address_pub_key);
 
             let amount: U256 = coin.amount;
             let fp_amount = Fp::try_from(amount)?;
@@ -100,7 +104,7 @@ pub async fn send(
                     receiver_commitment: u256_calc_send_commitment,
                     sender_commitment: u256_calc_sender_commitment,
                     sender_ephemeral: address_ephemeral.point,
-                    receiver_ephemeral: receiver_address_ephemeral.point,
+                    receiver_ephemeral: receiver_address_pub_ephemeral.point,
                 })),
                 Err(_e) => Err(eyre::Report::msg(
                     "Something wrong while creating proof for send",

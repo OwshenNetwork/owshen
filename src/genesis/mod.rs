@@ -3,7 +3,7 @@ mod genesis_data;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
-use crate::keys::EphemeralKey;
+use crate::keys::EphemeralPubKey;
 use crate::keys::PublicKey;
 use crate::SparseMerkleTree;
 use bindings::owshen::SentFilter;
@@ -17,7 +17,7 @@ use genesis_data::GENESIS;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Entry {
-    ephemeral: EphemeralKey,
+    ephemeral: EphemeralPubKey,
     index: usize,
     timestamp: u64,
     hint_amount: Fp,
@@ -56,7 +56,7 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
         .enumerate()
         .map(|(i, (addr, amnt))| {
             let pk: PublicKey = addr.parse().unwrap();
-            let (eph, stealth_pub) = pk.derive(Fp::ZERO);
+            let (_, eph, stealth_pub) = pk.derive(Fp::ZERO);
             let amount = Fp::from(amnt) * coeff;
             let commit = hash4([
                 stealth_pub.point.x,

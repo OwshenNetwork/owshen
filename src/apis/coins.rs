@@ -1,7 +1,7 @@
 use crate::fp::Fp;
 use crate::helper::extract_token_amount;
 use crate::keys::Point;
-use crate::keys::{EphemeralKey, PrivateKey, PublicKey};
+use crate::keys::{EphemeralPubKey, PrivateKey, PublicKey};
 use crate::tree::SparseMerkleTree;
 use crate::u256_to_h160;
 use crate::Coin;
@@ -124,7 +124,7 @@ pub async fn coins(
                     &chunk
                         .par_iter()
                         .filter_map(|sent_event| {
-                            let ephemeral = EphemeralKey {
+                            let ephemeral = EphemeralPubKey {
                                 point: Point {
                                     x: Fp::try_from(sent_event.ephemeral.x).ok()?,
                                     y: Fp::try_from(sent_event.ephemeral.y).ok()?,
