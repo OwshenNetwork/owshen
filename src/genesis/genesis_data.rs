@@ -46924,4 +46924,3 @@ pub const GENESIS: [(&'static str, u64); 11731] = [
         5,
     ),
 ];
-// Total: 61850

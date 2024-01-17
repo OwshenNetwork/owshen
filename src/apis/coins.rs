@@ -21,6 +21,7 @@ use tokio::time::timeout;
 pub async fn coins(
     provider: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
+    owshen_contract_deployment_block_number: U64,
 ) -> Result<Json<GetCoinsResponse>, eyre::Report> {
     let mut prov = provider.lock().await;
 
@@ -75,8 +76,8 @@ pub async fn coins(
         let sent_events = timeout(std::time::Duration::from_secs(5), async {
             contract
                 .event::<SentFilter>()
-                .from_block(5084838)
-                .to_block(5084838 + 1000)
+                .from_block(owshen_contract_deployment_block_number)
+                .to_block(owshen_contract_deployment_block_number + 1000)
                 .address(ValueOrArray::Value(contract.address()))
                 .query()
                 .await
@@ -95,8 +96,8 @@ pub async fn coins(
 
         let spent_events = contract
             .event::<SpendFilter>()
-            .from_block(5084838)
-            .to_block(5084838 + 1000)
+            .from_block(owshen_contract_deployment_block_number)
+            .to_block(owshen_contract_deployment_block_number + 1000)
             .query()
             .await?;
 
@@ -180,7 +181,6 @@ pub async fn coins(
                 tree: tree_task.clone(),
                 height: contract_height,
             };
-            println!("my coins in after wallet cache {:?}", my_coins.clone());
             std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
             Ok::<(SparseMerkleTree, Vec<Coin>), eyre::Report>((tree_task, my_coins))
         });

@@ -47,6 +47,10 @@ const SelectNetwork = () => {
         setNetWork("sepolia");
         updateNetworkDetails("sepolia", 11155111, "ethereum_sepolia");
         break;
+      case 5556:
+        setNetWork("Local-Testnet");
+        updateNetworkDetails("testnet", 5556, "Local-Testnet");
+        break;
       default:
         setNetWork("select network");
     }
@@ -61,6 +65,9 @@ const SelectNetwork = () => {
         break;
       case "sepolia":
         setChainId(11155111, val);
+        break;
+      case "Local-Testnet":
+        setChainId(5556, val);
         break;
       default:
         setNetWork(network);

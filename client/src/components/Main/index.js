@@ -128,9 +128,17 @@ const Main = ({ children }) => {
   };
   const diveAmount = () => {
     let totalAmount = 0;
+    const processedIndices = new Set();
+
     for (let i = 0; i < receivedCoins.length; i++) {
-      totalAmount = +trueAmount(receivedCoins[i]?.amount);
+      const coin = receivedCoins[i];
+      if (!processedIndices.has(coin?.index)) {
+        totalAmount += +trueAmount(coin?.amount);
+
+        processedIndices.add(coin?.index);
+      }
     }
+
     return totalAmount;
   };
 

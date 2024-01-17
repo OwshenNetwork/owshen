@@ -173,8 +173,6 @@ pub struct GetSendRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetSendResponse {
     proof: Proof,
-    pub token: H160,
-    pub amount: U256,
     pub nullifier: U256,
     pub receiver_commitment: U256,
     pub sender_commitment: U256,
@@ -182,6 +180,8 @@ pub struct GetSendResponse {
     pub receiver_ephemeral: Point,
     pub obfuscated_receiver_amount: U256,
     pub obfuscated_sender_amount: U256,
+    pub obfuscated_receiver_token_address: U256,
+    pub obfuscated_sender_token_address: U256,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Coin {
@@ -220,6 +220,7 @@ pub struct Config {
     endpoint: String,
     dive_contract_address: H160,
     owshen_contract_address: H160,
+    owshen_contract_deployment_block_number: U64,
     owshen_contract_abi: Abi,
     erc20_abi: Abi,
     token_contracts: NetworkManager,
@@ -280,6 +281,7 @@ impl Default for Config {
             endpoint: GOERLI_ENDPOINT.to_string(),
             dive_contract_address: H160::default(),
             owshen_contract_address: H160::default(),
+            owshen_contract_deployment_block_number: U64::default(),
             owshen_contract_abi: Abi::default(),
             erc20_abi: Abi::default(),
             token_contracts: NetworkManager::new(),
@@ -287,7 +289,7 @@ impl Default for Config {
         }
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Network {
     pub provider: Arc<Provider<Http>>,
     pub config: Config,
@@ -388,6 +390,8 @@ async fn serve_wallet(
         None
     };
 
+    let owshen_contract_deployment_block_number = config.owshen_contract_deployment_block_number;
+
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
         genesis: genesis.unwrap(),
@@ -432,7 +436,16 @@ async fn serve_wallet(
         )
         .route(
             "/coins",
-            get(move || async move { handle_error(apis::coins(context_coin, priv_key).await) }),
+            get(move || async move {
+                handle_error(
+                    apis::coins(
+                        context_coin,
+                        priv_key,
+                        owshen_contract_deployment_block_number,
+                    )
+                    .await,
+                )
+            }),
         )
         .route(
             "/withdraw",
@@ -662,6 +675,9 @@ async fn initialize_config(
         .await
         .unwrap();
 
+    log::info!("Getting Owshen contract deployment blocknumber...");
+    let mut owshen_contract_deployment_block_number: U64 = U64::default();
+
     let (owshen_contract_address, owshen_contract_abi) = if deploy_owshen {
         log::info!("Deploying Owshen contract...");
         let o = Owshen::deploy(
@@ -679,7 +695,10 @@ async fn initialize_config(
         .await
         .unwrap();
 
-        log::info!("Feeding DIVEs to the Owshen contract...");
+        let owshen_client = o.client();
+
+        owshen_contract_deployment_block_number = owshen_client.get_block_number().await.unwrap();
+
         dive_contract
             .method::<_, bool>("transfer", (o.address(), Into::<U256>::into(genesis.total)))
             .unwrap()
@@ -765,6 +784,7 @@ async fn initialize_config(
         name,
         endpoint,
         owshen_contract_address,
+        owshen_contract_deployment_block_number,
         owshen_contract_abi,
         dive_contract_address,
         erc20_abi: dive_contract.abi().clone(),
@@ -873,14 +893,11 @@ async fn main() -> Result<()> {
         }) => {
             let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
             let config_path = if test {
-                println!("here");
                 config.unwrap_or_else(|| config_path.clone())
             } else {
-                println!("or rhere");
                 PathBuf::from(format!("{}/usr/share/networks/Sepolia.json", app_dir_path))
             };
             let wallet_path = db.unwrap_or(wallet_path.clone());
-            println!("config path {:?}", config_path);
             let wallet = std::fs::read_to_string(&wallet_path)
                 .map(|s| {
                     let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");

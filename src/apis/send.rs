@@ -48,21 +48,30 @@ pub async fn send(
 
             let stealth_priv: PrivateKey = priv_key.derive(address_ephemeral);
             let sender_shared_secret: Fp = stealth_priv.shared_secret(address_ephemeral);
+
             let receiver_shared_secret: Fp =
-                receiver_address_priv_ephemeral.shared_secret(receiver_address_pub_key);
+                receiver_address_priv_ephemeral.shared_secret(receiver_address_stealth_pub_key);
 
             let amount: U256 = coin.amount;
             let fp_amount = Fp::try_from(amount)?;
             let u256_new_amount = U256::from_dec_str(&new_amount)?;
             let fp_new_amount = Fp::try_from(u256_new_amount)?;
             let remaining_amount = fp_amount - fp_new_amount;
+
             let hint_token_address = h160_to_u256(coin.uint_token);
+            let fp_hint_token_address = Fp::try_from(hint_token_address)?;
 
             let obfuscated_sender_remaining_amount_with_secret: U256 =
                 (remaining_amount + sender_shared_secret).into();
 
             let obfuscated_receiver_remaining_amount_with_secret: U256 =
                 (fp_new_amount + receiver_shared_secret).into();
+
+            let obfuscated_sender_token_address: U256 =
+                (fp_hint_token_address + sender_shared_secret).into();
+
+            let obfuscated_receiver_token_address: U256 =
+                (fp_hint_token_address + receiver_shared_secret).into();
 
             // calc commitment one -> its for receiver
             let calc_send_commitment = hash4([
@@ -96,11 +105,11 @@ pub async fn send(
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {
                     proof,
-                    token: coin.uint_token,
-                    amount,
                     nullifier: coin.nullifier,
                     obfuscated_receiver_amount: obfuscated_receiver_remaining_amount_with_secret,
                     obfuscated_sender_amount: obfuscated_sender_remaining_amount_with_secret,
+                    obfuscated_receiver_token_address,
+                    obfuscated_sender_token_address,
                     receiver_commitment: u256_calc_send_commitment,
                     sender_commitment: u256_calc_sender_commitment,
                     sender_ephemeral: address_ephemeral.point,
@@ -115,8 +124,8 @@ pub async fn send(
             log::warn!("No coin with index {} found", index);
             Ok(Json(GetSendResponse {
                 proof: Proof::default(),
-                token: H160::default(),
-                amount: U256::default(),
+                obfuscated_receiver_token_address: U256::default(),
+                obfuscated_sender_token_address: U256::default(),
                 nullifier: U256::default(),
                 obfuscated_receiver_amount: U256::default(),
                 obfuscated_sender_amount: U256::default(),

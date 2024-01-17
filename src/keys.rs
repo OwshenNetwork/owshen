@@ -340,7 +340,7 @@ mod tests {
             .unwrap(),
         };
         let master_pub_key: PublicKey = master_priv_key.into();
-        let (stealth_eph_priv_key, stealth_eph_pub_key, stealth_pub_key) =
+        let (_, stealth_eph_pub_key, stealth_pub_key) =
             master_pub_key.derive_random(&mut rand::thread_rng());
         assert!(master_pub_key != stealth_pub_key);
         let stealth_priv_key = master_priv_key.derive(stealth_eph_pub_key);

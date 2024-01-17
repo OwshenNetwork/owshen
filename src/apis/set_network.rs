@@ -42,7 +42,10 @@ pub async fn set_network(
     let config_path = if test {
         std::fs::read_to_string(&config_path)
     } else {
-        std::fs::read_to_string(format!("{}/usr/share/networks/Sepolia.json", app_dir_path))
+        std::fs::read_to_string(format!(
+            "{}/usr/share/networks/{}",
+            app_dir_path, config_path
+        ))
     };
 
     let provider: Arc<Provider<Http>> = Arc::new(Provider::<Http>::try_from(provider_url.clone())?);

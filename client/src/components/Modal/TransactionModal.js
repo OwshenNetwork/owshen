@@ -85,6 +85,9 @@ const TransactionModal = ({
       case 5:
         setSelectedContract("ethereum_goerli");
         break;
+      case 5556:
+        setSelectedContract("Local-Testnet");
+        break;
       default:
         setSelectedContract("Sepolia");
     }
@@ -187,7 +190,8 @@ const TransactionModal = ({
 
     const selectedCoint = findMatchingCoin();
 
-    const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
+    const coreEndpoint =
+      process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
     const options = {
       gasLimit: 5000000,
     };
@@ -241,7 +245,8 @@ const TransactionModal = ({
             sender_ephemeral,
             commitment1,
             commitment2,
-            result.data.token,
+            result.data.obfuscated_receiver_token_address,
+            result.data.obfuscated_sender_token_address,
             result.data.obfuscated_receiver_amount,
             result.data.obfuscated_sender_amount,
             true,

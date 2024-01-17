@@ -150,7 +150,8 @@ contract Owshen {
         Point calldata sender_ephemeral,
         uint256 _commitment1,
         uint256 _commitment2,
-        uint256 _token_address_hint,
+        uint256 _receiver_token_address_hint,
+        uint256 _sender_token_address_hint,
         uint256 _receiver_amount_hint,
         uint256 _sender_amount_hint,
         bool isDualOutput
@@ -162,7 +163,7 @@ contract Owshen {
             depositIndex,
             block.timestamp,
             _receiver_amount_hint,
-            _token_address_hint,
+            _receiver_token_address_hint,
             _commitment2
         );
         depositIndex += 1;
@@ -173,7 +174,7 @@ contract Owshen {
                 depositIndex,
                 block.timestamp,
                 _sender_amount_hint,
-                _token_address_hint,
+                _sender_token_address_hint,
                 _commitment1
             );
             depositIndex += 1;
