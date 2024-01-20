@@ -20,14 +20,14 @@ const SelectNetwork = () => {
   const isTest = useSelector(selectIsTest);
   const netWorkOptions = [
     !isTest && {
-      title: "goerli",
-      value: "goerli",
+      title: "Goerli",
+      value: "Goerli",
     },
     {
-      title: "sepolia",
-      value: "sepolia",
+      title: "Sepolia",
+      value: "Sepolia",
     },
-    !isTest && { title: "localhost", value: "localhost" },
+    !isTest && { title: "Localhost", value: "Localhost" },
   ];
   useEffect(() => {
     checkNetwork(chainId);
@@ -36,34 +36,34 @@ const SelectNetwork = () => {
   const checkNetwork = async (val) => {
     switch (val) {
       case 5:
-        setNetWork("goerli");
-        updateNetworkDetails("goerli", 5, "goerli");
+        setNetWork("Goerli");
+        updateNetworkDetails("Goerli", 5, "Goerli");
         break;
       case 1337:
-        setNetWork("localhost");
-        updateNetworkDetails("localhost", 1337, "localhost");
+        setNetWork("Localhost");
+        updateNetworkDetails("Localhost", 1337, "Localhost");
         break;
       case 11155111:
-        setNetWork("sepolia");
-        updateNetworkDetails("sepolia", 11155111, "ethereum_sepolia");
+        setNetWork("Sepolia");
+        updateNetworkDetails("Sepolia", 11155111, "Ethereum_Sepolia");
         break;
       case 5556:
         setNetWork("Local-Testnet");
         updateNetworkDetails("testnet", 5556, "Local-Testnet");
         break;
       default:
-        setNetWork("select network");
+        setNetWork("Select Network");
     }
   };
   const handelChangeNetwork = async (val) => {
     switch (val) {
-      case "goerli":
+      case "Goerli":
         setChainId(5, val);
         break;
-      case "localhost":
+      case "Localhost":
         setChainId(1337, val);
         break;
-      case "sepolia":
+      case "Sepolia":
         setChainId(11155111, val);
         break;
       case "Local-Testnet":
@@ -78,7 +78,7 @@ const SelectNetwork = () => {
   };
   const setChainId = async (newChainId, val) => {
     if (newChainId !== chainId && val) {
-      toast.error(`please change your wallet network to ${val}`);
+      toast.error(`Please change your wallet network to ${val}`);
     }
     updateNetworkDetails(val, newChainId);
     let chain_id = newChainId;

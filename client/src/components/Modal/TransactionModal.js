@@ -123,10 +123,10 @@ const TransactionModal = ({
     if (!address) return toast.error("Connect your wallet first");
     if (!destOwshenWallet) return toast.error("Enter your Destination");
     if (!tokenContract) return toast.error("Select your token");
-    if (!tokenAmount) return toast.error("enter amount of token");
+    if (!tokenAmount) return toast.error("Enter amount of token");
     if (network.chainId !== chainId)
       return toast.error(
-        `please change your wallet network to ${network.name}`
+        `Please change your wallet network to ${network.name}`
       );
     await axios
       .get(`${coreEndpoint}/stealth`, {
@@ -175,17 +175,17 @@ const TransactionModal = ({
         }
       })
       .catch((error) => {
-        return toast.error(`internal server error: ${error}`);
+        return toast.error(`Internal server error: ${error}`);
       });
   };
   const send = async () => {
     if (!address) return toast.error("Connect your wallet first");
     if (!destOwshenWallet) return toast.error("Enter your Destination");
     if (!tokenContract) return toast.error("Select your token");
-    if (!tokenAmount) return toast.error("enter amount of token");
+    if (!tokenAmount) return toast.error("Enter amount of token");
     if (network.chainId !== chainId)
       return toast.error(
-        `please change your wallet network to ${network.name}`
+        `Please change your wallet network to ${network.name}`
       );
 
     const selectedCoint = findMatchingCoin();
@@ -261,7 +261,7 @@ const TransactionModal = ({
         }
       })
       .catch((error) => {
-        return toast.error(`internal server error: ${error}`);
+        return toast.error(`Internal server error: ${error}`);
       });
   };
 
@@ -339,7 +339,7 @@ const TransactionModal = ({
         }
       })
       .catch((error) => {
-        return toast.error(`internal server error: ${error}`);
+        return toast.error(`Internal server error: ${error}`);
       });
   };
   return (

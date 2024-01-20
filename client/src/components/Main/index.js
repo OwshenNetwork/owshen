@@ -63,7 +63,7 @@ const Main = ({ children }) => {
   ]);
   const setChainId = async () => {
     if (!chainId) {
-      return toast.error("please connect your wallet");
+      return toast.error("Please connect your wallet");
     }
     let chain_id = chainId;
     if (chainId === 5) {

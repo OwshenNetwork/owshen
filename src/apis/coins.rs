@@ -48,6 +48,7 @@ pub async fn coins(
             network.config.owshen_contract_abi,
             Arc::clone(&network.provider),
         );
+        let curr_block_number = network.provider.get_block_number().await?.as_usize();
         let wallet_cache_path = home::home_dir().unwrap().join(".owshen-wallet-cache");
         let cache: Option<WalletCache> = if let Ok(f) = std::fs::read(&wallet_cache_path) {
             bincode::deserialize(&f).ok()
@@ -73,17 +74,40 @@ pub async fn coins(
             .map(|c| c.tree.clone())
             .unwrap_or(SparseMerkleTree::new(16));
 
-        let sent_events = timeout(std::time::Duration::from_secs(5), async {
-            contract
-                .event::<SentFilter>()
-                .from_block(owshen_contract_deployment_block_number)
-                .to_block(owshen_contract_deployment_block_number + 1000)
-                .address(ValueOrArray::Value(contract.address()))
-                .query()
-                .await
-                .unwrap()
-        })
-        .await?;
+        let mut curr = owshen_contract_deployment_block_number.as_usize();
+        const STEP: usize = 1000;
+        let mut spent_events = Vec::new();
+        let mut sent_events = Vec::new();
+
+        while curr < curr_block_number {
+            log::info!("Loading events from blocks {} to {}...", curr, curr + STEP);
+            let new_spent_events = timeout(std::time::Duration::from_secs(10), async {
+                contract
+                    .event::<SpendFilter>()
+                    .from_block(curr)
+                    .to_block(curr + STEP)
+                    .address(ValueOrArray::Value(contract.address()))
+                    .query()
+                    .await
+                    .unwrap()
+            })
+            .await?;
+            let new_sent_events = timeout(std::time::Duration::from_secs(10), async {
+                contract
+                    .event::<SentFilter>()
+                    .from_block(curr)
+                    .to_block(curr + STEP)
+                    .address(ValueOrArray::Value(contract.address()))
+                    .query()
+                    .await
+                    .unwrap()
+            })
+            .await?;
+
+            spent_events.extend(new_spent_events);
+            sent_events.extend(new_sent_events);
+            curr += STEP;
+        }
 
         let all_events = prov
             .genesis
@@ -93,13 +117,6 @@ pub async fn coins(
             .map(|e| e.into())
             .chain(sent_events.into_iter())
             .collect::<Vec<_>>();
-
-        let spent_events = contract
-            .event::<SpendFilter>()
-            .from_block(owshen_contract_deployment_block_number)
-            .to_block(owshen_contract_deployment_block_number + 1000)
-            .query()
-            .await?;
 
         let mut tree_task = tree.clone();
 
