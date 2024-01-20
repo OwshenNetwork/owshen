@@ -124,7 +124,7 @@ const Main = ({ children }) => {
     if (isTest) {
       return setIsInprogress(true);
     }
-    address ? setIsOpen(true) : toast.error("Connect your wallet first");
+    address ? setIsOpen(true) : toast.error("Connect your wallet first!");
   };
   const diveAmount = () => {
     let totalAmount = 0;
@@ -184,10 +184,10 @@ const Main = ({ children }) => {
             <button data-tooltip-id="Send" onClick={canOpenModal}>
               <img src={SendIcon} />
             </button>
-            <Tooltip id="swap" place="bottom" content="swap" />
+            <Tooltip id="Swap" place="bottom" content="Swap" />
             <button
               onClick={() => setIsInprogress(true)}
-              data-tooltip-id="swap"
+              data-tooltip-id="Swap"
               // onClick={openWithdraw}
             >
               <img src={SwapIcon} />

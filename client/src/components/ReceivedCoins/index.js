@@ -134,7 +134,8 @@ const ReceivedCoinList = () => {
                   </button>
 
                   <button
-                    onClick={() => withdrawHandler(coin)}
+                    // onClick={() => withdrawHandler(coin)}
+                    onClick={() => setIsInprogress(true)}
                     className="ml-2"
                   >
                     <img alt="" src={SwapIcon} />

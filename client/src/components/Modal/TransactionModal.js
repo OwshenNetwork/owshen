@@ -10,6 +10,7 @@ import {
   setReceivedCoins,
   selectReceivedCoins,
   selectNetwork,
+  selectIsTest,
 } from "../../store/containerSlice";
 import { useAccount } from "wagmi";
 import { getERC20Balance } from "../../utils/helper";
@@ -43,13 +44,16 @@ const TransactionModal = ({
   const [tokenOptions, setTokenOptions] = useState([]);
   const [MaxBalanceOfWithdraw, setMaxBalanceOfWithdraw] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
+  const isTest = useSelector(selectIsTest);
 
   const walletOptions = [
-    {
-      title: "Your Ethereum Account",
-      value: "Your Ethereum Account",
-      img: MetaMaskLogo,
-    },
+    isTest
+      ? {
+          title: "Your Ethereum Account",
+          value: "Your Ethereum Account",
+          img: MetaMaskLogo,
+        }
+      : {},
     { title: "Your Owshen Account", value: "Your Owshen Account", img: Logo },
   ];
   useEffect(() => {
@@ -120,10 +124,10 @@ const TransactionModal = ({
     return toast.error("No matching coin is found");
   };
   const getStealth = async () => {
-    if (!address) return toast.error("Connect your wallet first");
-    if (!destOwshenWallet) return toast.error("Enter your Destination");
-    if (!tokenContract) return toast.error("Select your token");
-    if (!tokenAmount) return toast.error("Enter amount of token");
+    if (!address) return toast.error("Connect your wallet first!");
+    if (!destOwshenWallet) return toast.error("Enter your destination!");
+    if (!tokenContract) return toast.error("Select your token!");
+    if (!tokenAmount) return toast.error("Enter amount of token!");
     if (network.chainId !== chainId)
       return toast.error(
         `Please change your wallet network to ${network.name}`
@@ -169,9 +173,9 @@ const TransactionModal = ({
             setIsOpen(false);
           });
         } catch (error) {
-          toast.error("Error while getting approve or deposit flow");
+          toast.error("Error while transferring tokens!");
 
-          console.log(error, "Error while getting approve or deposit flow");
+          console.log(error, "Error while transferring tokens!");
         }
       })
       .catch((error) => {
@@ -179,10 +183,10 @@ const TransactionModal = ({
       });
   };
   const send = async () => {
-    if (!address) return toast.error("Connect your wallet first");
-    if (!destOwshenWallet) return toast.error("Enter your Destination");
-    if (!tokenContract) return toast.error("Select your token");
-    if (!tokenAmount) return toast.error("Enter amount of token");
+    if (!address) return toast.error("Connect your wallet first!");
+    if (!destOwshenWallet) return toast.error("Enter your destination!");
+    if (!tokenContract) return toast.error("Select your token!");
+    if (!tokenAmount) return toast.error("Enter amount of token!");
     if (network.chainId !== chainId)
       return toast.error(
         `Please change your wallet network to ${network.name}`
@@ -256,8 +260,8 @@ const TransactionModal = ({
           const txReceipt = await txResponse.wait();
           console.log("Transaction receipt", txReceipt);
         } catch (error) {
-          toast.error("Error while getting withdraw flow");
-          console.log(error, "Error while getting withdraw flow");
+          toast.error("Error while transferring tokens!");
+          console.log(error, "Error while transferring tokens!");
         }
       })
       .catch((error) => {
@@ -267,12 +271,12 @@ const TransactionModal = ({
 
   const callSend = async () => {
     OwshenWallet.wallet === destOwshenWallet
-      ? await getStealth()
+      ? toast.error("You can't send to yourself!")
       : await send();
   };
 
   const withdrawal = async (index, owshen, address) => {
-    if (!address) return toast.error("Connect your wallet first");
+    if (!address) return toast.error("Connect your wallet first!");
     // if (tokenAmount > trueAmount(MaxBalanceOfWithdraw)) {
     //   return toast.error(
     //     "your entered amount for withdraw is grater than max value of the selected token"
@@ -334,7 +338,7 @@ const TransactionModal = ({
           console.log("Transaction receipt", txReceipt);
           setIsOpen(false);
         } catch (error) {
-          toast.error("Error while getting withdraw flow");
+          toast.error("Error while transferring tokens!");
           setIsOpen(false);
         }
       })
@@ -380,7 +384,7 @@ const TransactionModal = ({
           <b>Token: </b>
         </label>
         <Dropdown
-          label={isDataSet ? "DIVE" : "choose your token"}
+          label={isDataSet ? "DIVE" : "Choose your token"}
           options={tokenOptions}
           select={setTokenContract}
           style={`py-5 ${isDataSet ? "pointer-events-none" : ""}`}

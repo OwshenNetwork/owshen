@@ -13,21 +13,23 @@ const SelectNetwork = () => {
     process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
   const accountData = useAccount();
   const chainId = accountData ? accountData.chainId : undefined;
-  const [network, setNetWork] = useState("select network");
+  const [network, setNetWork] = useState("Select Network");
 
   useEffect(() => {}, []);
 
   const isTest = useSelector(selectIsTest);
   const netWorkOptions = [
+    isTest
+      ? {
+          title: "Goerli",
+          value: "Goerli",
+        }
+      : {},
     !isTest && {
-      title: "Goerli",
-      value: "Goerli",
-    },
-    {
       title: "Sepolia",
       value: "Sepolia",
     },
-    !isTest && { title: "Localhost", value: "Localhost" },
+    isTest ? { title: "Localhost", value: "Localhost" } : {},
   ];
   useEffect(() => {
     checkNetwork(chainId);

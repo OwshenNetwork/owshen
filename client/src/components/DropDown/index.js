@@ -60,7 +60,7 @@ const Dropdown = ({
           className="absolute w-full py-2 mt-1 space-y-1 text-sm bg-blue-100 border border-blue-500 rounded-lg shadow-lg z-50 not"
           aria-label="submenu"
         >
-          {options.map(({ title, value, img }, id) => {
+          {options?.map(({ title, value, img }, id) => {
             return (
               <button
                 className="flex items-center justify-center w-full  py-1 font-medium border-b border-blue-500 last:border-0 transition-colors duration-150  hover:text-gray-900 focus:outline-none focus:shadow-outline hover:bg-gray-100"
