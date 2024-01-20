@@ -109,14 +109,19 @@ pub async fn coins(
             curr += STEP;
         }
 
-        let all_events = prov
-            .genesis
-            .events
-            .iter()
-            .cloned()
-            .map(|e| e.into())
-            .chain(sent_events.into_iter())
-            .collect::<Vec<_>>();
+        let is_genesis_processed = cache.is_some();
+
+        let all_events = if is_genesis_processed {
+            sent_events
+        } else {
+            prov.genesis
+                .events
+                .iter()
+                .cloned()
+                .map(|e| e.into())
+                .chain(sent_events.into_iter())
+                .collect::<Vec<_>>()
+        };
 
         let mut tree_task = tree.clone();
 
