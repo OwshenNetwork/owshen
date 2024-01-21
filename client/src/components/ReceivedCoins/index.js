@@ -85,66 +85,68 @@ const ReceivedCoinList = () => {
             </div>
           </div>
         ) : receivedcoins?.length ? (
-          <ul>
-            {receivedcoins?.map((coin, index) => (
-              <li
-                className=" flex flex-wrap pb-1 items-center border-b-2 border-[#00000033]"
-                key={index}
-              >
-                <div className="w-5/6 text-left font-bold text-lg flex items-center">
-                  <img
-                    className="w-8 mr-2"
-                    src={getLogoByContractAddress(coin.uint_token)}
-                  />
-                  <p>
-                    {String(trueAmount(coin.amount)).includes(".")
-                      ? getRound(Number(trueAmount(coin.amount)))
-                      : `${getRound(trueAmount(coin.amount))}.0`}{" "}
-                    {getNameByContractAddress(coin.uint_token)}
-                  </p>
-                </div>
-                {/* <p className="w-1/6 text-lg">
+          <div className="max-h-350 overflow-y-auto">
+            <ul>
+              {receivedcoins?.map((coin, index) => (
+                <li
+                  className=" flex flex-wrap pb-1 items-center border-b-2 border-[#00000033]"
+                  key={index}
+                >
+                  <div className="w-5/6 text-left font-bold text-lg flex items-center">
+                    <img
+                      className="w-8 mr-2"
+                      src={getLogoByContractAddress(coin.uint_token)}
+                    />
+                    <p>
+                      {String(trueAmount(coin.amount)).includes(".")
+                        ? getRound(Number(trueAmount(coin.amount)))
+                        : `${getRound(trueAmount(coin.amount))}.0`}{" "}
+                      {getNameByContractAddress(coin.uint_token)}
+                    </p>
+                  </div>
+                  {/* <p className="w-1/6 text-lg">
                 {String(coin.uint_token).substring(0, 10)}
               </p>
               <p className="w-1/6 text-lg pl-5"> 
               {coin.index}
               </p> */}
-                <div className=" w-1/6 justify-between flex">
-                  <button
-                    onClick={
-                      () => setIsInprogress(true)
-                      // setIsOpen(true)
-                    }
-                  >
-                    <img
-                      alt=""
-                      width="34px"
-                      className=" border border-gray-300 p-1.5 rounded-3xl"
-                      src={MergIcon}
-                    />
-                  </button>
-                  <button
-                    className="ml-2"
-                    onClick={() => setIsInprogress(true)}
-                    //   withdrawal(coin.index, owshen, address);
-                    //   SetSelectedCoin(coin.index);
-                    //   setIsOpenWithdraw(true);
-                    // }}
-                  >
-                    <img alt="" src={SendIcon} />
-                  </button>
+                  <div className=" w-1/6 justify-between flex">
+                    <button
+                      onClick={
+                        () => setIsInprogress(true)
+                        // setIsOpen(true)
+                      }
+                    >
+                      <img
+                        alt=""
+                        width="34px"
+                        className=" border border-gray-300 p-1.5 rounded-3xl"
+                        src={MergIcon}
+                      />
+                    </button>
+                    <button
+                      className="ml-2"
+                      onClick={() => setIsInprogress(true)}
+                      //   withdrawal(coin.index, owshen, address);
+                      //   SetSelectedCoin(coin.index);
+                      //   setIsOpenWithdraw(true);
+                      // }}
+                    >
+                      <img alt="" src={SendIcon} />
+                    </button>
 
-                  <button
-                    // onClick={() => withdrawHandler(coin)}
-                    onClick={() => setIsInprogress(true)}
-                    className="ml-2"
-                  >
-                    <img alt="" src={SwapIcon} />
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    <button
+                      // onClick={() => withdrawHandler(coin)}
+                      onClick={() => setIsInprogress(true)}
+                      className="ml-2"
+                    >
+                      <img alt="" src={SwapIcon} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : (
           <p className="text-4xl font-bold mt-28">No coins yet </p>
         )}

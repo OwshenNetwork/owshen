@@ -75,7 +75,7 @@ pub async fn coins(
             .unwrap_or(SparseMerkleTree::new(16));
 
         let mut curr = owshen_contract_deployment_block_number.as_usize();
-        const STEP: usize = 1000;
+        const STEP: usize = 200;
         let mut spent_events = Vec::new();
         let mut sent_events = Vec::new();
 
