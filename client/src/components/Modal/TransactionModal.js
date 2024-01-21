@@ -31,8 +31,7 @@ const TransactionModal = ({
   selectedCoin,
   isDataSet,
 }) => {
-  const coreEndpoint =
-    process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
+  const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
   const address = useSelector(selectUserAddress);
   const OwshenWallet = useSelector(selectOwshen);
   const receivedcoins = useSelector(selectReceivedCoins);
@@ -194,8 +193,7 @@ const TransactionModal = ({
 
     const selectedCoint = findMatchingCoin();
 
-    const coreEndpoint =
-      process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
+    const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
     const options = {
       gasLimit: 5000000,
     };
@@ -284,8 +282,7 @@ const TransactionModal = ({
     // }
     //Todo: its should be with dynamic decimal
     const desireAmount = utils.toWei(Number(tokenAmount), "ether");
-    const coreEndpoint =
-      process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
+    const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
     const options = {
       gasLimit: 5000000,
     };

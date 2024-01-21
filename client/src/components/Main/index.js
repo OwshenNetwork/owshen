@@ -29,8 +29,7 @@ import SendIcon from "../../pics/icons/send.png";
 import SwapIcon from "../../pics/icons/swap.png";
 
 const Main = ({ children }) => {
-  const coreEndpoint =
-    process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
+  const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
   const address = useSelector(selectUserAddress);
   const accountData = useAccount();
   const chainId = accountData ? accountData.chainId : undefined;

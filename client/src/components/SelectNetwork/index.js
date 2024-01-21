@@ -9,8 +9,7 @@ import { setNetworkDetails } from "../../store/containerSlice";
 
 const SelectNetwork = () => {
   const dispatch = useDispatch();
-  const coreEndpoint =
-    process.env.REACT_APP_OWSHEN_ENDPOINT || "http://127.0.0.1:9000";
+  const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
   const accountData = useAccount();
   const chainId = accountData ? accountData.chainId : undefined;
   const [network, setNetWork] = useState("Select Network");
