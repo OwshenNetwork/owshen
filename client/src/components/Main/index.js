@@ -20,6 +20,7 @@ import {
   shortenAddress,
   copyWalletAddress,
   trueAmount,
+  getRound,
 } from "../../utils/helper";
 
 import "../../styles/main.css";
@@ -176,7 +177,7 @@ const Main = ({ children }) => {
           )}
 
           <div className="text-3xl font-bold mt-4">
-            {receivedCoins ? diveAmount() : "0.0 "} DIVE
+            {receivedCoins ? getRound(diveAmount()) : "0.0"} DIVE
           </div>
           <div className="text-lg mt-4">$? USD</div>
           <div className="my-8 flex justify-around w-32 mx-auto">

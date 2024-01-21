@@ -22,3 +22,7 @@ export const copyWalletAddress = (owshenWalletWallet) => {
 export const trueAmount = (val) => {
   return Number(toBigInt(val).toString()) / Math.pow(10, 18);
 };
+
+export const getRound = (num) => {
+  return Number.parseFloat(num.toFixed(3));
+};

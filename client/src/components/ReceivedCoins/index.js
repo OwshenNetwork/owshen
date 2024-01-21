@@ -19,6 +19,7 @@ import {
   getLogoByContractAddress,
   getNameByContractAddress,
 } from "../../utils/Currencies";
+import { getRound } from "../../utils/helper";
 
 const ReceivedCoinList = () => {
   const receivedcoins = useSelector(selectReceivedCoins);
@@ -97,8 +98,8 @@ const ReceivedCoinList = () => {
                   />
                   <p>
                     {String(trueAmount(coin.amount)).includes(".")
-                      ? trueAmount(coin.amount)
-                      : `${trueAmount(coin.amount)}.0`}{" "}
+                      ? getRound(Number(trueAmount(coin.amount)))
+                      : `${getRound(trueAmount(coin.amount))}.0`}{" "}
                     {getNameByContractAddress(coin.uint_token)}
                   </p>
                 </div>
