@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import axios from "axios";
 import { useAccount } from "wagmi";
-import { selectIsTest } from "../../store/containerSlice";
+import { selectIsTest, selectNetwork } from "../../store/containerSlice";
 import Dropdown from "../DropDown";
 import { toast } from "react-toastify";
 import { setNetworkDetails } from "../../store/containerSlice";
@@ -11,6 +11,7 @@ const SelectNetwork = () => {
   const dispatch = useDispatch();
   const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
   const accountData = useAccount();
+  const selectedNetwork = useSelector(selectNetwork);
   const chainId = accountData ? accountData.chainId : undefined;
   const [network, setNetWork] = useState("Select Network");
 
@@ -99,8 +100,11 @@ const SelectNetwork = () => {
   };
   useEffect(() => {
     if (window.ethereum) {
-      window.ethereum.on("chainChanged", () => {
-        window.location.reload();
+      window.ethereum.on("chainChanged", (data) => {
+        let chain_id = parseInt(data, 16);
+        checkNetwork(chain_id);
+        handelChangeNetwork(selectedNetwork.name);
+        setChainId(chain_id.toString(), selectedNetwork.name);
       });
     }
   }, []);

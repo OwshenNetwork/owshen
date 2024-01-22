@@ -9,13 +9,13 @@ lazy_static! {
     static ref NETWORK_CONFIG_MAP: HashMap<String, (String, String)> = [
         (
             "1337".into(),
-            ("http://127.0.0.1:8545".into(), "localhost.json".into())
+            ("http://127.0.0.1:8545".into(), "Localhost.json".into())
         ),
         (
             "0x5".into(),
             (
                 "https://ethereum-goerli.publicnode.com".into(),
-                "goerli.json".into()
+                "Goerli.json".into()
             )
         ),
         (
