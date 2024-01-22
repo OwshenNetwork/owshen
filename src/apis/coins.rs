@@ -55,11 +55,13 @@ pub async fn coins(
         } else {
             None
         };
+        const UPDATE_THRESHOLD: usize = 5;
 
         let root: U256 = contract.method("root", ())?.call().await?;
-        let contract_height = contract.method("depositIndex", ())?.call().await?;
         if let Some(cache) = &cache {
-            if Into::<U256>::into(cache.tree.root()) == root && cache.height == contract_height {
+            if Into::<U256>::into(cache.tree.root()) == root
+                && curr_block_number.wrapping_sub(cache.height as usize) < UPDATE_THRESHOLD
+            {
                 prov.coins = cache.coins.clone();
                 prov.tree = cache.tree.clone();
                 return Ok(Json(GetCoinsResponse {
@@ -74,39 +76,59 @@ pub async fn coins(
             .map(|c| c.tree.clone())
             .unwrap_or(SparseMerkleTree::new(16));
 
-        let mut curr = owshen_contract_deployment_block_number.as_usize();
-        const STEP: usize = 200;
+        let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));
+        prov.syncing = syncing_arc.clone();
+
+        let mut step = 1024;
+        let mut curr = if let Some(cache) = &cache {
+            cache.height as usize - step
+        } else {
+            owshen_contract_deployment_block_number.as_usize()
+        };
         let mut spent_events = Vec::new();
         let mut sent_events = Vec::new();
 
         while curr < curr_block_number {
-            log::info!("Loading events from blocks {} to {}...", curr, curr + STEP);
-            let new_spent_events = timeout(std::time::Duration::from_secs(10), async {
-                contract
-                    .event::<SpendFilter>()
-                    .from_block(curr)
-                    .to_block(curr + STEP)
-                    .address(ValueOrArray::Value(contract.address()))
-                    .query()
+            log::info!("Loading events from blocks {} to {}...", curr, curr + step);
+            if let Some((new_spent_events, new_sent_events)) =
+                timeout(std::time::Duration::from_secs(10), async {
+                    contract
+                        .event::<SpendFilter>()
+                        .from_block(curr)
+                        .to_block(curr + step)
+                        .address(ValueOrArray::Value(contract.address()))
+                        .query()
+                        .await
+                })
+                .await
+                .map(|r| r.ok())
+                .ok()
+                .unwrap_or_default()
+                .zip(
+                    timeout(std::time::Duration::from_secs(10), async {
+                        contract
+                            .event::<SentFilter>()
+                            .from_block(curr)
+                            .to_block(curr + step)
+                            .address(ValueOrArray::Value(contract.address()))
+                            .query()
+                            .await
+                    })
                     .await
-                    .unwrap()
-            })
-            .await?;
-            let new_sent_events = timeout(std::time::Duration::from_secs(10), async {
-                contract
-                    .event::<SentFilter>()
-                    .from_block(curr)
-                    .to_block(curr + STEP)
-                    .address(ValueOrArray::Value(contract.address()))
-                    .query()
-                    .await
-                    .unwrap()
-            })
-            .await?;
-
-            spent_events.extend(new_spent_events);
-            sent_events.extend(new_sent_events);
-            curr += STEP;
+                    .map(|r| r.ok())
+                    .ok()
+                    .unwrap_or_default(),
+                )
+            {
+                spent_events.extend(new_spent_events);
+                sent_events.extend(new_sent_events);
+                curr += step;
+                if step < 1024 {
+                    step = step * 2;
+                }
+            } else {
+                step = step / 2;
+            }
         }
 
         let is_genesis_processed = cache.is_some();
@@ -124,11 +146,9 @@ pub async fn coins(
         };
 
         let mut tree_task = tree.clone();
+        let mut my_coins: Vec<Coin> = cache.map(|c| c.coins).unwrap_or_default();
 
-        let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));
-        prov.syncing = syncing_arc.clone();
         let task = tokio::task::spawn_blocking(move || {
-            let mut my_coins: Vec<Coin> = Vec::new();
             let mut cnt = 0;
             for chunk in all_events.chunks(128) {
                 let progress = (cnt as f32) / all_events.len() as f32;
@@ -143,45 +163,48 @@ pub async fn coins(
                 for e in chunk.iter() {
                     tree_task.set(e.index.low_u64(), Fp::try_from(e.commitment)?);
                 }
-                my_coins.extend(
-                    &chunk
-                        .par_iter()
-                        .filter_map(|sent_event| {
-                            let ephemeral = EphemeralPubKey {
-                                point: Point {
-                                    x: Fp::try_from(sent_event.ephemeral.x).ok()?,
-                                    y: Fp::try_from(sent_event.ephemeral.y).ok()?,
-                                },
-                            };
-                            let stealth_priv = priv_key.derive(ephemeral);
-                            let stealth_pub: PublicKey = stealth_priv.clone().into();
-                            let index: U256 = sent_event.index;
-                            let hint_amount = sent_event.hint_amount;
-                            let hint_token_address = sent_event.hint_token_address;
-                            let commitment = Fp::try_from(sent_event.commitment).ok()?;
-                            let shared_secret = stealth_priv.shared_secret(ephemeral);
-                            match extract_token_amount(
-                                hint_token_address,
-                                hint_amount,
-                                shared_secret,
-                                commitment,
-                                stealth_pub,
-                            ) {
-                                Ok(Some((fp_hint_token_address, fp_hint_amount))) => Some(Coin {
-                                    index,
-                                    uint_token: u256_to_h160(fp_hint_token_address.into()),
-                                    amount: fp_hint_amount.into(),
-                                    nullifier: stealth_priv.nullifier(index.low_u32()).into(),
-                                    priv_key: stealth_priv,
-                                    pub_key: stealth_pub,
-                                    commitment: sent_event.commitment,
-                                }),
-                                Ok(None) => None,
-                                Err(_) => None,
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                );
+                for new_coin in chunk
+                    .par_iter()
+                    .filter_map(|sent_event| {
+                        let ephemeral = EphemeralPubKey {
+                            point: Point {
+                                x: Fp::try_from(sent_event.ephemeral.x).ok()?,
+                                y: Fp::try_from(sent_event.ephemeral.y).ok()?,
+                            },
+                        };
+                        let stealth_priv = priv_key.derive(ephemeral);
+                        let stealth_pub: PublicKey = stealth_priv.clone().into();
+                        let index: U256 = sent_event.index;
+                        let hint_amount = sent_event.hint_amount;
+                        let hint_token_address = sent_event.hint_token_address;
+                        let commitment = Fp::try_from(sent_event.commitment).ok()?;
+                        let shared_secret = stealth_priv.shared_secret(ephemeral);
+                        match extract_token_amount(
+                            hint_token_address,
+                            hint_amount,
+                            shared_secret,
+                            commitment,
+                            stealth_pub,
+                        ) {
+                            Ok(Some((fp_hint_token_address, fp_hint_amount))) => Some(Coin {
+                                index,
+                                uint_token: u256_to_h160(fp_hint_token_address.into()),
+                                amount: fp_hint_amount.into(),
+                                nullifier: stealth_priv.nullifier(index.low_u32()).into(),
+                                priv_key: stealth_priv,
+                                pub_key: stealth_pub,
+                                commitment: sent_event.commitment,
+                            }),
+                            Ok(None) => None,
+                            Err(_) => None,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                {
+                    if !my_coins.iter().any(|c| c.index == new_coin.index) {
+                        my_coins.push(new_coin);
+                    }
+                }
                 cnt += chunk.len();
             }
             for spend_event in spent_events {
@@ -201,7 +224,7 @@ pub async fn coins(
             let wallet_cache = WalletCache {
                 coins: my_coins.clone(),
                 tree: tree_task.clone(),
-                height: contract_height,
+                height: curr_block_number as u64,
             };
             std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
             Ok::<(SparseMerkleTree, Vec<Coin>), eyre::Report>((tree_task, my_coins))
