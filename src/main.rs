@@ -38,6 +38,7 @@ use proof::Proof;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    env,
     net::SocketAddr,
     path::PathBuf,
     str::FromStr,
@@ -505,7 +506,8 @@ async fn serve_wallet(
         )
         .layer(CorsLayer::permissive());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
+    let listen_address = env::var("LISTEN_ADDRESS").unwrap_or_else(|_| "127.0.0.1:9000".to_string());
+    let addr: SocketAddr = listen_address.parse().expect("failed to parse listen address");
 
     if test {
         let frontend = async {
