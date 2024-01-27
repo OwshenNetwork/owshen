@@ -19,7 +19,7 @@ import {
   getLogoByContractAddress,
   getNameByContractAddress,
 } from "../../utils/Currencies";
-import { getRound } from "../../utils/helper";
+import { getRound, trueAmount } from "../../utils/helper";
 
 const ReceivedCoinList = () => {
   const receivedcoins = useSelector(selectReceivedCoins);
@@ -31,9 +31,6 @@ const ReceivedCoinList = () => {
   const [isInprogress, setIsInprogress] = useState(false);
   const isTest = useSelector(selectIsTest);
 
-  const trueAmount = (val) => {
-    return Number(toBigInt(val).toString()) / Math.pow(10, 18);
-  };
   const withdrawHandler = (coin) => {
     if (isTest) {
       return setIsInprogress(true);
@@ -98,9 +95,15 @@ const ReceivedCoinList = () => {
                       src={getLogoByContractAddress(coin.uint_token)}
                     />
                     <p>
-                      {String(trueAmount(coin.amount)).includes(".")
-                        ? getRound(Number(trueAmount(coin.amount)))
-                        : `${getRound(trueAmount(coin.amount))}.0`}{" "}
+                      {String(
+                        trueAmount(coin.amount, coin.uint_token)
+                      ).includes(".")
+                        ? getRound(
+                            Number(trueAmount(coin.amount, coin.uint_token))
+                          )
+                        : `${getRound(
+                            trueAmount(coin.amount, coin.uint_token)
+                          )}.0`}{" "}
                       {getNameByContractAddress(coin.uint_token)}
                     </p>
                   </div>

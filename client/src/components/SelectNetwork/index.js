@@ -6,6 +6,7 @@ import { selectIsTest, selectNetwork } from "../../store/containerSlice";
 import Dropdown from "../DropDown";
 import { toast } from "react-toastify";
 import { setNetworkDetails } from "../../store/containerSlice";
+import { SwitchNetwork } from "../../utils/helper";
 
 const SelectNetwork = () => {
   const dispatch = useDispatch();
@@ -15,25 +16,28 @@ const SelectNetwork = () => {
   const chainId = accountData ? accountData.chainId : undefined;
   const [network, setNetWork] = useState("Select Network");
 
-  useEffect(() => {}, []);
-
   const isTest = useSelector(selectIsTest);
   const netWorkOptions = [
-    isTest
-      ? {
-          title: "Goerli",
-          value: "Goerli",
-        }
-      : {},
-    !isTest && {
+    {
       title: "Sepolia",
       value: "Sepolia",
     },
-    isTest ? { title: "Localhost", value: "Localhost" } : {},
   ];
   useEffect(() => {
     checkNetwork(chainId);
   }, [chainId]);
+
+  useEffect(() => {
+    if (!isTest) {
+      netWorkOptions.push(
+        {
+          title: "Goerli",
+          value: "Goerli",
+        },
+        { title: "Localhost", value: "Localhost" }
+      );
+    }
+  });
 
   const checkNetwork = async (val) => {
     switch (val) {
@@ -79,10 +83,11 @@ const SelectNetwork = () => {
     dispatch(setNetworkDetails({ name, chainId, contractName }));
   };
   const setChainId = async (newChainId, val) => {
+    console.log(val);
+    SwitchNetwork(val);
     if (newChainId !== chainId && val) {
       toast.error(`Please change your wallet network to ${val}`);
     }
-    updateNetworkDetails(val, newChainId);
     let chain_id = newChainId;
     if (newChainId === 5) {
       chain_id = "0x5";
@@ -98,6 +103,7 @@ const SelectNetwork = () => {
         console.error("Error:", error);
       });
   };
+
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("chainChanged", (data) => {
@@ -110,15 +116,13 @@ const SelectNetwork = () => {
   }, []);
   return (
     <>
-      {!isTest && (
-        <Dropdown
-          label={network}
-          options={netWorkOptions}
-          select={setNetWork}
-          onChange={handelChangeNetwork}
-          style="!bg-gray-200 !text-white !py-3 !rounded-xl border-0 "
-        />
-      )}
+      <Dropdown
+        label={network}
+        options={netWorkOptions}
+        select={setNetWork}
+        onChange={handelChangeNetwork}
+        style="!bg-gray-200 !text-white !py-3 !rounded-xl border-0 "
+      />
     </>
   );
 };

@@ -180,6 +180,9 @@ export const currencies = {
       homestead: {
         contract: "",
       },
+      sepolia: {
+        contract: "0x4bf749ec68270027c5910220ceab30cc284c7ba2",
+      },
     },
     img: DIVEIcon,
   },
@@ -233,4 +236,15 @@ export function getNameByContractAddress(contractAddress) {
     }
   }
   return "DIVE";
+}
+
+export function getDecimalByContractAddress(contractAddress) {
+  for (const [_, currency] of Object.entries(currencies)) {
+    for (const chainInfo of Object.values(currency.chain)) {
+      if (chainInfo.contract === contractAddress) {
+        return currency.decimals;
+      }
+    }
+  }
+  return 18;
 }

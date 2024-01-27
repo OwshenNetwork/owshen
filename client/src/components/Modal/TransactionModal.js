@@ -20,7 +20,7 @@ import Logo from "../../pics/icons/logo.png";
 import MetaMaskLogo from "../../pics/icons/metaMask.png";
 import { toast } from "react-toastify";
 import { currencies } from "../../utils/Currencies";
-import { trueAmount } from "../../utils/helper";
+import { trueAmount, SwitchNetwork } from "../../utils/helper";
 
 const TransactionModal = ({
   setTokenContract,
@@ -113,7 +113,7 @@ const TransactionModal = ({
   const findMatchingCoin = () => {
     for (let coin of receivedcoins) {
       if (
-        trueAmount(coin.amount) > Number(tokenAmount) &&
+        trueAmount(coin.amount, coin.uint_token) > Number(tokenAmount) &&
         String(coin.uint_token) === String(tokenContract)
       ) {
         return coin;
@@ -123,14 +123,19 @@ const TransactionModal = ({
     return toast.error("No matching coin is found");
   };
   const getStealth = async () => {
+    if (isTest) {
+      return toast.error("You can't send to yourself!");
+    }
     if (!address) return toast.error("Connect your wallet first!");
     if (!destOwshenWallet) return toast.error("Enter your destination!");
     if (!tokenContract) return toast.error("Select your token!");
     if (!tokenAmount) return toast.error("Enter amount of token!");
-    if (network.chainId !== chainId)
+    if (network.chainId !== chainId) {
+      SwitchNetwork(network.name);
       return toast.error(
         `Please change your wallet network to ${network.name}`
       );
+    }
     await axios
       .get(`${coreEndpoint}/stealth`, {
         params: { address: destOwshenWallet },
@@ -186,10 +191,12 @@ const TransactionModal = ({
     if (!destOwshenWallet) return toast.error("Enter your destination!");
     if (!tokenContract) return toast.error("Select your token!");
     if (!tokenAmount) return toast.error("Enter amount of token!");
-    if (network.chainId !== chainId)
+    if (network.chainId !== chainId) {
+      SwitchNetwork(network.name);
       return toast.error(
         `Please change your wallet network to ${network.name}`
       );
+    }
 
     const selectedCoint = findMatchingCoin();
 
@@ -269,7 +276,7 @@ const TransactionModal = ({
 
   const callSend = async () => {
     OwshenWallet.wallet === destOwshenWallet
-      ? toast.error("You can't send to yourself!")
+      ? await getStealth()
       : await send();
   };
 
