@@ -41,7 +41,7 @@ const Dropdown = ({
   };
 
   return (
-    <div className="relative w-60" ref={ref}>
+    <div className="relative lg:w-60" ref={ref}>
       <button
         className={`dropdown:block w-full relative px-3 py-2 text-sm font-semibold leading-relaxed  transition-colors duration-150 bg-white border border-gray-300 rounded-lg focus:outline-none hover:border-gray-600 focus:shadow-outline focus:border-gray-900 ${style} `}
         role="navigation"

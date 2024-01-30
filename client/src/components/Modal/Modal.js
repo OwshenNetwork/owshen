@@ -1,7 +1,5 @@
 import { useRef, useEffect } from "react";
 import BackArrow from "../../pics/icons/arrow.png";
-import { useDispatch, useSelector } from "react-redux";
-
 
 const Modal = ({ title, setIsOpen, isOpen, children,dispatch }) => {
   const ref = useRef(null);
@@ -26,12 +24,11 @@ const Modal = ({ title, setIsOpen, isOpen, children,dispatch }) => {
     <div
       className={`${
         isOpen ? "block" : "hidden"
-      } fixed z-10 left-0 top-0 w-full h-full backdrop:blur-md bg-[#0000005c] `}
+      } absolute z-10 left-0 top-0 w-full h-full backdrop:blur-md bg-[#0000005c] `}
     >
       <div
         ref={ref}
-        className=" border-2 text-center w-1/4 p-5 my-[10%] mx-auto bg-white rounded-xl"
-      >
+        className=" border-2 text-center md:w-3/4 lg:!min-w-[510px] lg:w-1/4 p-5 mt-16 mx-auto bg-white rounded-xl"      >
         <div className="relative">
           <div className="cursor-pointer w-9 absolute top-2" onClick={() => setIsOpen(!isOpen)}>
             <img src={BackArrow} />

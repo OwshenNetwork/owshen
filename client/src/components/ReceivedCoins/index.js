@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
-import { toBigInt } from "ethers";
 import Modal from "../Modal/Modal";
 import Main from "../Main";
 import {
@@ -11,7 +10,6 @@ import {
 import ReactLoading from "react-loading";
 import TransactionModal from "../Modal/TransactionModal";
 import InProgress from "../Modal/InProgress";
-
 import MergIcon from "../../pics/icons/merge-icon.png";
 import SendIcon from "../../pics/icons/send-inside.png";
 import SwapIcon from "../../pics/icons/swap-inside.png";
@@ -20,7 +18,7 @@ import {
   getNameByContractAddress,
 } from "../../utils/Currencies";
 import { getRound, trueAmount } from "../../utils/helper";
-
+import { Tooltip } from "react-tooltip";
 const ReceivedCoinList = () => {
   const receivedcoins = useSelector(selectReceivedCoins);
   const isLoading = useSelector(selectReceivedCoinsLoading);
@@ -39,7 +37,6 @@ const ReceivedCoinList = () => {
     setIsOpenWithdraw(true);
     setIsDataSet(true);
   };
-
   return (
     <Main>
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
@@ -50,7 +47,7 @@ const ReceivedCoinList = () => {
         selectedCoin={selectedCoin}
         isDataSet={isDataSet}
       />
-      <div className="received-coins-container mx-52">
+      <div className=" text-center lg:max-w-[830px] w-full mx-auto">
         <Modal title="merge coins" isOpen={isOpen} setIsOpen={setIsOpen}>
           <div>
             <h3 className="text-xl font-bold mt-5 mb-3">
@@ -86,7 +83,7 @@ const ReceivedCoinList = () => {
             <ul>
               {receivedcoins?.map((coin, index) => (
                 <li
-                  className=" flex flex-wrap pb-1 items-center border-b-2 border-[#00000033]"
+                  className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 hover:bg-transparent ease-in-out duration-300 border-[#00000033]"
                   key={index}
                 >
                   <div className="w-5/6 text-left font-bold text-lg flex items-center">
@@ -114,19 +111,22 @@ const ReceivedCoinList = () => {
               {coin.index}
               </p> */}
                   <div className=" w-1/6 justify-between flex">
+                    <Tooltip id="MergeIcon" place="bottom" content="Merge" />
                     <button
+                      data-tooltip-id="MergeIcon"
                       onClick={
                         () => setIsInprogress(true)
                         // setIsOpen(true)
                       }
                     >
                       <img
-                        alt=""
-                        width="34px"
-                        className=" border border-gray-300 p-1.5 rounded-3xl"
+                        alt="MergIcon"
+                        className=" border w-10 border-gray-400 p-1.5 rounded-3xl"
                         src={MergIcon}
                       />
                     </button>
+                    <Tooltip id="SendIcon" place="bottom" content="Withdraw" />
+
                     <button
                       className="ml-2"
                       onClick={() => setIsInprogress(true)}
@@ -134,16 +134,18 @@ const ReceivedCoinList = () => {
                       //   SetSelectedCoin(coin.index);
                       //   setIsOpenWithdraw(true);
                       // }}
+                      data-tooltip-id="SendIcon"
                     >
-                      <img alt="" src={SendIcon} />
+                      <img alt="SendIcon" className="w-10" src={SendIcon} />
                     </button>
-
+                    <Tooltip id="SwapIcon" place="bottom" content="Swap" />
                     <button
                       // onClick={() => withdrawHandler(coin)}
                       onClick={() => setIsInprogress(true)}
                       className="ml-2"
+                      data-tooltip-id="SwapIcon"
                     >
-                      <img alt="" src={SwapIcon} />
+                      <img alt="SwapIcon" className="w-10" src={SwapIcon} />
                     </button>
                   </div>
                 </li>
@@ -152,7 +154,7 @@ const ReceivedCoinList = () => {
           </div>
         ) : (
           <p className="text-4xl font-bold mt-28">No coins yet </p>
-        )}
+        )}{" "}
       </div>
     </Main>
   );

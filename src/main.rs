@@ -232,7 +232,7 @@ impl NetworkManager {
         let mut networks: HashMap<String, Vec<TokenInfo>> = HashMap::new();
 
         networks.insert(
-            "Ethereum_Goerli".to_string(),
+            "Goerli".to_string(),
             vec![TokenInfo {
                 token_address: H160::from_str("0xdD69DB25F6D620A7baD3023c5d32761D353D3De9")
                     .unwrap(),

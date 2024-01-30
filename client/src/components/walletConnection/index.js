@@ -5,12 +5,9 @@ import WalletIcon from "../../pics/icons/account_balance_wallet.png";
 import SelectNetwork from "../SelectNetwork";
 import { setUserDetails } from "../../store/containerSlice";
 import { useDispatch } from "react-redux";
-import InProgress from "../Modal/InProgress";
 const Web3ModalComponent = () => {
   const [provider, setProvider] = useState(null);
   const [account, setAccount] = useState(null);
-  const [isInprogress, setIsInprogress] = useState(false);
-
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -22,9 +19,6 @@ const Web3ModalComponent = () => {
   }, []);
 
   const connectWallet = async () => {
-    // if (isTest) {
-    //   return setIsInprogress(true);
-    // }
     const web3Modal = new Web3Modal();
     const _provider = await web3Modal.connect();
     const web3 = new Web3(_provider);
@@ -35,7 +29,7 @@ const Web3ModalComponent = () => {
     dispatch(setUserDetails({ address: accounts[0] }));
   };
   const buttonClass =
-    "border w-52 rounded-2xl px-3 py-2   ease-in-out duration-300 flex items-center justify-around";
+    "border lg:w-52 w-full rounded-xl px-3 py-2   ease-in-out duration-300 flex items-center justify-around";
 
   const disconnectWallet = async () => {
     if (provider.close) {
@@ -52,11 +46,10 @@ const Web3ModalComponent = () => {
 
   return (
     <>
-      <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
       {account ? (
         <>
           <button
-            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  mr-3`}
+            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  lg:mr-3 mb-3 lg:mb-0`}
             onClick={disconnectWallet}
           >
             Disconnect Wallet

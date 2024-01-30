@@ -57,6 +57,7 @@ const TransactionModal = ({
   ];
   useEffect(() => {
     if (OwshenWallet && chainId) {
+      console.log("selectedContract", selectedContract);
       setContract(chainId);
       const newTokenOptions = OwshenWallet.token_contracts?.networks?.[
         selectedContract
@@ -80,13 +81,13 @@ const TransactionModal = ({
   const setContract = (chainId) => {
     switch (chainId) {
       case 1337:
-        setSelectedContract("localhost");
+        setSelectedContract("Localhost");
         break;
       case 11155111:
         setSelectedContract("Sepolia");
         break;
       case 5:
-        setSelectedContract("ethereum_goerli");
+        setSelectedContract("Goerli");
         break;
       case 5556:
         setSelectedContract("Local-Testnet");
@@ -378,7 +379,7 @@ const TransactionModal = ({
               label="Source wallet"
               options={walletOptions}
               select={setWalletName}
-              style="py-5"
+              style="py-5 !w-60"
             />
           </div>
         </>
@@ -391,7 +392,7 @@ const TransactionModal = ({
           label={isDataSet ? "DIVE" : "Choose your token"}
           options={tokenOptions}
           select={setTokenContract}
-          style={`py-5 ${isDataSet ? "pointer-events-none" : ""}`}
+          style={`py-5 ${isDataSet ? "pointer-events-none" : ""}!w-60`}
         />
       </div>
       <div className="px-3 flex justify-between items-center relative">
