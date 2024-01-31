@@ -48,19 +48,19 @@ pub async fn coins(
             network.config.owshen_contract_abi,
             Arc::clone(&network.provider),
         );
-        let curr_block_number = network.provider.get_block_number().await?.as_usize();
+        let curr_block_number = network.provider.get_block_number().await?.as_u64();
         let wallet_cache_path = home::home_dir().unwrap().join(".owshen-wallet-cache");
         let cache: Option<WalletCache> = if let Ok(f) = std::fs::read(&wallet_cache_path) {
             bincode::deserialize(&f).ok()
         } else {
             None
         };
-        const UPDATE_THRESHOLD: usize = 5;
+        const UPDATE_THRESHOLD: u64 = 5;
 
         let root: U256 = contract.method("root", ())?.call().await?;
         if let Some(cache) = &cache {
             if Into::<U256>::into(cache.tree.root()) == root
-                && curr_block_number.wrapping_sub(cache.height as usize) < UPDATE_THRESHOLD
+                && curr_block_number.wrapping_sub(cache.height as u64) < UPDATE_THRESHOLD
             {
                 prov.coins = cache.coins.clone();
                 prov.tree = cache.tree.clone();
@@ -81,9 +81,13 @@ pub async fn coins(
 
         let mut step = 1024;
         let mut curr = if let Some(cache) = &cache {
-            cache.height as usize - step
+            if cache.height > step {
+                (cache.height as u64).wrapping_sub(step)
+            } else {
+                cache.height
+            }
         } else {
-            owshen_contract_deployment_block_number.as_usize()
+            owshen_contract_deployment_block_number.as_u64()
         };
         let mut spent_events = Vec::new();
         let mut sent_events = Vec::new();
