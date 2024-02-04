@@ -38,7 +38,7 @@ use proof::Proof;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     str::FromStr,
     sync::Arc,
@@ -70,7 +70,9 @@ pub struct WalletOpt {
     db: Option<PathBuf>,
     #[structopt(long)]
     config: Option<PathBuf>,
-    #[structopt(long, default_value = "8000")]
+    #[structopt(long, default_value = "127.0.0.1")]
+    ip: String,
+    #[structopt(long, default_value = "9000")]
     port: u16,
     #[structopt(long, help = "Enable test mode")]
     test: bool,
@@ -354,7 +356,8 @@ struct WalletCache {
 }
 
 async fn serve_wallet(
-    _port: u16,
+    ip: String,
+    port: u16,
     priv_key: PrivateKey,
     pub_key: PublicKey,
     token_contracts: NetworkManager,
@@ -505,7 +508,8 @@ async fn serve_wallet(
         )
         .layer(CorsLayer::permissive());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 9000));
+    let ip_addr: IpAddr = ip.parse().expect("failed to parse ip");
+    let addr = SocketAddr::new(ip_addr, port);
 
     if test {
         let frontend = async {
@@ -888,6 +892,7 @@ async fn main() -> Result<()> {
         OwshenCliOpt::Wallet(WalletOpt {
             db,
             config,
+            ip,
             port,
             test,
         }) => {
@@ -917,6 +922,7 @@ async fn main() -> Result<()> {
                 let pub_key = PublicKey::from(priv_key);
 
                 serve_wallet(
+                    ip,
                     port,
                     priv_key,
                     pub_key,
