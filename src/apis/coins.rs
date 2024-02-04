@@ -176,7 +176,10 @@ pub async fn coins(
                                 y: Fp::try_from(sent_event.ephemeral.y).ok()?,
                             },
                         };
+                        // hash(g^sr) + s
                         let stealth_priv = priv_key.derive(ephemeral);
+
+                        // g^(hash(g^sr) + s)
                         let stealth_pub: PublicKey = stealth_priv.clone().into();
                         let index: U256 = sent_event.index;
                         let hint_amount = sent_event.hint_amount;

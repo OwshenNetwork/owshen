@@ -3,16 +3,15 @@ import ReactLoading from "react-loading";
 
 const InProgress = ({ isOpen, setIsOpen }) => {
   return (
-    <Modal title="In progress" isOpen={isOpen} setIsOpen={setIsOpen}>
-      <h1 className="text-2xl mt-16 mb-10">Under development.</h1>
-
+    <Modal title="" isOpen={isOpen} setIsOpen={setIsOpen}>
+      <div className="h-[300px] bg-[url('../pics/inProgress.png')] bg-contain bg-center">
       <ReactLoading
-        className="mx-auto"
+        className="mx-auto pt-24"
         type="spin"
-        color="green"
+        color="#2c21ff99"
         height={100}
         width={100}
-      />
+      /></div>
     </Modal>
   );
 };

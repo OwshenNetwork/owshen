@@ -54,12 +54,12 @@ const ReceivedCoinList = () => {
               Are you want merge all of your coins?
             </h3>
             <p className="bg-yellow-100 text-amber-950 text-lg px-6 m-auto inline-block py-2  border border-amber-950 ">
-              Gas fee = 1 usdt
+              Gas fee = 1 USDT
             </p>
           </div>
           <button className="border border-green-400 bg-green-200 text-green-600 rounded-lg px-6 mt-3 font-bold py-1">
             {" "}
-            yes
+            Yes
           </button>
         </Modal>
         {isLoading ? (

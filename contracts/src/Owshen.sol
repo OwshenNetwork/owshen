@@ -24,12 +24,12 @@ contract Owshen {
     event Sent(
         // directed or obfuscated
         // directed or obfuscated
-        Point ephemeral,
-        uint256 index,
-        uint256 timestamp,
-        uint256 _hint_amount,
-        uint256 _hint_tokenAddress,
-        uint256 _commitment
+        uint256 _commitment // h(index, g^s, amount, token)
+
+        // hash(g^sr) + s
+        // g^(hash(g^sr) + s)
+        hash(index, g^(hash(g^sr) + s), _hint_amount -  h(g^sr), _hint_tokenAddress-h(g^sr)) == _commitment
+
     );
 
     event Spend(uint256 nullifier);
@@ -51,9 +51,9 @@ contract Owshen {
         coin_withdraw_verifier = new CoinWithdrawVerifier();
     }
 
-    function deposit(
-        Point calldata _pub_key,
-        Point calldata ephemeral,
+    function deposit( //g^s
+        Point calldata _pub_key, // g^(hash(g^sr) + s)
+        Point calldata ephemeral, // g^r
         address _tokenAddress,
         uint256 _amount,
         address _from,
@@ -74,13 +74,6 @@ contract Owshen {
             leaf
         );
         depositIndex += 1;
-    }
-
-    function getPointKey(Point memory _pub_key) public pure returns (bytes32) {
-        string memory keyString = string(
-            abi.encodePacked(_pub_key.x.toString(), ",", _pub_key.y.toString())
-        );
-        return keccak256(abi.encodePacked(keyString));
     }
 
     function _processDeposit(

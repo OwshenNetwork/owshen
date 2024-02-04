@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import ReceivedCoinList from "./components/ReceivedCoins";
 import Footer from "./components/Footer";
-import Web3ModalComponent from "./components/walletConnection";
+import Web3ModalComponent from "./components/WalletConnection";
 import Logo from "./pics/icons/logo.png";
 import { Provider } from "react-redux";
 import store from "./store/store";
