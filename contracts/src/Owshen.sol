@@ -22,14 +22,12 @@ contract Owshen {
     }
 
     event Sent(
-        // directed or obfuscated
-        // directed or obfuscated
-        uint256 _commitment // h(index, g^s, amount, token)
-
-        // hash(g^sr) + s
-        // g^(hash(g^sr) + s)
-        hash(index, g^(hash(g^sr) + s), _hint_amount -  h(g^sr), _hint_tokenAddress-h(g^sr)) == _commitment
-
+        Point ephemeral,
+        uint256 index,
+        uint256 timestamp,
+        uint256 _hint_amount,
+        uint256 _hint_tokenAddress,
+        uint256 _commitment
     );
 
     event Spend(uint256 nullifier);
@@ -51,9 +49,9 @@ contract Owshen {
         coin_withdraw_verifier = new CoinWithdrawVerifier();
     }
 
-    function deposit( //g^s
-        Point calldata _pub_key, // g^(hash(g^sr) + s)
-        Point calldata ephemeral, // g^r
+    function deposit(
+        Point calldata _pub_key,
+        Point calldata ephemeral,
         address _tokenAddress,
         uint256 _amount,
         address _from,
@@ -91,25 +89,34 @@ contract Owshen {
 
     function spend(
         uint256 nullifier,
+        uint256 nullifier2,
         Proof calldata proof,
         uint256 _commitment,
         uint256 _commitment2
     ) internal {
-        require(!nullifiers[nullifier], "Nullifier has been spent");
+        require(nullifier != nullifier2, "Nullifiers needs to be different");
+
+        require(!nullifiers[nullifier] || nullifier == 0, "Nullifier has been spent");
         nullifiers[nullifier] = true;
+
+        require(!nullifiers[nullifier2] || nullifier2 == 0, "Nullifier has been spent");
+        nullifiers[nullifier2] = true;
+
         require(
             coin_withdraw_verifier.verifyProof(
                 proof.a,
                 proof.b,
                 proof.c,
-                [root(), nullifier, _commitment, _commitment2]
+                [root(), nullifier, nullifier2, _commitment, _commitment2]
             ),
             "Invalid proof"
         );
+
     }
 
     function withdraw(
         uint256 nullifier,
+        uint256 nullifier2,
         Point calldata _ephemeral,
         Proof calldata proof,
         address _tokenAddress,
@@ -120,7 +127,7 @@ contract Owshen {
     ) public {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
         uint256 commitment2 = mimc.poseidon([0, 0, _amount, uint_tokenaddress]);
-        spend(nullifier, proof, commitment2, _commitment);
+        spend(nullifier, nullifier2, proof, commitment2, _commitment);
         tree.set(depositIndex, _commitment);
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
@@ -133,11 +140,13 @@ contract Owshen {
             _commitment
         );
         emit Spend(nullifier);
+        emit Spend(nullifier2);
         depositIndex += 1;
     }
 
     function send(
         uint256 nullifier,
+        uint256 nullifier2,
         Proof calldata proof,
         Point calldata receiver_ephemeral,
         Point calldata sender_ephemeral,
@@ -149,7 +158,7 @@ contract Owshen {
         uint256 _sender_amount_hint,
         bool isDualOutput
     ) public {
-        spend(nullifier, proof, _commitment2, _commitment1);
+        spend(nullifier, nullifier2, proof, _commitment2, _commitment1);
         tree.set(depositIndex, _commitment2);
         emit Sent(
             receiver_ephemeral,
@@ -173,6 +182,7 @@ contract Owshen {
             depositIndex += 1;
         }
         emit Spend(nullifier);
+        emit Spend(nullifier2);
     }
 
     /**

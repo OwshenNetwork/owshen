@@ -250,6 +250,7 @@ const TransactionModal = ({
         try {
           const txResponse = await contract.send(
             result.data.nullifier,
+            utils.toBigInt(0),
             proof,
             receiver_ephemeral,
             sender_ephemeral,

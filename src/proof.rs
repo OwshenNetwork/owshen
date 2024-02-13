@@ -3,7 +3,6 @@ use crate::keys::PublicKey;
 
 use ethers::{abi::ethabi::ethereum_types::FromStrRadixErr, prelude::*};
 use eyre::Result;
-use ff::PrimeField;
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use std::{io::Write, path::Path, process::Command, str::FromStr};
@@ -18,58 +17,42 @@ pub struct Proof {
 }
 
 pub fn prove<P: AsRef<Path>>(
-    params: P,
-    index: u32,
     token_address: U256,
-    amount: U256,
-    new_amount1: U256,
-    new_amount2: U256,
-    address_1: PublicKey,
-    address_2: PublicKey,
-    secret: Fp,
-    proof: [[Fp; 3]; 16],
+    
+    index: Vec<u32>,
+    amount: Vec<U256>,
+    secret: Vec<Fp>,
+    proof: Vec<Vec<[Fp; 3]>>,
+    
+    new_amount: Vec<U256>,
+    pk: Vec<PublicKey>,
+    
+    params: P,
     witness_gen_path: String,
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
 
     let json_input = format!(
-        "{{ \"index\": \"{:?}\", 
-        \"token_address\": \"{:?}\", 
-        \"amount\": \"{:?}\", 
-        \"new_amount1\": \"{:?}\", 
-        \"new_amount2\": \"{:?}\", 
-        \"pk_ax1\": \"{:?}\", 
-        \"pk_ay1\": \"{:?}\", 
-        \"pk_ax2\": \"{:?}\", 
-        \"pk_ay2\": \"{:?}\", 
-        \"secret\": \"{:?}\", 
-        \"proof\": [{}] }}",
-        index,
-        BigUint::from_str(&token_address.to_string()).unwrap(),
-        BigUint::from_str(&amount.to_string()).unwrap(),
-        BigUint::from_str(&new_amount1.to_string()).unwrap(),
-        BigUint::from_str(&new_amount2.to_string()).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_1.point.x.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_1.point.y.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_2.point.x.into())).unwrap(),
-        BigUint::from_str(&U256::to_string(&address_2.point.y.into())).unwrap(),
-        BigUint::from_bytes_le(secret.to_repr().as_ref()),
-        proof
-            .iter()
-            .map(|p| format!(
-                "[{}]",
-                p.iter()
-                    .map(|p| format!(
-                        "\"{}\"",
-                        BigUint::from_bytes_le(p.to_repr().as_ref()).to_string()
-                    ))
-                    .collect::<Vec<_>>()
-                    .join(",")
-            ))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
+        "{{ \"index\": {}, 
+        \"token_address\": \"{}\", 
+        \"amount\": {}, 
+        \"secret\": {},
+        \"proof\": [{}],
+     
+        \"new_amount\": {}, 
+        \"pk_ax\": {}, 
+        \"pk_ay\": {} }}",
 
+        serde_json::to_string(&index).ok().unwrap(),
+        BigUint::from_str(&token_address.to_string()).ok().unwrap(),
+        serde_json::to_string(&amount).ok().unwrap(),
+        serde_json::to_string(&secret).ok().unwrap(),
+        serde_json::to_string(&proof).ok().unwrap(),
+        serde_json::to_string(&new_amount).ok().unwrap(),
+        serde_json::to_string(&pk.iter().map(|pk| pk.point.x).collect::<Vec<Fp>>()).ok().unwrap(),
+        serde_json::to_string(&pk.iter().map(|pk| pk.point.y).collect::<Vec<Fp>>()).ok().unwrap()
+    );
+    
     write!(inputs_file, "{}", json_input)?;
 
     log::info!("Circuit input: {}", json_input);
@@ -107,6 +90,20 @@ pub fn prove<P: AsRef<Path>>(
         .arg(pub_inp_file.path())
         .output()?;
 
+    if !proof_gen_output.stdout.is_empty() {
+        log::info!(
+            "Proof generator output: {}",
+            String::from_utf8_lossy(&proof_gen_output.stdout)
+        );
+    }
+
+    if !proof_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating proof: {}",
+            String::from_utf8_lossy(&proof_gen_output.stderr)
+        );
+    }
+
     assert_eq!(proof_gen_output.stdout.len(), 0);
     assert_eq!(proof_gen_output.stderr.len(), 0);
 
@@ -115,6 +112,7 @@ pub fn prove<P: AsRef<Path>>(
         .arg(pub_inp_file.path())
         .arg(proof_file.path())
         .output()?;
+
     let mut calldata = std::str::from_utf8(&generatecall_output.stdout)?.to_string();
     calldata = calldata
         .replace("\"", "")

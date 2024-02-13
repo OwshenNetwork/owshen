@@ -4,20 +4,41 @@ use crate::hash::hash4;
 use crate::keys::{Point, PrivateKey, PublicKey};
 use crate::proof::{prove, Proof};
 use crate::Context;
-use crate::GetSendRequest;
-use crate::GetSendResponse;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSendRequest {
+    pub index: U256,
+    pub new_amount: String,
+    pub receiver_address: String,
+    pub address: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetSendResponse {
+    proof: Proof,
+    pub nullifier: U256,
+    pub receiver_commitment: U256,
+    pub sender_commitment: U256,
+    pub sender_ephemeral: Point,
+    pub receiver_ephemeral: Point,
+    pub obfuscated_receiver_amount: U256,
+    pub obfuscated_sender_amount: U256,
+    pub obfuscated_receiver_token_address: U256,
+    pub obfuscated_sender_token_address: U256,
+}
 
 pub async fn send(
     Query(req): Query<GetSendRequest>,
     context_send: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
     witness_gen_path: String,
-    params_fils: String,
+    params_file: String,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
     let new_amount = req.new_amount;
@@ -89,19 +110,26 @@ pub async fn send(
                 Fp::try_from(hint_token_address)?,
             ]);
             let u256_calc_sender_commitment = calc_sender_commitment.into();
+
+            let indices: Vec<u32> = vec![u32_index, 0];
+            let amounts: Vec<U256> = vec![amount, U256::from(0)];
+            let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
+            let proofs: Vec<Vec<[Fp; 3]>> = vec![merkle_proof.proof.clone().try_into().unwrap(), merkle_proof.proof.clone().try_into().unwrap()];
+            let new_amounts: Vec<U256> = vec![u256_new_amount, remaining_amount.into()];
+            let pks: Vec<PublicKey> = vec![receiver_address_stealth_pub_key, address_stealth_pub_key];
+            
             let proof: std::result::Result<Proof, eyre::Error> = prove(
-                params_fils,
-                u32_index,
                 hint_token_address,
-                amount,
-                u256_new_amount,
-                remaining_amount.into(),
-                receiver_address_stealth_pub_key,
-                address_stealth_pub_key,
-                coin.priv_key.secret,
-                merkle_proof.proof.try_into().unwrap(),
+                indices,
+                amounts,
+                secrets,
+                proofs,
+                new_amounts,
+                pks,
+                params_file,
                 witness_gen_path,
             );
+
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {
                     proof,

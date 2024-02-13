@@ -26,88 +26,104 @@ template CSwap() {
     out[3] <== (v - in[2]) * s0_and_s1 + in[2];
 }
 
-template CoinWithdraw() {
-    signal input index;
+template CoinWithdraw(NUM_INPS, NUM_OUTS) {
     signal input token_address;
-    signal input amount;
-    signal input new_amount1;
-    signal input new_amount2;
-    signal input pk_ax1;
-    signal input pk_ay1;
-    signal input pk_ax2;
-    signal input pk_ay2;
-    signal input secret;
-    signal input proof[16][3];
+
+    signal input index[NUM_INPS];
+    signal input amount[NUM_INPS];
+    signal input secret[NUM_INPS];
+    signal input proof[NUM_INPS][16][3];
+
+    signal input new_amount[NUM_OUTS];
+    signal input pk_ax[NUM_OUTS];
+    signal input pk_ay[NUM_OUTS];
+
     signal output root;
-    signal output nullifier;
-    signal output new_commitment1;  
-    signal output new_commitment2;
+    signal output nullifier[NUM_INPS];
+    signal output new_commitment[NUM_OUTS];
 
-    signal inters[17];
+    signal total_amount;
 
-    component bd = BitDecompose(32);
-    bd.num <== index;
-    
-    component pk = BabyPbk();
-    pk.in <== secret;
+    var sum_amount = 0;
+    signal masked_amounts[NUM_INPS];
+    component is_zero[NUM_INPS];
+    for(var i = 0; i < NUM_INPS; i++) {
+        is_zero[i] = IsZero();
+        is_zero[i].in <== index[i];
 
-    component gt1 = GreaterEqThan(250);
-
-    gt1.in[0] <== amount;
-    gt1.in[1] <== new_amount1;
-    gt1.out === 1;
-    
-    component gt2 = GreaterEqThan(250);
-
-    gt2.in[0] <== amount;
-    gt2.in[1] <== new_amount2;
-    gt2.out === 1;
-
-    amount === new_amount1 + new_amount2;
-
-    component commiter_hasher = Poseidon(4);
-    commiter_hasher.inputs[0] <== pk.Ax;
-    commiter_hasher.inputs[1] <== pk.Ay;
-    commiter_hasher.inputs[2] <== amount;
-    commiter_hasher.inputs[3] <== token_address;
-    inters[0] <== commiter_hasher.out;
-
-    component new_commiter_hasher_1 = Poseidon(4);
-    new_commiter_hasher_1.inputs[0] <== pk_ax1;
-    new_commiter_hasher_1.inputs[1] <== pk_ay1;
-    new_commiter_hasher_1.inputs[2] <== new_amount1;
-    new_commiter_hasher_1.inputs[3] <== token_address;
-    new_commitment1 <== new_commiter_hasher_1.out;
-
-    component new_commiter_hasher_2 = Poseidon(4);
-    new_commiter_hasher_2.inputs[0] <== pk_ax2;
-    new_commiter_hasher_2.inputs[1] <== pk_ay2;
-    new_commiter_hasher_2.inputs[2] <== new_amount2;
-    new_commiter_hasher_2.inputs[3] <== token_address;
-    new_commitment2 <== new_commiter_hasher_2.out;
-    
-    component nullifier_hasher = Poseidon(4); // TODO: Switch to Poseidon2
-    nullifier_hasher.inputs[0] <== secret;
-    nullifier_hasher.inputs[1] <== index;
-    nullifier_hasher.inputs[2] <== 0;
-    nullifier_hasher.inputs[3] <== 0;
-    nullifier <== nullifier_hasher.out;
-
-    component hashers[16];
-    component swaps[16];
-    for(var i=0; i < 16; i++) {
-        swaps[i] = CSwap();
-        swaps[i].s[0] <== bd.bits[2 * i];
-        swaps[i].s[1] <== bd.bits[2 * i + 1];
-        swaps[i].v <== inters[i];
-        swaps[i].in <== proof[i];
-
-        hashers[i] = Poseidon(4);
-        hashers[i].inputs <== swaps[i].out;
-        inters[i+1] <== hashers[i].out;
+        masked_amounts[i] <== amount[i] * (1 - is_zero[i].out);
+        sum_amount += masked_amounts[i];
     }
-    
-    root <== inters[16];
+    total_amount <== sum_amount;
+
+    var sum_new_amount = 0;
+    component gt[NUM_OUTS];
+    component new_commiter_hasher[NUM_OUTS];
+    for(var i = 0; i < NUM_OUTS; i++) {
+        gt[i] = GreaterEqThan(250);
+        gt[i].in[0] <== total_amount;
+        gt[i].in[1] <== new_amount[i];
+        gt[i].out === 1;
+
+        new_commiter_hasher[i] = Poseidon(4);
+        new_commiter_hasher[i].inputs[0] <== pk_ax[i];
+        new_commiter_hasher[i].inputs[1] <== pk_ay[i];
+        new_commiter_hasher[i].inputs[2] <== new_amount[i];
+        new_commiter_hasher[i].inputs[3] <== token_address;
+        new_commitment[i] <== new_commiter_hasher[i].out;
+
+        sum_new_amount += new_amount[i];
+    }
+    total_amount === sum_new_amount;
+
+    signal inters[NUM_INPS][17];
+
+    component bd[NUM_INPS];
+    component pk[NUM_INPS];
+    component hashers[NUM_INPS][16];
+    component swaps[NUM_INPS][16];
+    component commiter_hasher[NUM_INPS];
+    component nullifier_hasher[NUM_INPS];
+    for(var i = 0; i < NUM_INPS; i++) {
+        bd[i] = BitDecompose(32);
+        bd[i].num <== index[i];
+
+        pk[i] = BabyPbk();
+        pk[i].in <== secret[i];
+
+        commiter_hasher[i] = Poseidon(4);
+        commiter_hasher[i].inputs[0] <== pk[i].Ax;
+        commiter_hasher[i].inputs[1] <== pk[i].Ay;
+        commiter_hasher[i].inputs[2] <== amount[i];
+        commiter_hasher[i].inputs[3] <== token_address;
+        inters[i][0] <== commiter_hasher[i].out;
+
+        nullifier_hasher[i] = Poseidon(4); // TODO: Switch to Poseidon2
+        nullifier_hasher[i].inputs[0] <== secret[i];
+        nullifier_hasher[i].inputs[1] <== index[i];
+        nullifier_hasher[i].inputs[2] <== 0;
+        nullifier_hasher[i].inputs[3] <== 0;
+        nullifier[i] <== (1 - is_zero[i].out) * nullifier_hasher[i].out;
+
+        for(var j = 0; j < 16; j++) {
+            swaps[i][j] = CSwap();
+            swaps[i][j].s[0] <== bd[i].bits[2 * j];
+            swaps[i][j].s[1] <== bd[i].bits[2 * j + 1];
+            swaps[i][j].v <== inters[i][j];
+            swaps[i][j].in <== proof[i][j];
+
+            hashers[i][j] = Poseidon(4);
+            hashers[i][j].inputs <== swaps[i][j].out;
+            inters[i][j+1] <== hashers[i][j].out;
+        }
+
+        if(i == 0) {
+            root <== inters[i][16];
+        }
+
+        0 === (root - inters[i][16]) * (1 - is_zero[i].out);
+    }
  }
 
- component main = CoinWithdraw();
+ component main = CoinWithdraw(2, 2);
+ 

@@ -164,27 +164,6 @@ pub struct SetNetworkResponse {
     pub success: Empty,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GetSendRequest {
-    index: U256,
-    pub new_amount: String,
-    pub receiver_address: String,
-    pub address: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GetSendResponse {
-    proof: Proof,
-    pub nullifier: U256,
-    pub receiver_commitment: U256,
-    pub sender_commitment: U256,
-    pub sender_ephemeral: Point,
-    pub receiver_ephemeral: Point,
-    pub obfuscated_receiver_amount: U256,
-    pub obfuscated_sender_amount: U256,
-    pub obfuscated_receiver_token_address: U256,
-    pub obfuscated_sender_token_address: U256,
-}
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Coin {
     pub index: U256,
@@ -470,7 +449,7 @@ async fn serve_wallet(
         .route(
             "/send",
             get(
-                move |extract::Query(req): extract::Query<GetSendRequest>| async move {
+                move |extract::Query(req): extract::Query<apis::GetSendRequest>| async move {
                     handle_error(
                         apis::send(
                             Query(req),

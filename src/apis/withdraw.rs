@@ -58,17 +58,22 @@ pub async fn withdraw(
 
             let u256_calc_commitment: U256 = calc_commitment.into();
 
+            let indices: Vec<u32> = vec![u32_index, 0];
+            let amounts: Vec<U256> = vec![amount, U256::from(0)];
+            let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
+            let proofs: Vec<Vec<[Fp; 3]>> = vec![merkle_proof.proof.clone().try_into().unwrap(), merkle_proof.proof.clone().try_into().unwrap()];
+            let new_amounts: Vec<U256> = vec![fp_new_amount.into(), obfuscated_remaining_amount.into()];
+            let pks: Vec<PublicKey> = vec![PublicKey::null(), stealth_pub_key];
+            
             let proof: std::result::Result<Proof, eyre::Error> = prove(
-                params_file,
-                u32_index,
                 hint_token_address,
-                amount,
-                fp_new_amount.into(),
-                obfuscated_remaining_amount.into(),
-                PublicKey::null(),
-                stealth_pub_key,
-                coin.priv_key.secret,
-                merkle_proof.proof.try_into().unwrap(),
+                indices,
+                amounts,
+                secrets,
+                proofs,
+                new_amounts,
+                pks,
+                params_file,
                 witness_gen_path,
             );
             match proof {
