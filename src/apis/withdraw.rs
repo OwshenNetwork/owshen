@@ -1,16 +1,33 @@
+use crate::config::Context;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::{Point, PrivateKey, PublicKey};
 use crate::proof::{prove, Proof};
-use crate::Context;
-use crate::GetWithdrawRequest;
-use crate::GetWithdrawResponse;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetWithdrawRequest {
+    index: U256,
+    pub address: String,
+    pub desire_amount: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetWithdrawResponse {
+    proof: Proof,
+    pub token: H160,
+    pub amount: U256,
+    pub obfuscated_remaining_amount: U256,
+    pub nullifier: U256,
+    pub commitment: U256,
+    pub ephemeral: Point,
+}
 
 pub async fn withdraw(
     Query(req): Query<GetWithdrawRequest>,

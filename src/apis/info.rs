@@ -1,9 +1,22 @@
-use crate::{keys::PublicKey, GetInfoResponse, NetworkManager};
-use crate::{Context, Network};
+use crate::{config::{Context, Network}, keys::PublicKey, NetworkManager};
 
 use axum::Json;
+use ethers::abi::Abi;
+use ethers::types::H160;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetInfoResponse {
+    address: PublicKey,
+    erc20_abi: Abi,
+    dive_contract: H160,
+    owshen_contract: H160,
+    owshen_abi: Abi,
+    token_contracts: NetworkManager,
+    is_test: bool,
+}
 
 pub async fn info(
     address: PublicKey,

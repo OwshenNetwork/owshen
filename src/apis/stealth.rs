@@ -1,8 +1,19 @@
 use axum::{extract::Query, Json};
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::keys::PublicKey;
-use crate::{GetStealthRequest, GetStealthResponse};
+use crate::keys::{Point, PublicKey};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetStealthRequest {
+    address: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetStealthResponse {
+    address: Point,
+    ephemeral: Point,
+}
 
 pub async fn stealth(
     Query(req): Query<GetStealthRequest>,

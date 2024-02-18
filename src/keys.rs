@@ -83,6 +83,7 @@ lazy_static! {
 }
 
 impl Point {
+    #[allow(dead_code)]
     pub fn is_on_curve(&self) -> bool {
         let x2 = self.x * self.x;
         let y2 = self.y * self.y;
@@ -143,6 +144,7 @@ impl From<PrivateKey> for PublicKey {
 }
 
 impl PublicKey {
+    #[allow(dead_code)]
     pub fn encrypt(&self, random: Fp, msg: Point) -> Cipher {
         Cipher {
             a: *BASE * random,
@@ -200,6 +202,7 @@ impl Entropy {
 }
 
 impl PrivateKey {
+    #[allow(dead_code)]
     pub fn generate<R: Rng>(_rng: &mut R) -> Self {
         let rnd: BigUint = rand::thread_rng().gen_biguint_range(&BigUint::zero(), &*ORDER);
         Self {
@@ -207,6 +210,7 @@ impl PrivateKey {
         }
     }
 
+    #[allow(dead_code)]
     pub fn to_mnemonic(&self) -> Result<String, bip39::Error> {
         let secret_bytes: Vec<u8> = self.secret.to_repr().as_ref().to_vec();
         let mnemonic: Mnemonic = Mnemonic::from_entropy(&secret_bytes)?;
@@ -235,6 +239,8 @@ impl PrivateKey {
             secret: stealth_secret,
         }
     }
+
+    #[allow(dead_code)]
     pub fn decrypt(&self, cipher: Cipher) -> Point {
         cipher.b - cipher.a * self.secret
     }

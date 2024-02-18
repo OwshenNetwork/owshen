@@ -1,3 +1,4 @@
+use crate::config::Context;
 use crate::fp::Fp;
 use crate::helper::extract_token_amount;
 use crate::keys::Point;
@@ -5,8 +6,6 @@ use crate::keys::{EphemeralPubKey, PrivateKey, PublicKey};
 use crate::tree::SparseMerkleTree;
 use crate::u256_to_h160;
 use crate::Coin;
-use crate::Context;
-use crate::GetCoinsResponse;
 use crate::WalletCache;
 
 use axum::Json;
@@ -14,9 +13,16 @@ use bindings::owshen::{SentFilter, SpendFilter};
 use ethers::prelude::*;
 use eyre::Result;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct GetCoinsResponse {
+    coins: Vec<Coin>,
+    syncing: Option<f32>,
+}
 
 pub async fn coins(
     provider: Arc<Mutex<Context>>,

@@ -1,9 +1,9 @@
+use crate::config::Context;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::{Point, PrivateKey, PublicKey};
 use crate::proof::{prove, Proof};
-use crate::Context;
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;

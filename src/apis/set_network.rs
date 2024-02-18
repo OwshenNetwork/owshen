@@ -1,9 +1,25 @@
-use crate::{Config, Context, Network, SetNetworkRequest, SetNetworkResponse};
-
 use axum::{extract::Query, Json};
 use ethers::providers::{Http, Provider};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
+
+use crate::config::{Config, Context, Network};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Empty {
+    ok: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SetNetworkRequest {
+    pub chain_id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SetNetworkResponse {
+    pub success: Empty,
+}
 
 lazy_static! {
     static ref NETWORK_CONFIG_MAP: HashMap<String, (String, String)> = [
@@ -62,6 +78,6 @@ pub async fn set_network(
     // reset the current coins with last provider
     ctx.coins.clear();
     Ok(Json(SetNetworkResponse {
-        success: crate::Empty { ok: true },
+        success: Empty { ok: true },
     }))
 }
