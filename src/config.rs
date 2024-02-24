@@ -1,5 +1,6 @@
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
+use bindings::owshen::{SentFilter, SpendFilter};
 use ethers::{abi::Abi, prelude::*, types::H160};
 use serde::{Deserialize, Serialize};
 
@@ -10,17 +11,13 @@ use crate::{
 };
 
 pub const GOERLI_ENDPOINT: &str = "https://ethereum-goerli.publicnode.com";
-
-#[derive(Clone, Debug)]
-pub struct Network {
-    pub provider: Arc<Provider<Http>>,
-    pub config: Config,
-}
+pub const NODE_UPDATE_INTERVAL: u64 = 5;
 
 pub struct Context {
     pub coins: Vec<Coin>,
     pub tree: SparseMerkleTree,
-    pub network: Option<Network>,
+    pub node_manager: NodeManager,
+    pub events_latest_status: EventsLatestStatus,
     pub genesis: Genesis,
     pub syncing: Arc<std::sync::Mutex<Option<f32>>>,
     pub syncing_task: Option<
@@ -28,6 +25,74 @@ pub struct Context {
             std::result::Result<(tree::SparseMerkleTree, Vec<Coin>), eyre::Report>,
         >,
     >,
+}
+
+pub struct NodeContext {
+    pub node_manager: NodeManager,
+
+    pub spent_events: Vec<SpendFilter>,
+    pub sent_events: Vec<SentFilter>,
+    pub currnet_block_number: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct Network {
+    pub provider: Arc<Provider<Http>>,
+    pub config: Config,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Peer {
+    pub ip: String,
+    pub port: u16,
+
+    pub current_block: u64,
+}
+
+impl FromStr for Peer {
+    type Err = eyre::Report;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(':');
+        let ip = parts.next().ok_or_else(|| eyre::eyre!("Invalid ip"))?;
+        let port = parts.next().ok_or_else(|| eyre::eyre!("Invalid port"))?.parse()?;
+        Ok(Peer {
+            ip: ip.to_string(),
+            port,
+            current_block: 0,
+        })
+    }
+}
+
+impl PartialEq for Peer {
+    fn eq(&self, other: &Self) -> bool {
+        self.ip == other.ip && self.port == other.port
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct EventsLatestStatus {
+    pub last_sent_event: u64,
+    pub last_spent_event: u64,
+}
+
+#[derive(Clone, Debug)]
+pub struct NodeManager {
+    pub ip: Option<String>,
+    pub port: Option<u16>,
+
+    pub network: Option<Network>,
+    pub peers: Vec<Peer>,
+    pub elected_peer: Option<Peer>,
+    pub is_peer2peer: bool,
+
+    pub is_client: bool
+}
+
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NetworkManager {
+    pub networks: HashMap<String, Vec<TokenInfo>>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -48,11 +113,6 @@ pub struct TokenInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NetworkManager {
-    pub networks: HashMap<String, Vec<TokenInfo>>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Wallet {
     pub entropy: Entropy,
 }
@@ -70,41 +130,9 @@ pub struct Config {
     pub poseidon_contract_address: H160,
 }
 
-impl NetworkManager {
-    pub fn new() -> NetworkManager {
-        let mut networks: HashMap<String, Vec<TokenInfo>> = HashMap::new();
-
-        networks.insert(
-            "Goerli".to_string(),
-            vec![TokenInfo {
-                token_address: H160::from_str("0xdD69DB25F6D620A7baD3023c5d32761D353D3De9")
-                    .unwrap(),
-                symbol: "WETH".to_string(),
-            }],
-        );
-
-        NetworkManager { networks }
-    }
-
-    // pub fn set(&mut self, data: HashMap<String, Vec<TokenInfo>>, expand: bool) {
-    //     if expand {
-    //         self.networks.extend(data);
-    //     } else {
-    //         self.networks = data;
-    //     }
-    // }
-
-    pub fn add_network(&mut self, network: String, token_info: Vec<TokenInfo>) {
-        self.networks.insert(network, token_info);
-    }
-
-    // pub fn get(&self, network: &str) -> Option<&Vec<TokenInfo>> {
-    //     self.networks.get(network)
-    // }
-
-    // pub fn has(&self, network: &str, symbol: &str) -> bool {
-    //     self.get(network).map_or(false, |tokens| {
-    //         tokens.iter().any(|token_info| token_info.symbol == symbol)
-    //     })
-    // }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletCache {
+    pub coins: Vec<Coin>,
+    pub tree: SparseMerkleTree,
+    pub height: u64,
 }

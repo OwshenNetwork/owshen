@@ -22,7 +22,7 @@ use tower_http::{cors::CorsLayer, services::ServeFile};
 
 use crate::{
     apis,
-    config::{Config, Context, NetworkManager, Wallet},
+    config::{Config, Context, EventsLatestStatus, NetworkManager, NodeManager, Peer, Wallet},
     genesis::Genesis,
     keys::{PrivateKey, PublicKey},
     tree::SparseMerkleTree,
@@ -38,6 +38,10 @@ pub struct WalletOpt {
     ip: String,
     #[structopt(long, default_value = "9000")]
     port: u16,
+    #[structopt(long, parse(try_from_str))]
+    bootstrap_peers: Vec<Peer>,
+    #[structopt(long)]
+    peer2peer: bool,
     #[structopt(long, help = "Enable test mode")]
     test: bool,
 }
@@ -48,6 +52,8 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
         config,
         ip,
         port,
+        bootstrap_peers,
+        peer2peer,
         test,
     } = opt;
 
@@ -83,6 +89,8 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
             priv_key,
             pub_key,
             config.token_contracts.clone(),
+            bootstrap_peers,
+            peer2peer,
             test,
             config.clone(),
         )
@@ -96,6 +104,8 @@ async fn serve_wallet(
     priv_key: PrivateKey,
     pub_key: PublicKey,
     token_contracts: NetworkManager,
+    bootstrap_peers: Vec<Peer>,
+    peer2peer: bool,
     test: bool,
     config: Config,
 ) -> Result<()> {
@@ -134,10 +144,40 @@ async fn serve_wallet(
         coins: vec![],
         genesis: genesis.unwrap(),
         tree: SparseMerkleTree::new(16),
-        network: None,
+        events_latest_status: EventsLatestStatus {
+            last_sent_event: 0,
+            last_spent_event: 0,
+        },
+        node_manager: NodeManager {
+            ip: None,
+            port: None,
+
+            network: None,
+            peers: bootstrap_peers,
+            elected_peer: None,
+            is_peer2peer: peer2peer,
+
+            is_client: true,
+        },
         syncing: Arc::new(std::sync::Mutex::new(None)),
         syncing_task: None,
     }));
+
+    let context_sync = context.clone();
+    tokio::spawn(async move {
+        loop {
+            log::info!("Syncing with peers...");
+            let now = std::time::Instant::now();
+
+            let mut node_manager = context_sync.lock().await.node_manager.clone();
+            node_manager.sync_with_peers();
+
+            context_sync.lock().await.node_manager = node_manager;
+
+            log::info!("Syncing with peers took: {:?}", now.elapsed());
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+    });
 
     let info_addr: PublicKey = pub_key.clone();
     let context_coin = context.clone();

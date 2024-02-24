@@ -1,4 +1,4 @@
-use crate::{config::{Context, Network}, keys::PublicKey, NetworkManager};
+use crate::{config::Context, keys::PublicKey, NetworkManager};
 
 use axum::Json;
 use ethers::abi::Abi;
@@ -24,7 +24,11 @@ pub async fn info(
     token_contracts: NetworkManager,
     is_test: bool,
 ) -> Result<Json<GetInfoResponse>, eyre::Report> {
-    let info_arc: Option<Network> = info_context.lock().await.network.clone();
+    let info_arc = info_context
+        .lock()
+        .await
+        .node_manager
+        .get_provider_network();
     if let Some(network) = info_arc {
         Ok(Json(GetInfoResponse {
             address,

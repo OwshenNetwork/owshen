@@ -9,6 +9,7 @@ mod keys;
 mod poseidon;
 mod proof;
 mod tree;
+mod network;
 
 use bindings::owshen::Point as OwshenPoint;
 use colored::Colorize;
@@ -17,7 +18,6 @@ use ethers::{abi::Abi, prelude::*, types::H160};
 use eyre::Result;
 use helper::{h160_to_u256, u256_to_h160};
 use keys::Point;
-use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 use tree::SparseMerkleTree;
 
@@ -30,6 +30,7 @@ enum OwshenCliOpt {
     Info(commands::InfoOpt),
     Wallet(commands::WalletOpt),
     Deploy(commands::DeployOpt),
+    Node(commands::NodeOpt),
 }
 
 impl Default for Config {
@@ -46,13 +47,6 @@ impl Default for Config {
             poseidon_contract_address: H160::default(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct WalletCache {
-    coins: Vec<Coin>,
-    tree: SparseMerkleTree,
-    height: u64,
 }
 
 impl Into<OwshenPoint> for Point {
@@ -93,6 +87,9 @@ async fn main() -> Result<()> {
         }
         OwshenCliOpt::Info(info_opt) => {
             commands::info(info_opt, wallet_path).await;
+        }
+        OwshenCliOpt::Node(node_opt) => {
+            commands::node(node_opt, config_path).await;
         }
     }
 

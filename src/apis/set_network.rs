@@ -73,8 +73,9 @@ pub async fn set_network(
         })
         .ok()
         .unwrap();
+    ctx.node_manager
+        .set_provider_network(Network { provider, config });
 
-    ctx.network = Some(Network { provider, config });
     // reset the current coins with last provider
     ctx.coins.clear();
     Ok(Json(SetNetworkResponse {
