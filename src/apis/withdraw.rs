@@ -21,6 +21,7 @@ pub struct GetWithdrawRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetWithdrawResponse {
     proof: Proof,
+    pub root: U256,
     pub token: H160,
     pub amount: U256,
     pub obfuscated_remaining_amount: U256,
@@ -80,7 +81,19 @@ pub async fn withdraw(
             let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
             let proofs: Vec<Vec<[Fp; 3]>> = vec![merkle_proof.proof.clone().try_into().unwrap(), merkle_proof.proof.clone().try_into().unwrap()];
             let new_amounts: Vec<U256> = vec![fp_new_amount.into(), obfuscated_remaining_amount.into()];
-            let pks: Vec<PublicKey> = vec![PublicKey::null(), stealth_pub_key];
+
+            let h160_address = H160::from_str(&address)?;
+            let null_pub_key = PublicKey {
+                point: Point {
+                    x: Fp::try_from(h160_to_u256(h160_address))?,
+                    y: 0.into(),
+                },
+            };
+
+            let pks: Vec<PublicKey> = vec![
+                null_pub_key,
+                stealth_pub_key,
+            ];
             
             let proof: std::result::Result<Proof, eyre::Error> = prove(
                 hint_token_address,
@@ -93,9 +106,12 @@ pub async fn withdraw(
                 params_file,
                 witness_gen_path,
             );
+
+            let root: U256 = merkle_root.root().into();
             match proof {
                 Ok(proof) => Ok(Json(GetWithdrawResponse {
                     proof,
+                    root: root,
                     token: coin.uint_token,
                     amount,
                     obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
@@ -112,6 +128,7 @@ pub async fn withdraw(
             log::warn!("No coin with index {} found", index);
             Ok(Json(GetWithdrawResponse {
                 proof: Proof::default(),
+                root: U256::default(),
                 token: H160::default(),
                 amount: U256::default(),
                 obfuscated_remaining_amount: U256::default(),

@@ -14,6 +14,9 @@ contract SparseMerkleTree {
     }
 
     mapping(uint256 => mapping(uint256 => uint256)) layers;
+    mapping(uint256 => uint256) public roots;
+    uint32 public constant ROOT_HISTORY_SIZE = 30;
+    uint32 public currentRootIndex = 0;
 
     function get_at_layer(uint256 layer, uint256 index) public view returns (uint256) {
         if(layer == 15 && index == 0) {
@@ -45,6 +48,30 @@ contract SparseMerkleTree {
             value = mimc.poseidon(vals);
             index /= 4;
         }
+
+        uint32 newRootIndex = (currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        currentRootIndex = newRootIndex;
+        roots[newRootIndex] = root();
+    }
+
+    function is_known_root(uint256 _root) public view returns (bool) {
+        if (_root == 0) {
+            return false;
+        }
+
+        uint32 _currentRootIndex = currentRootIndex;
+        uint32 i = _currentRootIndex;
+        do {
+        if (_root == roots[i]) {
+            return true;
+        }
+        if (i == 0) {
+            i = ROOT_HISTORY_SIZE;
+        }
+        i--;
+        } while (i != _currentRootIndex);
+
+        return false;
     }
 
     function zeros(uint256 i) public pure returns (uint256) {

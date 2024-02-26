@@ -169,8 +169,6 @@ const TransactionModal = ({
             ephemeral,
             tokenContract,
             utils.toBigInt(to_wei_token_amount),
-            address,
-            OwshenWallet.contract_address
           );
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -219,8 +217,8 @@ const TransactionModal = ({
       })
       .then(async (result) => {
         let abi = OwshenWallet.contract_abi;
-        let commitment1 = result.data.sender_commitment;
-        let commitment2 = result.data.receiver_commitment;
+        let reciver_commitment = result.data.receiver_commitment;
+        let sender_commitment = result.data.sender_commitment;
         let provider = new ethers.BrowserProvider(window.ethereum);
 
         let contract = new ethers.Contract(
@@ -249,13 +247,12 @@ const TransactionModal = ({
 
         try {
           const txResponse = await contract.send(
-            result.data.nullifier,
-            utils.toBigInt(0),
+            result.data.root,
             proof,
             receiver_ephemeral,
             sender_ephemeral,
-            commitment1,
-            commitment2,
+            [result.data.nullifier, utils.toBigInt(0)],
+            [sender_commitment, reciver_commitment],
             result.data.obfuscated_receiver_token_address,
             result.data.obfuscated_sender_token_address,
             result.data.obfuscated_receiver_amount,
@@ -299,7 +296,7 @@ const TransactionModal = ({
       .get(`${coreEndpoint}/withdraw`, {
         params: {
           index: index,
-          address: owshen.wallet,
+          address: address, // TODO: change it to user modal eth address
           desire_amount: desireAmount,
         },
       })
@@ -329,9 +326,10 @@ const TransactionModal = ({
         const ephemeral = [ax, ay];
         try {
           const txResponse = await contract.withdraw(
-            result.data.nullifier,
-            ephemeral,
+            result.data.root,
             proof,
+            ephemeral,
+            [result.data.nullifier, utils.toBigInt(0)],
             result.data.token,
             toBigInt(desireAmount),
             result.data.obfuscated_remaining_amount,

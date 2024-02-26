@@ -22,6 +22,7 @@ pub struct GetSendRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetSendResponse {
     proof: Proof,
+    pub root: U256,
     pub nullifier: U256,
     pub receiver_commitment: U256,
     pub sender_commitment: U256,
@@ -129,10 +130,13 @@ pub async fn send(
                 params_file,
                 witness_gen_path,
             );
+            
+            let root: U256 = merkle_root.root().into();
 
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {
-                    proof,
+                    proof: proof,
+                    root: root,
                     nullifier: coin.nullifier,
                     obfuscated_receiver_amount: obfuscated_receiver_remaining_amount_with_secret,
                     obfuscated_sender_amount: obfuscated_sender_remaining_amount_with_secret,
@@ -152,6 +156,7 @@ pub async fn send(
             log::warn!("No coin with index {} found", index);
             Ok(Json(GetSendResponse {
                 proof: Proof::default(),
+                root: U256::default(),
                 obfuscated_receiver_token_address: U256::default(),
                 obfuscated_sender_token_address: U256::default(),
                 nullifier: U256::default(),
