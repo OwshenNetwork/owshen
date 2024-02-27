@@ -1,4 +1,4 @@
-import Modal from "./Modal";
+import Modal from ".";
 import ReactLoading from "react-loading";
 
 const InProgress = ({ isOpen, setIsOpen }) => {

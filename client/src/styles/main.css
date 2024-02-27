@@ -8,7 +8,9 @@
 body {
   background: #e9e9e9;
 }
-
+.dark body{
+  background: #000029 !important;
+}
 .modal {
   position: fixed;
   z-index: 1;
@@ -44,3 +46,6 @@ body {
   margin: 0 auto;
   justify-content: center;
 }
+
+
+.react-tooltip{z-index: 50 !important;}

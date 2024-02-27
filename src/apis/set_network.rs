@@ -28,7 +28,7 @@ lazy_static! {
             ("http://127.0.0.1:8545".into(), "Localhost.json".into())
         ),
         (
-            "0x5".into(),
+            "5".into(),
             (
                 "https://ethereum-goerli.publicnode.com".into(),
                 "Goerli.json".into()

@@ -1,31 +1,31 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import axios from "axios";
-import { useAccount } from "wagmi";
 import { selectIsTest, selectNetwork } from "../../store/containerSlice";
 import Dropdown from "../DropDown";
-import { toast } from "react-toastify";
 import { setNetworkDetails } from "../../store/containerSlice";
-import { SwitchNetwork } from "../../utils/helper";
+import {
+  getNetworkNameByChainId,
+  isChainIdExist,
+  networkDetails,
+} from "../../utils/networkDetails";
+import { useSelectNetworkApi } from "../../api/hooks/useSelectNetworkApi";
+import { chainIdOfWallet, SwitchNetwork } from "../../utils/helper";
+import { toast } from "react-toastify";
 
 const SelectNetwork = () => {
   const dispatch = useDispatch();
-  const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT || "";
-  const accountData = useAccount();
   const selectedNetwork = useSelector(selectNetwork);
-  const chainId = accountData ? accountData.chainId : undefined;
+  const [chainId, setChainId] = useState(null);
   const [network, setNetWork] = useState("Select Network");
-
   const isTest = useSelector(selectIsTest);
+  const { setChainIdOnCore } = useSelectNetworkApi();
+
   const netWorkOptions = [
     {
       title: "Sepolia",
       value: "Sepolia",
     },
   ];
-  useEffect(() => {
-    checkNetwork(chainId);
-  }, [chainId]);
 
   useEffect(() => {
     if (!isTest) {
@@ -38,82 +38,36 @@ const SelectNetwork = () => {
       );
     }
   });
+  const getChainId = async () => {
+    let ChainId = await chainIdOfWallet(); // Get the chainId
+    if (!isChainIdExist(ChainId)) {
+      return toast.error("please select your network")
+    }
 
-  const checkNetwork = async (val) => {
-    switch (val) {
-      case 5:
-        setNetWork("Goerli");
-        updateNetworkDetails("Goerli", 5, "Goerli");
-        break;
-      case 1337:
-        setNetWork("Localhost");
-        updateNetworkDetails("Localhost", 1337, "Localhost");
-        break;
-      case 11155111:
-        setNetWork("Sepolia");
-        updateNetworkDetails("Sepolia", 11155111, "Ethereum_Sepolia");
-        break;
-      case 5556:
-        setNetWork("Local-Testnet");
-        updateNetworkDetails("testnet", 5556, "Local-Testnet");
-        break;
-      default:
-        setNetWork("Select Network");
-    }
+    const networkName = getNetworkNameByChainId(ChainId);
+
+    setNetWork(networkName);
+    const selectedNetwork = networkDetails[networkName];
+    updateNetworkDetails(
+      selectedNetwork.name,
+      selectedNetwork.chainId,
+      selectedNetwork.contractName
+    );
+    setChainId(ChainId);
   };
-  const handelChangeNetwork = async (val) => {
-    switch (val) {
-      case "Goerli":
-        setChainId(5, val);
-        break;
-      case "Localhost":
-        setChainId(1337, val);
-        break;
-      case "Sepolia":
-        setChainId(11155111, val);
-        break;
-      case "Local-Testnet":
-        setChainId(5556, val);
-        break;
-      default:
-        setNetWork(network);
-    }
-  };
+  useEffect(() => {
+    getChainId();
+  }, []);
+
   const updateNetworkDetails = (name, chainId, contractName) => {
     dispatch(setNetworkDetails({ name, chainId, contractName }));
   };
-  const setChainId = async (newChainId, val) => {
-    console.log(val);
-    SwitchNetwork(val);
-    if (newChainId !== chainId && val) {
-      toast.error(`Please change your wallet network to ${val}`);
+  const handelChangeNetwork = async (val) => {
+    if (val) {
+      const selectedNetwork = await networkDetails[val];
+      setChainIdOnCore(selectedNetwork?.chainId, val, chainId);
     }
-    let chain_id = newChainId;
-    if (newChainId === 5) {
-      chain_id = "0x5";
-    }
-    await axios
-      .post(`${coreEndpoint}/set-network`, null, {
-        params: { chain_id },
-      })
-      .then((response) => {
-        console.log("Response:", response.data);
-      })
-      .catch((error) => {
-        console.error("Error:", error);
-      });
   };
-
-  useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on("chainChanged", (data) => {
-        let chain_id = parseInt(data, 16);
-        checkNetwork(chain_id);
-        handelChangeNetwork(selectedNetwork.name);
-        setChainId(chain_id.toString(), selectedNetwork.name);
-      });
-    }
-  }, []);
   return (
     <>
       <Dropdown
@@ -121,7 +75,7 @@ const SelectNetwork = () => {
         options={netWorkOptions}
         select={setNetWork}
         onChange={handelChangeNetwork}
-        style="!bg-gray-200 !text-white !py-3 !rounded-xl border-0 "
+        style={"!text-white !py-3 !rounded-xl !bg-blue-100 dark:!bg-blue-900 !border-0 dark:!border-gray-300"}
       />
     </>
   );

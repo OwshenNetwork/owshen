@@ -29,7 +29,7 @@ const Web3ModalComponent = () => {
     dispatch(setUserDetails({ address: accounts[0] }));
   };
   const buttonClass =
-    "border lg:w-52 w-full rounded-xl px-3 py-2   ease-in-out duration-300 flex items-center justify-around";
+    "border lg:w-52 w-full rounded-xl px-3 py-3   ease-in-out duration-300 flex items-center justify-around";
 
   const disconnectWallet = async () => {
     if (provider.close) {
@@ -48,21 +48,20 @@ const Web3ModalComponent = () => {
     <>
       {account ? (
         <>
+          <SelectNetwork />
           <button
-            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  lg:mr-3 mb-3 lg:mb-0`}
+            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950  lg:ml-3 mb-3 lg:mb-0`}
             onClick={disconnectWallet}
           >
             Disconnect Wallet
           </button>
-
-          <SelectNetwork />
         </>
       ) : (
         <button
-          className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC]  `}
+          className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950  `}
           onClick={connectWallet}
         >
-          <img src={WalletIcon} width="20px" />
+          <img src={WalletIcon} width="20px" alt="WalletIcon" />
           <p>Connect Wallet</p>
         </button>
       )}

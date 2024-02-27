@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { currencies } from "../../utils/Currencies";
-import Modal from "../Modal/Modal";
+import Modal from "../Modal";
 import ImportTokens from "../ImportToken";
 import { useState } from "react";
 import { selectIsTest } from "../../store/containerSlice";

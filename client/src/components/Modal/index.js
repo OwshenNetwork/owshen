@@ -1,16 +1,13 @@
 import { useRef, useEffect } from "react";
 import BackArrow from "../../pics/icons/arrow.png";
 
-const Modal = ({ title, setIsOpen, isOpen, children,dispatch }) => {
+const Modal = ({ title, setIsOpen, isOpen, children }) => {
   const ref = useRef(null);
 
   // Close Modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (ref.current && !ref.current.contains(event.target)) {
-        if (dispatch) {
-          return
-        }
         setIsOpen(false);
       }
     };
@@ -19,7 +16,7 @@ const Modal = ({ title, setIsOpen, isOpen, children,dispatch }) => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [ref]);
+  }, [ref,setIsOpen]);
   return (
     <div
       className={`${
@@ -28,10 +25,10 @@ const Modal = ({ title, setIsOpen, isOpen, children,dispatch }) => {
     >
       <div
         ref={ref}
-        className=" border-2 text-center md:w-3/4 lg:!min-w-[510px] lg:w-1/4 p-5 mt-16 mx-auto bg-white rounded-xl"      >
+        className=" border-2 text-center md:w-3/4 lg:!min-w-[510px] lg:w-1/4 p-5 mt-16 mx-auto bg-white dark:bg-indigo-950 rounded-xl"      >
         <div className="relative">
-          <div className="cursor-pointer w-9 absolute top-2" onClick={() => setIsOpen(!isOpen)}>
-            <img src={BackArrow} />
+          <div className="cursor-pointer w-9 absolute top-2 dark:invert" onClick={() => setIsOpen(!isOpen)}>
+            <img src={BackArrow} alt="BackArrow" />
           </div>
           <h3 className="font-bold text-3xl">{title}</h3>
         </div>

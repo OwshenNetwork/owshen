@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useSelector } from "react-redux";
-import Modal from "../Modal/Modal";
+import Modal from "../Modal";
 import Main from "../Main";
 import {
   selectReceivedCoins,
@@ -20,7 +20,7 @@ import {
 import { getRound, trueAmount } from "../../utils/helper";
 import { Tooltip } from "react-tooltip";
 const ReceivedCoinList = () => {
-  const receivedcoins = useSelector(selectReceivedCoins);
+  const receivedCoins = useSelector(selectReceivedCoins);
   const isLoading = useSelector(selectReceivedCoinsLoading);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCoin, SetSelectedCoin] = useState("");
@@ -78,18 +78,19 @@ const ReceivedCoinList = () => {
                 : "Loading..."}
             </div>
           </div>
-        ) : receivedcoins?.length ? (
+        ) : receivedCoins?.length ? (
           <div className="max-h-350 overflow-y-auto">
             <ul>
-              {receivedcoins?.map((coin, index) => (
+              {receivedCoins?.map((coin, index) => (
                 <li
-                  className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 hover:bg-transparent ease-in-out duration-300 border-[#00000033]"
+                  className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 dark:bg-blue-950 hover:bg-transparent dark:hover:bg-transparent ease-in-out duration-300 border-[#00000033]"
                   key={index}
                 >
                   <div className="w-5/6 text-left font-bold text-lg flex items-center">
                     <img
                       className="w-8 mr-2"
                       src={getLogoByContractAddress(coin.uint_token)}
+                      alt="coin"
                     />
                     <p>
                       {String(
@@ -121,7 +122,7 @@ const ReceivedCoinList = () => {
                     >
                       <img
                         alt="MergIcon"
-                        className=" border w-10 border-gray-400 p-1.5 rounded-3xl"
+                        className=" border w-10 border-gray-400 p-1.5 rounded-3xl dark:invert"
                         src={MergIcon}
                       />
                     </button>
@@ -136,7 +137,7 @@ const ReceivedCoinList = () => {
                       // }}
                       data-tooltip-id="SendIcon"
                     >
-                      <img alt="SendIcon" className="w-10" src={SendIcon} />
+                      <img alt="SendIcon" className="w-10 dark:invert" src={SendIcon} />
                     </button>
                     <Tooltip id="SwapIcon" place="bottom" content="Swap" />
                     <button
@@ -145,7 +146,7 @@ const ReceivedCoinList = () => {
                       className="ml-2"
                       data-tooltip-id="SwapIcon"
                     >
-                      <img alt="SwapIcon" className="w-10" src={SwapIcon} />
+                      <img alt="SwapIcon" className="w-10 dark:invert" src={SwapIcon} />
                     </button>
                   </div>
                 </li>
@@ -154,7 +155,7 @@ const ReceivedCoinList = () => {
           </div>
         ) : (
           <p className="text-4xl font-bold mt-28">No coins yet </p>
-        )}{" "}
+        )}
       </div>
     </Main>
   );
