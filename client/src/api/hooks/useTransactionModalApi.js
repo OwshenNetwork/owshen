@@ -77,7 +77,7 @@ export const useTransactionModalApi = (tokenContract) => {
             pubKey,
             ephemeral,
             tokenContract,
-            utils.toBigInt(to_wei_token_amount),
+            utils.toBigInt(to_wei_token_amount)
           );
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -197,14 +197,13 @@ export const useTransactionModalApi = (tokenContract) => {
     // }
     //Todo: its should be with dynamic decimal
     const desireAmount = utils.toWei(Number(tokenAmount), "ether");
-    const options = {
-      gasLimit: 5000000,
-    };
+    console.log("request withdrawal", index, owshen.wallet, desireAmount);
     axios
       .get(`${coreEndpoint}/withdraw`, {
         params: {
-          index: index,
-          address: address, // TODO: change it to user modal eth address
+          index,
+          address,
+          owshen_address: owshen.wallet, // TODO: change it to user modal eth address
           desire_amount: desireAmount,
         },
       })
@@ -237,13 +236,13 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.root,
             proof,
             ephemeral,
-            [result.data.nullifier, utils.toBigInt(0)],
+            [result.data.nullifier, 0],
             result.data.token,
             toBigInt(desireAmount),
             result.data.obfuscated_remaining_amount,
             address,
-            commitment,
-            options
+            commitment
+            // options
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();

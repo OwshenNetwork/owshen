@@ -14,6 +14,7 @@ use tokio::sync::Mutex;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetWithdrawRequest {
     index: U256,
+    pub owshen_address: String,
     pub address: String,
     pub desire_amount: String,
 }
@@ -38,6 +39,7 @@ pub async fn withdraw(
     params_file: String,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
+    let owshen_address = req.owshen_address;
     let address = req.address;
     let coins = context_withdraw.lock().await.coins.clone();
     let merkle_root = context_withdraw.lock().await.tree.clone();
@@ -50,7 +52,7 @@ pub async fn withdraw(
             // get merkle proof
             let merkle_proof = merkle_root.get(u64_index);
 
-            let pub_key: PublicKey = PublicKey::from_str(&address)?;
+            let pub_key: PublicKey = PublicKey::from_str(&owshen_address)?;
             let (_, ephemeral, stealth_pub_key) = pub_key.derive_random(&mut rand::thread_rng());
             let stealth_priv: PrivateKey = priv_key.derive(ephemeral);
             let shared_secret: Fp = stealth_priv.shared_secret(ephemeral);
@@ -79,8 +81,12 @@ pub async fn withdraw(
             let indices: Vec<u32> = vec![u32_index, 0];
             let amounts: Vec<U256> = vec![amount, U256::from(0)];
             let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
-            let proofs: Vec<Vec<[Fp; 3]>> = vec![merkle_proof.proof.clone().try_into().unwrap(), merkle_proof.proof.clone().try_into().unwrap()];
-            let new_amounts: Vec<U256> = vec![fp_new_amount.into(), obfuscated_remaining_amount.into()];
+            let proofs: Vec<Vec<[Fp; 3]>> = vec![
+                merkle_proof.proof.clone().try_into().unwrap(),
+                merkle_proof.proof.clone().try_into().unwrap(),
+            ];
+            let new_amounts: Vec<U256> =
+                vec![fp_new_amount.into(), obfuscated_remaining_amount.into()];
 
             let h160_address = H160::from_str(&address)?;
             let null_pub_key = PublicKey {
@@ -90,11 +96,8 @@ pub async fn withdraw(
                 },
             };
 
-            let pks: Vec<PublicKey> = vec![
-                null_pub_key,
-                stealth_pub_key,
-            ];
-            
+            let pks: Vec<PublicKey> = vec![null_pub_key, stealth_pub_key];
+
             let proof: std::result::Result<Proof, eyre::Error> = prove(
                 hint_token_address,
                 indices,
