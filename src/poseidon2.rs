@@ -259,7 +259,7 @@ fn mix(inp: [Fp; T], m: &Vec<Vec<Fp>>) -> [Fp; T] {
 pub fn poseidon2(inp: [Fp; 2]) -> Fp {
     const T: usize = 3;
     const ROUNDS_F: usize = 8;
-    const ROUNDS_P: usize = 60;
+    const ROUNDS_P: usize = 57;
 
     let mut state = [Fp::ZERO, inp[0], inp[1]];
     for r in 0..ROUNDS_F + ROUNDS_P {
