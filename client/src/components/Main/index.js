@@ -20,6 +20,7 @@ import {
   chainIdOfWallet,
 } from "../../utils/helper";
 import { isChainIdExist } from "../../utils/networkDetails";
+import MergeCoins from "../Modal/MergeCoins";
 
 import "../../styles/main.css";
 import CopyIcon from "../../pics/icons/copy.png";
@@ -66,7 +67,7 @@ const Main = ({ children }) => {
     if (isTest) {
       return setIsInprogress(true);
     }
-    address ? setIsOpen(true) : toast.error("Connect your wallet first!");
+    address ? setIsOpen(true) : toast.error("Your wallet is not connected. Please connect your wallet to proceed.");
   };
   const diveAmount = () => {
     let totalAmount = 0;
@@ -102,38 +103,32 @@ const Main = ({ children }) => {
 
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
 
-      <div style={{ textAlign: "center" }}>
-        <div className="mt-10 ">
-          <Tooltip id="copy" place="top" content="Copy wallet address" />
-          {OwshenWallet.wallet && (
-            <button
-              data-tooltip-id="copy"
-              onClick={() => copyWalletAddress(OwshenWallet.wallet)}
-              className="mt-4 rounded-2xl px-3 py-2 w-52 mx-auto justify-between border border-gray-300 bg-[#BBDCFBCC] dark:bg-blue-950 ease-in-out duration-300 flex"
-            >
-              {shortenAddress(OwshenWallet.wallet)}
-              <img className="ml-2" src={CopyIcon} alt="copyIcon" />
-            </button>
-          )}
+      <div className="mt-10 text-center">
+        <Tooltip id="copy" place="top" content="Copy wallet address" />
+        {OwshenWallet.wallet && (
+          <button
+            data-tooltip-id="copy"
+            onClick={() => copyWalletAddress(OwshenWallet.wallet)}
+            className="mt-4 rounded-2xl px-3 py-2 w-52 mx-auto justify-between border border-gray-300 bg-[#BBDCFBCC] dark:bg-blue-950 ease-in-out duration-300 flex"
+          >
+            {shortenAddress(OwshenWallet.wallet)}
+            <img className="ml-2" src={CopyIcon} alt="copyIcon" />
+          </button>
+        )}
 
-          <div className="text-3xl font-bold mt-4">
-            {receivedCoins ? getRound(diveAmount()) : "0.0"} DIVE
-          </div>
-          <div className="text-lg mt-4">$? USD</div>
-          <div className="my-8 flex justify-around w-32 mx-auto">
-            <Tooltip id="Send" place="bottom" content="Send" />
-            <button data-tooltip-id="Send" onClick={canOpenModal}>
-              <img src={SendIcon} alt="sendIcon" />
-            </button>
-            <Tooltip id="Swap" place="bottom" content="Swap" />
-            <button
-              onClick={() => setIsInprogress(true)}
-              data-tooltip-id="Swap"
-              // onClick={openWithdraw}
-            >
-              <img src={SwapIcon} alt="swapIcon" />
-            </button>
-          </div>
+        <div className="text-3xl font-bold mt-4">
+          {receivedCoins ? getRound(diveAmount()) : "0.0"} DIVE
+        </div>
+        <div className="text-lg mt-4">$? USD</div>
+        <div className="my-8 flex justify-around w-32 mx-auto">
+          <button onClick={canOpenModal}>
+            <img src={SendIcon} alt="sendIcon" />
+            <p>send</p>
+          </button>
+          <button onClick={() => setIsInprogress(true)}>
+            <img src={SwapIcon} alt="swapIcon" />
+            <p>swap</p>
+          </button>
         </div>
       </div>
       {children}

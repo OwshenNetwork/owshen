@@ -8,7 +8,7 @@
 body {
   background: #e9e9e9;
 }
-.dark body{
+.dark body {
   background: #000029 !important;
 }
 .modal {
@@ -47,5 +47,18 @@ body {
   justify-content: center;
 }
 
+.react-tooltip {
+  z-index: 50 !important;
+}
 
-.react-tooltip{z-index: 50 !important;}
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type="number"] {
+  -moz-appearance: textfield;
+}

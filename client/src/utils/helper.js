@@ -75,19 +75,27 @@ export const chainIdOfWallet = async () => {
     const chainId = await web3.eth.getChainId(); // Get the chainId
     return Number(chainId);
   } catch (error) {
-    console.error('Error getting chain ID:', error);
+    console.error("Error getting chain ID:", error);
     throw error; // Re-throw the error so it can be handled by the calling code
   }
 };
 
-export const validateTransaction = (address, destOwshenWallet, tokenContract, tokenAmount, network, chainId) => {
-  if (!address) return "Connect your wallet first!";
-  if (!destOwshenWallet) return "Enter your destination!";
-  if (!tokenContract) return "Select your token!";
-  if (!tokenAmount) return "Enter amount of token!";
+export const validateTransaction = (
+  destOwshenWallet,
+  tokenContract,
+  tokenAmount,
+  network,
+  chainId
+) => {
+  if (!destOwshenWallet)
+    return "Destination wallet address is missing. Please enter the recipient's wallet address.";
+  if (!tokenContract)
+    return "Token selection is required. Please choose the token you wish to send.";
+  if (!tokenAmount || tokenAmount === 0)
+    return "Token amount is not specified. Please enter the amount of tokens you want to send.";
   if (network.chainId !== chainId) {
     SwitchNetwork(network.name);
-    return `Please change your wallet network to ${network.name}`;
+    return `Your wallet is currently on a different network. Please switch to the ${network.name} network to continue.`;
   }
   return null; // No error
 };

@@ -14,15 +14,14 @@ export const useMainApi = () => {
 
   const setChainId = async (chain_id) => {
     if (!chain_id) {
-      toast.error("Please connect your wallet");
+      toast.error("Your wallet is not connected. Please connect your wallet to proceed.");
       return;
     }
     await axios
       .post(`${coreEndpoint}/set-network`, null, {
         params: { chain_id },
       })
-      .then((response) => {
-        console.log("Response:", response.data);
+      .then(() => {
         GetCoins();
         GetInfo();
       })

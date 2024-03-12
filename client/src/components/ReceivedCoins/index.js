@@ -6,6 +6,7 @@ import {
   selectReceivedCoins,
   selectIsTest,
   selectReceivedCoinsLoading,
+  selectUserAddress,
 } from "../../store/containerSlice";
 import ReactLoading from "react-loading";
 import TransactionModal from "../Modal/TransactionModal";
@@ -19,6 +20,7 @@ import {
 } from "../../utils/Currencies";
 import { getRound, trueAmount } from "../../utils/helper";
 import { Tooltip } from "react-tooltip";
+import { toast } from "react-toastify";
 const ReceivedCoinList = () => {
   const receivedCoins = useSelector(selectReceivedCoins);
   const isLoading = useSelector(selectReceivedCoinsLoading);
@@ -28,8 +30,15 @@ const ReceivedCoinList = () => {
   const [isDataSet, setIsDataSet] = useState(false);
   const [isInprogress, setIsInprogress] = useState(false);
   const isTest = useSelector(selectIsTest);
+  const address = useSelector(selectUserAddress);
 
   const withdrawHandler = (coin) => {
+    if (!address) {
+      return toast.error(
+        "Your wallet is not connected. Please connect your wallet to proceed."
+      );
+    }
+
     if (isTest) {
       return setIsInprogress(true);
     }
@@ -83,7 +92,7 @@ const ReceivedCoinList = () => {
             <ul>
               {receivedCoins?.map((coin, index) => (
                 <li
-                  className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 dark:bg-blue-950 hover:bg-transparent dark:hover:bg-transparent ease-in-out duration-300 border-[#00000033]"
+                  className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 dark:bg-blue-950 hover:bg-transparent dark:hover:bg-transparent ease-in-out duration-300 border-[#00000033] dark:hover:border-[#ffffff52]"
                   key={index}
                 >
                   <div className="w-5/6 text-left font-bold text-lg flex items-center">
@@ -130,14 +139,14 @@ const ReceivedCoinList = () => {
 
                     <button
                       className="ml-2"
-                      onClick={() => setIsInprogress(true)}
-                      //   withdrawal(coin.index, owshen, address);
-                      //   SetSelectedCoin(coin.index);
-                      //   setIsOpenWithdraw(true);
-                      // }}
+                      onClick={() => withdrawHandler(coin)}
                       data-tooltip-id="SendIcon"
                     >
-                      <img alt="SendIcon" className="w-10 dark:invert" src={SendIcon} />
+                      <img
+                        alt="SendIcon"
+                        className="w-10 dark:invert"
+                        src={SendIcon}
+                      />
                     </button>
                     <Tooltip id="SwapIcon" place="bottom" content="Swap" />
                     <button
@@ -146,7 +155,11 @@ const ReceivedCoinList = () => {
                       className="ml-2"
                       data-tooltip-id="SwapIcon"
                     >
-                      <img alt="SwapIcon" className="w-10 dark:invert" src={SwapIcon} />
+                      <img
+                        alt="SwapIcon"
+                        className="w-10 dark:invert"
+                        src={SwapIcon}
+                      />
                     </button>
                   </div>
                 </li>

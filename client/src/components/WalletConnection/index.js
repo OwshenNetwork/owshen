@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import Web3 from "web3";
 import Web3Modal from "web3modal";
 import WalletIcon from "../../pics/icons/account_balance_wallet.png";
 import SelectNetwork from "../SelectNetwork";
-import { setUserDetails } from "../../store/containerSlice";
-import { useDispatch } from "react-redux";
+import { setUserDetails, selectUserAddress } from "../../store/containerSlice";
+import { useDispatch, useSelector } from "react-redux";
 const Web3ModalComponent = () => {
-  const [provider, setProvider] = useState(null);
-  const [account, setAccount] = useState(null);
   const dispatch = useDispatch();
+  const account = useSelector(selectUserAddress);
 
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts) => {
-        setAccount(accounts[0]);
+        dispatch(setUserDetails({ address: accounts[0] }));
       });
     }
   }, []);
@@ -24,24 +23,13 @@ const Web3ModalComponent = () => {
     const web3 = new Web3(_provider);
 
     const accounts = await web3.eth.getAccounts();
-    setProvider(_provider);
-    setAccount(accounts[0]);
     dispatch(setUserDetails({ address: accounts[0] }));
   };
   const buttonClass =
     "border lg:w-52 w-full rounded-xl px-3 py-3   ease-in-out duration-300 flex items-center justify-around";
 
   const disconnectWallet = async () => {
-    if (provider.close) {
-      await provider.close();
-
-      // If the cached provider is not cleared, WalletConnect will automatically
-      // connect to the previously connected wallet when we try to call 'connect' again!
-      await window.localStorage.removeItem("walletconnect");
-    }
-
-    setProvider(null);
-    setAccount(null);
+    dispatch(setUserDetails({ address: null }));
   };
 
   return (

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, memo } from "react";
 
 const Dropdown = memo(
-  ({ label, options, select, style, img, onChange = () => {} }) => {
+  ({ label, options, select, style, onChange = () => {}, setLabel }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [title, setTitle] = useState(label);
     const ref = useRef(null);
@@ -28,6 +28,9 @@ const Dropdown = memo(
       setTitle(title);
       select(val);
       setIsOpen(false);
+      if (setLabel) {
+        setLabel(title);
+      }
 
       if (onChange()) {
         onChange(val);
@@ -43,7 +46,9 @@ const Dropdown = memo(
         >
           <div className="flex items-center justify-center">
             {/* SVG code */}
-            <span className="px-2 text-gray-700 dark:text-gray-200">{title}</span>
+            <span className="px-2 text-gray-700 dark:text-gray-200">
+              {title}
+            </span>
             {/* SVG code */}
           </div>
         </button>

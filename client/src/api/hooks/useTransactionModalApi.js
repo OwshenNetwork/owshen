@@ -36,7 +36,6 @@ export const useTransactionModalApi = (tokenContract) => {
       return toast.error("You can't send to yourself!");
     }
     const errorMessage = validateTransaction(
-      address,
       destOwshenWallet,
       tokenContract,
       tokenAmount,
@@ -103,7 +102,6 @@ export const useTransactionModalApi = (tokenContract) => {
     findMatchingCoin
   ) => {
     const errorMessage = validateTransaction(
-      address,
       destOwshenWallet,
       tokenContract,
       tokenAmount,
@@ -189,7 +187,10 @@ export const useTransactionModalApi = (tokenContract) => {
   };
 
   const withdrawal = async (index, owshen, address, setIsOpen, tokenAmount) => {
-    if (!address) return toast.error("Connect your wallet first!");
+    if (!address)
+      return toast.error(
+        "Your wallet is not connected. Please connect your wallet to proceed."
+      );
     // if (tokenAmount > trueAmount(MaxBalanceOfWithdraw)) {
     //   return toast.error(
     //     "your entered amount for withdraw is grater than max value of the selected token"

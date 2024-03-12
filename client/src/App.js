@@ -7,8 +7,6 @@ import Footer from "./components/Footer";
 import Header from "./components/Header";
 import { Provider } from "react-redux";
 import store from "./store/store";
-import { WagmiProvider } from "wagmi";
-import { config } from "./config";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AllRoutes from "./components/AllRoutes";
 
@@ -18,28 +16,23 @@ const App = () => {
     // Parse the stored value as a boolean
     return localStorage.getItem("theme") === "true";
   });
+  const bodyCS =
+    "lg:max-w-[1270px] mx-auto p-8 lg:min-w-[980px] lg:mt-14 h-5/6 min-h-full lg:min-h-[726px] flex flex-col bg-white dark:bg-indigo-950 dark:text-white lg:rounded-lg lg:shadow-2xl ease-in-out duration-300";
 
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <Provider store={store}>
-          <div className={`h-screen ${isDarkTheme ? "dark" : ""} `}>
-            <ToastContainer theme="colored" position="bottom-right" />
-            <div
-              className="lg:mx-72 p-8 lg:mt-14 h-5/6 min-h-full lg:min-h-[726px] flex flex-col
-            bg-white dark:bg-indigo-950 dark:text-white lg:rounded-lg lg:shadow-2xl ease-in-out duration-300"
-            >
-              <Header
-                isDarkTheme={isDarkTheme}
-                setIsDarkTheme={setIsDarkTheme}
-              />
-              <AllRoutes />
-              <Footer />
-            </div>
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <div className={`h-[90vh] ${isDarkTheme ? "dark" : ""}  `}>
+          <ToastContainer theme="colored" position="bottom-right" />
+
+          <div className={bodyCS}>
+            <Header isDarkTheme={isDarkTheme} setIsDarkTheme={setIsDarkTheme} />
+            <AllRoutes />
+            <Footer />
           </div>
-        </Provider>
-      </QueryClientProvider>
-    </WagmiProvider>
+        </div>
+      </Provider>
+    </QueryClientProvider>
   );
 };
 

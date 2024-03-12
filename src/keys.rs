@@ -261,8 +261,15 @@ impl From<Entropy> for PrivateKey {
 impl FromStr for PublicKey {
     type Err = eyre::Report;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 69 || !s.starts_with("OoOo") {
-            return Err(eyre::Report::msg("Invalid Owshen address!"));
+        if !s.starts_with("OoOo") {
+            return Err(eyre::Report::msg(
+                "Invalid Owshen address, address should start with OoOo!",
+            ));
+        }
+        if s.len() != 69 {
+            return Err(eyre::Report::msg(
+                "Invalid Owshen address, incorrect length!",
+            ));
         }
         if let Some(x) = Fp::from_str_vartime(&BigUint::from_str_radix(&s[5..], 16)?.to_string()) {
             let is_odd = if &s[4..5] == "3" {

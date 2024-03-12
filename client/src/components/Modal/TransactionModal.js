@@ -39,6 +39,8 @@ const TransactionModal = ({
   const [MaxBalanceOfWithdraw, setMaxBalanceOfWithdraw] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
   const [chainId, setChainId] = useState(null);
+  const [selectTokenLabel, SetSelectTokenLabel] = useState("Choose your token");
+  const [selectWalletLabel, SetSelectWalletLabel] = useState("Source wallet");
   const isTest = useSelector(selectIsTest);
   const { send, withdrawal, newGetStealth } =
     useTransactionModalApi(tokenContract);
@@ -117,7 +119,18 @@ const TransactionModal = ({
     return toast.error("No matching coin is found");
   };
 
-  const callSend = async () => {
+  const handleSend = async () => {
+    if (destOwshenWallet.length !== 69) {
+      return toast.error(
+        "Please make sure your destination wallet address is correct"
+      );
+    }
+    const firstPartOfAddress = destOwshenWallet.slice(0, 4);
+    if (firstPartOfAddress !== "OoOo") {
+      return toast.error(
+        "your destination wallet address must start with 'OoOo'"
+      );
+    }
     OwshenWallet.wallet === destOwshenWallet
       ? await newGetStealth(
           destOwshenWallet,
@@ -134,6 +147,23 @@ const TransactionModal = ({
           findMatchingCoin
         );
   };
+  const tokenAmountHandler = (e) => {
+    const newVal = e.target.value;
+    // Regular expression to match only numbers or an empty string
+    const regex = /^(\d+)?$/;
+    // Test the input value against the regular expression
+    if (regex.test(newVal)) {
+      setTokenAmount(newVal);
+    }
+  };
+  useEffect(() => {
+    if (!isOpen) {
+      setDstOwshenWallet("");
+      setTokenAmount(0);
+      SetSelectTokenLabel("Choose your token");
+      SetSelectWalletLabel("Source wallet");
+    }
+  }, [isOpen]);
 
   return (
     <Modal title={transactionType} isOpen={isOpen} setIsOpen={setIsOpen}>
@@ -160,10 +190,11 @@ const TransactionModal = ({
               <b>From: </b>
             </label>
             <Dropdown
-              label="Source wallet"
+              label={selectWalletLabel}
               options={walletOptions}
               select={setWalletName}
               style={`py-5 !w-60`}
+              setLabel={SetSelectWalletLabel}
             />
           </div>
         </>
@@ -173,10 +204,11 @@ const TransactionModal = ({
           <b>Token: </b>
         </label>
         <Dropdown
-          label={isDataSet ? "DIVE" : "Choose your token"}
+          label={isDataSet ? "DIVE" : selectTokenLabel}
           options={tokenOptions}
           select={setTokenContract}
           style={`py-5 ${isDataSet ? "pointer-events-none" : ""}!w-60`}
+          setLabel={SetSelectTokenLabel}
         />
       </div>
       <div className="px-3 flex justify-between items-center relative">
@@ -198,7 +230,7 @@ const TransactionModal = ({
           <input
             className="rounded py-5 px-2 bg-white dark:bg-indigo-950 my-4 border w-60 text-center"
             placeholder="Enter amount"
-            onChange={(e) => setTokenAmount(e.target.value)}
+            onChange={tokenAmountHandler}
             type="number"
             value={tokenAmount}
           />
@@ -214,7 +246,7 @@ const TransactionModal = ({
                 setIsOpen,
                 tokenAmount
               )
-            : callSend()
+            : handleSend()
         }
         className="border border-blue-400 bg-blue-200 text-blue-600 rounded-lg px-6 mt-3 font-bold py-1"
       >
