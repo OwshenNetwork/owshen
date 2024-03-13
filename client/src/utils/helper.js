@@ -33,7 +33,8 @@ export const trueAmount = (val, uintToken) => {
 };
 
 export const getRound = (num) => {
-  return Number.parseFloat(num.toFixed(3));
+  const rounded = Number.parseFloat(num.toFixed(4));
+  return rounded % 1 === 0 ? rounded + ".0" : rounded;
 };
 
 export const SwitchNetwork = async (networkName) => {

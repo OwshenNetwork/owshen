@@ -38,7 +38,7 @@ const Web3ModalComponent = () => {
         <>
           <SelectNetwork />
           <button
-            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950  lg:ml-3 mb-3 lg:mb-0`}
+            className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950  lg:ml-3 mt-3 lg:mt-0`}
             onClick={disconnectWallet}
           >
             Disconnect Wallet

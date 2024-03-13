@@ -6,7 +6,6 @@ import {
   selectOwshen,
   selectReceivedCoins,
   selectIsTest,
-  selectNetwork,
 } from "../../store/containerSlice";
 import { getERC20Balance, chainIdOfWallet } from "../../utils/helper";
 import { useSelector } from "react-redux";
@@ -20,6 +19,7 @@ import {
   networkDetails,
 } from "../../utils/networkDetails";
 import { useTransactionModalApi } from "../../api/hooks/useTransactionModalApi";
+import ReactLoading from "react-loading";
 const TransactionModal = ({
   setTokenContract,
   tokenContract,
@@ -41,6 +41,7 @@ const TransactionModal = ({
   const [chainId, setChainId] = useState(null);
   const [selectTokenLabel, SetSelectTokenLabel] = useState("Choose your token");
   const [selectWalletLabel, SetSelectWalletLabel] = useState("Source wallet");
+  const [isLoading, setIsLoading] = useState(false);
   const isTest = useSelector(selectIsTest);
   const { send, withdrawal, newGetStealth } =
     useTransactionModalApi(tokenContract);
@@ -120,7 +121,10 @@ const TransactionModal = ({
   };
 
   const handleSend = async () => {
+    setIsLoading(true); // Set isLoading to true at the beginning of the method
+
     if (destOwshenWallet.length !== 69) {
+      setIsLoading(false); // Set isLoading to false if there's an error
       return toast.error(
         "Please make sure your destination wallet address is correct"
       );
@@ -130,22 +134,32 @@ const TransactionModal = ({
       return toast.error(
         "your destination wallet address must start with 'OoOo'"
       );
+      setIsLoading(false)
     }
-    OwshenWallet.wallet === destOwshenWallet
-      ? await newGetStealth(
+    try {
+      if (OwshenWallet.wallet === destOwshenWallet) {
+        await newGetStealth(
           destOwshenWallet,
           tokenContract,
           tokenAmount,
           chainId,
           setIsOpen
-        )
-      : await send(
+        );
+      } else {
+        await send(
           destOwshenWallet,
           tokenContract,
           tokenAmount,
           chainId,
           findMatchingCoin
         );
+      }
+    } catch (error) {
+      console.error("Error during transaction:", error);
+      toast.error("An error occurred during the transaction.");
+    } finally {
+      setIsLoading(false); // Set isLoading to false after the transaction is complete
+    }
   };
   const tokenAmountHandler = (e) => {
     const newVal = e.target.value;
@@ -165,6 +179,9 @@ const TransactionModal = ({
     }
   }, [isOpen]);
 
+  const loading = (
+    <ReactLoading type="bars" color="#2481D7" height={30} width={30} />
+  );
   return (
     <Modal title={transactionType} isOpen={isOpen} setIsOpen={setIsOpen}>
       <p className="mt-5">
@@ -237,6 +254,7 @@ const TransactionModal = ({
         </>
       </div>
       <button
+        disabled={isLoading}
         onClick={() =>
           transactionType === "Withdraw"
             ? withdrawal(
@@ -250,7 +268,11 @@ const TransactionModal = ({
         }
         className="border border-blue-400 bg-blue-200 text-blue-600 rounded-lg px-6 mt-3 font-bold py-1"
       >
-        {transactionType === "Withdraw" ? transactionType : "Send"}
+        {isLoading
+          ? loading
+          : transactionType === "Withdraw"
+          ? transactionType
+          : "Send"}
       </button>
     </Modal>
   );

@@ -4,7 +4,7 @@ import DiscordIcon from "../../pics/discord.png";
 
 const Footer = () => {
   return (
-    <footer className="mt-auto flex  mx-auto dark:invert ">
+    <footer className="mt-auto flex  mx-auto dark:invert">
       <a href="https://twitter.com/OwshenNetwork">
         <img src={TwitterIcon} className="w-8 mx-4" />
       </a>

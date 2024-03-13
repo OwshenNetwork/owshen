@@ -99,7 +99,8 @@ export const useTransactionModalApi = (tokenContract) => {
     tokenContract,
     tokenAmount,
     chainId,
-    findMatchingCoin
+    findMatchingCoin,
+    setIsOpen
   ) => {
     const errorMessage = validateTransaction(
       destOwshenWallet,
@@ -176,12 +177,15 @@ export const useTransactionModalApi = (tokenContract) => {
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();
           console.log("Transaction receipt", txReceipt);
+          setIsOpen(false);
         } catch (error) {
+          setIsOpen(false);
           toast.error("Error while transferring tokens!");
           console.log(error, "Error while transferring tokens!");
         }
       })
       .catch((error) => {
+        setIsOpen(false);
         return toast.error(`Internal server error: ${error}`);
       });
   };
@@ -255,6 +259,7 @@ export const useTransactionModalApi = (tokenContract) => {
         }
       })
       .catch((error) => {
+        setIsOpen(false);
         return toast.error(`Internal server error: ${error}`);
       });
   };

@@ -67,7 +67,6 @@ const ReceivedCoinList = () => {
             </p>
           </div>
           <button className="border border-green-400 bg-green-200 text-green-600 rounded-lg px-6 mt-3 font-bold py-1">
-            {" "}
             Yes
           </button>
         </Modal>
@@ -88,53 +87,27 @@ const ReceivedCoinList = () => {
             </div>
           </div>
         ) : receivedCoins?.length ? (
-          <div className="max-h-350 overflow-y-auto">
+          <div className="md:max-h-350 overflow-y-auto max-h-[29vh] ">
             <ul>
               {receivedCoins?.map((coin, index) => (
                 <li
                   className=" flex flex-wrap p-2 rounded-md mb-1 items-center border-2 bg-blue-100 dark:bg-blue-950 hover:bg-transparent dark:hover:bg-transparent ease-in-out duration-300 border-[#00000033] dark:hover:border-[#ffffff52]"
                   key={index}
                 >
-                  <div className="w-5/6 text-left font-bold text-lg flex items-center">
+                  <div className="md:w-5/6 w-1/2 text-left font-bold text-lg flex items-center">
                     <img
                       className="w-8 mr-2"
                       src={getLogoByContractAddress(coin.uint_token)}
                       alt="coin"
                     />
                     <p>
-                      {String(
-                        trueAmount(coin.amount, coin.uint_token)
-                      ).includes(".")
-                        ? getRound(
-                            Number(trueAmount(coin.amount, coin.uint_token))
-                          )
-                        : `${getRound(
-                            trueAmount(coin.amount, coin.uint_token)
-                          )}.0`}{" "}
-                      {getNameByContractAddress(coin.uint_token)}
+                      {getRound(
+                        Number(trueAmount(coin.amount, coin.uint_token))
+                      )}
+                      {" "}{getNameByContractAddress(coin.uint_token)}
                     </p>
                   </div>
-                  {/* <p className="w-1/6 text-lg">
-                {String(coin.uint_token).substring(0, 10)}
-              </p>
-              <p className="w-1/6 text-lg pl-5"> 
-              {coin.index}
-              </p> */}
-                  <div className=" w-1/6 justify-between flex">
-                    <Tooltip id="MergeIcon" place="bottom" content="Merge" />
-                    <button
-                      data-tooltip-id="MergeIcon"
-                      onClick={
-                        () => setIsInprogress(true)
-                        // setIsOpen(true)
-                      }
-                    >
-                      <img
-                        alt="MergIcon"
-                        className=" border w-10 border-gray-400 p-1.5 rounded-3xl dark:invert"
-                        src={MergIcon}
-                      />
-                    </button>
+                  <div className=" md:w-1/6 w-1/2 justify-end flex">
                     <Tooltip id="SendIcon" place="bottom" content="Withdraw" />
 
                     <button
@@ -150,7 +123,6 @@ const ReceivedCoinList = () => {
                     </button>
                     <Tooltip id="SwapIcon" place="bottom" content="Swap" />
                     <button
-                      // onClick={() => withdrawHandler(coin)}
                       onClick={() => setIsInprogress(true)}
                       className="ml-2"
                       data-tooltip-id="SwapIcon"
