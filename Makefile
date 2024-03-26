@@ -1,5 +1,13 @@
 .PHONY = test clean install
 
+rapidsnark/package/bin/prover:
+	cd rapidsnark && git submodule init
+	cd rapidsnark && git submodule update
+	cd rapidsnark && ./build_gmp.sh host
+	cd rapidsnark && mkdir -p build_prover
+	cd rapidsnark && cd build_prover && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package
+	cd rapidsnark && cd build_prover && make -j4 && make install
+
 bindings: contracts/src/*.sol
 	rm -rf bindings
 	cd contracts && make build
