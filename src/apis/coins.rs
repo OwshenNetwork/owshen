@@ -96,10 +96,10 @@ pub async fn coins(
 
         #[allow(unused_assignments)]
         let mut spent_events: Vec<SpendFilter> = vec![];
-        
+
         #[allow(unused_assignments)]
         let mut sent_events: Vec<SentFilter> = vec![];
-        
+
         if prov.node_manager.is_peer2peer {
             let from_spent: u64 = prov.events_latest_status.last_spent_event;
             let from_sent: u64 = prov.events_latest_status.last_sent_event;

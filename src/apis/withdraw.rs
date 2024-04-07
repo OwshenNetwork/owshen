@@ -36,6 +36,7 @@ pub async fn withdraw(
     context_withdraw: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
     witness_gen_path: String,
+    prover_path: String,
     params_file: String,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
@@ -108,6 +109,7 @@ pub async fn withdraw(
                 pks,
                 params_file,
                 witness_gen_path,
+                prover_path,
             );
 
             let root: U256 = merkle_root.root().into();

@@ -20,10 +20,11 @@ test: bindings
 	cargo test -- --test-threads 1
 
 clean:
+	cd rapidsnark && make clean
 	rm -rf bindings
 	cd contracts && make clean
 
-appimage:
+appimage: rapidsnark/package/bin/prover
 	mkdir -p ~/Owshen-Production.AppDir/usr/bin
 	mkdir -p ~/Owshen-Production.AppDir/usr/lib
 	mkdir -p ~/Owshen-Production.AppDir/usr/share/applications
@@ -43,6 +44,8 @@ appimage:
 	cp -r ./contracts/circuits/coin_withdraw_cpp/coin_withdraw ~/Owshen-Production.AppDir/usr/bin
 	cp -r ./contracts/circuits/coin_withdraw_cpp/coin_withdraw.dat ~/Owshen-Production.AppDir/usr/bin
 	cp -r ./contracts/circuits/coin_withdraw_0001.zkey ~/Owshen-Production.AppDir/usr/bin
+
+	cp -r ./rapidsnark/package/bin/prover ~/Owshen-Production.AppDir/usr/bin
 	
 	echo "[Desktop Entry]\nType=Application\nName=Owshen\nIcon=owshen\nExec=owshen\nCategories=Utility;" > ~/Owshen-Production.AppDir/owshen.desktop
 	

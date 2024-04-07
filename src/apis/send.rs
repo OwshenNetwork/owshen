@@ -39,6 +39,7 @@ pub async fn send(
     context_send: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
     witness_gen_path: String,
+    prover_path: String,
     params_file: String,
 ) -> Result<Json<GetSendResponse>, eyre::Report> {
     let index = req.index;
@@ -115,10 +116,14 @@ pub async fn send(
             let indices: Vec<u32> = vec![u32_index, 0];
             let amounts: Vec<U256> = vec![amount, U256::from(0)];
             let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
-            let proofs: Vec<Vec<[Fp; 3]>> = vec![merkle_proof.proof.clone().try_into().unwrap(), merkle_proof.proof.clone().try_into().unwrap()];
+            let proofs: Vec<Vec<[Fp; 3]>> = vec![
+                merkle_proof.proof.clone().try_into().unwrap(),
+                merkle_proof.proof.clone().try_into().unwrap(),
+            ];
             let new_amounts: Vec<U256> = vec![u256_new_amount, remaining_amount.into()];
-            let pks: Vec<PublicKey> = vec![receiver_address_stealth_pub_key, address_stealth_pub_key];
-            
+            let pks: Vec<PublicKey> =
+                vec![receiver_address_stealth_pub_key, address_stealth_pub_key];
+
             let proof: std::result::Result<Proof, eyre::Error> = prove(
                 hint_token_address,
                 indices,
@@ -129,8 +134,9 @@ pub async fn send(
                 pks,
                 params_file,
                 witness_gen_path,
+                prover_path,
             );
-            
+
             let root: U256 = merkle_root.root().into();
 
             match proof {

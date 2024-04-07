@@ -18,17 +18,18 @@ pub struct Proof {
 
 pub fn prove<P: AsRef<Path>>(
     token_address: U256,
-    
+
     index: Vec<u32>,
     amount: Vec<U256>,
     secret: Vec<Fp>,
     proof: Vec<Vec<[Fp; 3]>>,
-    
+
     new_amount: Vec<U256>,
     pk: Vec<PublicKey>,
-    
+
     params: P,
     witness_gen_path: String,
+    prover_path: String,
 ) -> Result<Proof> {
     let mut inputs_file = NamedTempFile::new()?;
 
@@ -42,17 +43,20 @@ pub fn prove<P: AsRef<Path>>(
         \"new_amount\": {}, 
         \"pk_ax\": {}, 
         \"pk_ay\": {} }}",
-
         serde_json::to_string(&index).ok().unwrap(),
         BigUint::from_str(&token_address.to_string()).ok().unwrap(),
         serde_json::to_string(&amount).ok().unwrap(),
         serde_json::to_string(&secret).ok().unwrap(),
         serde_json::to_string(&proof).ok().unwrap(),
         serde_json::to_string(&new_amount).ok().unwrap(),
-        serde_json::to_string(&pk.iter().map(|pk| pk.point.x).collect::<Vec<Fp>>()).ok().unwrap(),
-        serde_json::to_string(&pk.iter().map(|pk| pk.point.y).collect::<Vec<Fp>>()).ok().unwrap()
+        serde_json::to_string(&pk.iter().map(|pk| pk.point.x).collect::<Vec<Fp>>())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&pk.iter().map(|pk| pk.point.y).collect::<Vec<Fp>>())
+            .ok()
+            .unwrap()
     );
-    
+
     write!(inputs_file, "{}", json_input)?;
 
     log::info!("Circuit input: {}", json_input);
@@ -81,9 +85,7 @@ pub fn prove<P: AsRef<Path>>(
 
     let proof_file = NamedTempFile::new()?;
     let pub_inp_file = NamedTempFile::new()?;
-    let proof_gen_output = Command::new("snarkjs")
-        .arg("groth16")
-        .arg("prove")
+    let proof_gen_output = Command::new(prover_path)
         .arg(params.as_ref().as_os_str())
         .arg(witness_file.path())
         .arg(proof_file.path())

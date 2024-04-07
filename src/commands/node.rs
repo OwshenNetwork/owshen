@@ -13,7 +13,7 @@ use tower_http::cors::CorsLayer;
 
 use crate::apis;
 use crate::config::{
-    Config, Network, NodeContext, NodeManager, Peer, GOERLI_ENDPOINT, NODE_UPDATE_INTERVAL
+    Config, Network, NodeContext, NodeManager, Peer, GOERLI_ENDPOINT, NODE_UPDATE_INTERVAL,
 };
 
 #[derive(StructOpt, Debug, Clone)]
@@ -55,7 +55,6 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
     // validate ip and port
     let _ = ip.parse::<IpAddr>().expect("Invalid ip address");
     let _ = SocketAddr::new(ip.parse().unwrap(), port);
-
 
     let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
     let context = Arc::new(Mutex::new(NodeContext {

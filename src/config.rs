@@ -55,7 +55,10 @@ impl FromStr for Peer {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split(':');
         let ip = parts.next().ok_or_else(|| eyre::eyre!("Invalid ip"))?;
-        let port = parts.next().ok_or_else(|| eyre::eyre!("Invalid port"))?.parse()?;
+        let port = parts
+            .next()
+            .ok_or_else(|| eyre::eyre!("Invalid port"))?
+            .parse()?;
         Ok(Peer {
             ip: ip.to_string(),
             port,
@@ -86,9 +89,8 @@ pub struct NodeManager {
     pub elected_peer: Option<Peer>,
     pub is_peer2peer: bool,
 
-    pub is_client: bool
+    pub is_client: bool,
 }
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkManager {

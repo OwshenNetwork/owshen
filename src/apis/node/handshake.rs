@@ -27,7 +27,11 @@ pub async fn handshake(
 
     if let Some(ip) = req.ip {
         if let Some(port) = req.port {
-            context.node_manager.add_peer(Peer { ip, port, current_block: 0});
+            context.node_manager.add_peer(Peer {
+                ip,
+                port,
+                current_block: 0,
+            });
         }
     }
 

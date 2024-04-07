@@ -15,7 +15,9 @@ pub struct GetStatusResponse {
     pub port: u16,
 }
 
-pub async fn status(context: Arc<Mutex<NodeContext>>) -> Result<Json<GetStatusResponse>, eyre::Report> {
+pub async fn status(
+    context: Arc<Mutex<NodeContext>>,
+) -> Result<Json<GetStatusResponse>, eyre::Report> {
     let context = context.lock().await;
 
     Ok(Json(GetStatusResponse {

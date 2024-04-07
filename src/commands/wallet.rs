@@ -131,7 +131,14 @@ async fn serve_wallet(
         format!("{}/usr/bin/coin_withdraw", app_dir_path).to_string()
     };
 
+    let prover_path = if test {
+        "rapidsnark/package/bin/prover".to_string()
+    } else {
+        format!("{}/usr/bin/prover", app_dir_path).to_string()
+    };
+
     let send_witness_gen_path = witness_gen_path.clone();
+    let send_prover_path = prover_path.clone();
     let genesis: Option<Genesis> = if let Ok(f) = std::fs::read(genesis_path) {
         bincode::deserialize(&f).ok()
     } else {
@@ -235,6 +242,7 @@ async fn serve_wallet(
                             context_withdraw,
                             priv_key,
                             witness_gen_path,
+                            prover_path,
                             params_file,
                         )
                         .await,
@@ -252,6 +260,7 @@ async fn serve_wallet(
                             context_send,
                             priv_key,
                             send_witness_gen_path,
+                            send_prover_path,
                             send_params_file,
                         )
                         .await,

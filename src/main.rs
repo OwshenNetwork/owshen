@@ -6,10 +6,10 @@ mod genesis;
 mod hash;
 mod helper;
 mod keys;
+mod network;
 mod poseidon;
 mod proof;
 mod tree;
-mod network;
 
 use bindings::owshen::Point as OwshenPoint;
 use colored::Colorize;
