@@ -1,4 +1,5 @@
 use crate::config::Context;
+use crate::fmt::FMTProof;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
@@ -22,7 +23,8 @@ pub struct GetWithdrawRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetWithdrawResponse {
     proof: Proof,
-    pub root: U256,
+    pub checkpoint_head: U256,
+    pub latest_values_commitment_head: U256,
     pub token: H160,
     pub amount: U256,
     pub obfuscated_remaining_amount: U256,
@@ -43,15 +45,16 @@ pub async fn withdraw(
     let owshen_address = req.owshen_address;
     let address = req.address;
     let coins = context_withdraw.lock().await.coins.clone();
-    let merkle_root = context_withdraw.lock().await.tree.clone();
+    // let merkle_root = context_withdraw.lock().await.tree.clone();
+    let fmt = context_withdraw.lock().await.fmt.clone();
     // Find a coin with the specified index
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
     match filtered_coin {
         Some(coin) => {
             let u32_index: u32 = index.low_u32();
             let u64_index: u64 = index.low_u64();
-            // get merkle proof
-            let merkle_proof = merkle_root.get(u64_index);
+
+            let fmt_proof = fmt.get(u64_index);
 
             let pub_key: PublicKey = PublicKey::from_str(&owshen_address)?;
             let (_, ephemeral, stealth_pub_key) = pub_key.derive_random(&mut rand::thread_rng());
@@ -82,10 +85,7 @@ pub async fn withdraw(
             let indices: Vec<u32> = vec![u32_index, 0];
             let amounts: Vec<U256> = vec![amount, U256::from(0)];
             let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
-            let proofs: Vec<Vec<[Fp; 3]>> = vec![
-                merkle_proof.proof.clone().try_into().unwrap(),
-                merkle_proof.proof.clone().try_into().unwrap(),
-            ];
+            let proofs: Vec<FMTProof> = vec![fmt_proof.clone(), fmt_proof.clone()];
             let new_amounts: Vec<U256> =
                 vec![fp_new_amount.into(), obfuscated_remaining_amount.into()];
 
@@ -112,11 +112,14 @@ pub async fn withdraw(
                 prover_path,
             );
 
-            let root: U256 = merkle_root.root().into();
+            let checkpoint_head: U256 = fmt_proof.checkpoint_head.into();
+            let latest_values_commitment_head: U256 =
+                fmt_proof.latest_values_commitment_head.into();
             match proof {
                 Ok(proof) => Ok(Json(GetWithdrawResponse {
                     proof,
-                    root: root,
+                    checkpoint_head,
+                    latest_values_commitment_head,
                     token: coin.uint_token,
                     amount,
                     obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
@@ -133,7 +136,8 @@ pub async fn withdraw(
             log::warn!("No coin with index {} found", index);
             Ok(Json(GetWithdrawResponse {
                 proof: Proof::default(),
-                root: U256::default(),
+                checkpoint_head: U256::default(),
+                latest_values_commitment_head: U256::default(),
                 token: H160::default(),
                 amount: U256::default(),
                 obfuscated_remaining_amount: U256::default(),

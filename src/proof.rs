@@ -1,5 +1,5 @@
-use crate::fp::Fp;
 use crate::keys::PublicKey;
+use crate::{fmt::FMTProof, fp::Fp};
 
 use ethers::{abi::ethabi::ethereum_types::FromStrRadixErr, prelude::*};
 use eyre::Result;
@@ -22,7 +22,8 @@ pub fn prove<P: AsRef<Path>>(
     index: Vec<u32>,
     amount: Vec<U256>,
     secret: Vec<Fp>,
-    proof: Vec<Vec<[Fp; 3]>>,
+
+    proof: Vec<FMTProof>,
 
     new_amount: Vec<U256>,
     pk: Vec<PublicKey>,
@@ -38,7 +39,15 @@ pub fn prove<P: AsRef<Path>>(
         \"token_address\": \"{}\", 
         \"amount\": {}, 
         \"secret\": {},
-        \"proof\": [{}],
+        
+        \"user_checkpoint_head\": {},
+        \"user_latest_values_commitment_head\": {},
+        \"value\": {},
+        \"between_values\": {},
+        \"checkpoint_commitments\": {},
+        \"checkpoints\": {},
+        \"latest_values\": {},
+        \"is_in_latest_commits\": {},
      
         \"new_amount\": {}, 
         \"pk_ax\": {}, 
@@ -47,7 +56,40 @@ pub fn prove<P: AsRef<Path>>(
         BigUint::from_str(&token_address.to_string()).ok().unwrap(),
         serde_json::to_string(&amount).ok().unwrap(),
         serde_json::to_string(&secret).ok().unwrap(),
-        serde_json::to_string(&proof).ok().unwrap(),
+        serde_json::to_string(&proof[0].checkpoint_head)
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof[0].latest_values_commitment_head)
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof.iter().map(|p| p.value).collect::<Vec<Fp>>())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(
+            &proof
+                .iter()
+                .map(|p| p.between_values.clone())
+                .collect::<Vec<Vec<Fp>>>()
+        )
+        .ok()
+        .unwrap(),
+        serde_json::to_string(&proof[0].checkpoint_commitments.clone())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof[0].checkpoints.clone())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof[0].latest_values.clone())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(
+            &proof
+                .iter()
+                .map(|p| if p.is_in_latest_commits { 1 } else { 0 })
+                .collect::<Vec<u64>>()
+        )
+        .ok()
+        .unwrap(),
         serde_json::to_string(&new_amount).ok().unwrap(),
         serde_json::to_string(&pk.iter().map(|pk| pk.point.x).collect::<Vec<Fp>>())
             .ok()

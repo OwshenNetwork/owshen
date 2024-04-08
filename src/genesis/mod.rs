@@ -1,11 +1,11 @@
 mod genesis_data;
 
+use crate::fmt::FMT;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::EphemeralPubKey;
 use crate::keys::PublicKey;
-use crate::SparseMerkleTree;
 use bindings::owshen::SentFilter;
 use ethers::types::H160;
 use ethers::types::U256;
@@ -41,7 +41,7 @@ impl Into<SentFilter> for Entry {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Genesis {
     pub total: Fp,
-    pub smt: SparseMerkleTree,
+    pub fmt: FMT,
     pub events: Vec<Entry>,
 }
 
@@ -76,13 +76,19 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
         .collect()
 }
 
-pub fn fill_genesis(depth: usize, dive_token_address: H160) -> Genesis {
-    let mut smt = SparseMerkleTree::new(depth);
+pub fn fill_genesis(dive_token_address: H160) -> Genesis {
+    let mut fmt = FMT::new();
     let mut total: Fp = Fp::default();
     let events = gen_genesis_events(dive_token_address);
     for event in events.iter() {
-        smt.set(event.index as u64, event.commitment.try_into().unwrap());
+        fmt.set(event.commitment);
         total += event.hint_amount;
     }
-    Genesis { total, smt, events }
+    if events.len() % 1024 != 0 {
+        for _ in 0..(1024 - events.len() % 1024) {
+            fmt.set(Fp::default());
+        }
+    }
+
+    Genesis { total, fmt, events }
 }

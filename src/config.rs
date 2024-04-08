@@ -5,9 +5,9 @@ use ethers::{abi::Abi, prelude::*, types::H160};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    fmt::FMT,
     genesis::Genesis,
     keys::{Entropy, PrivateKey, PublicKey},
-    tree::{self, SparseMerkleTree},
 };
 
 pub const GOERLI_ENDPOINT: &str = "https://ethereum-goerli.publicnode.com";
@@ -15,16 +15,13 @@ pub const NODE_UPDATE_INTERVAL: u64 = 5;
 
 pub struct Context {
     pub coins: Vec<Coin>,
-    pub tree: SparseMerkleTree,
+    pub fmt: FMT,
     pub node_manager: NodeManager,
     pub events_latest_status: EventsLatestStatus,
     pub genesis: Genesis,
     pub syncing: Arc<std::sync::Mutex<Option<f32>>>,
-    pub syncing_task: Option<
-        tokio::task::JoinHandle<
-            std::result::Result<(tree::SparseMerkleTree, Vec<Coin>), eyre::Report>,
-        >,
-    >,
+    pub syncing_task:
+        Option<tokio::task::JoinHandle<std::result::Result<(FMT, Vec<Coin>), eyre::Report>>>,
 }
 
 pub struct NodeContext {
@@ -129,12 +126,13 @@ pub struct Config {
     pub owshen_contract_abi: Abi,
     pub erc20_abi: Abi,
     pub token_contracts: NetworkManager,
-    pub poseidon_contract_address: H160,
+    pub poseidon4_contract_address: H160,
+    pub poseidon2_contract_address: H160,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletCache {
     pub coins: Vec<Coin>,
-    pub tree: SparseMerkleTree,
+    pub fmt: FMT,
     pub height: u64,
 }

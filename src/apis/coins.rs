@@ -1,11 +1,11 @@
 use crate::config::{Context, WalletCache};
+use crate::fmt::FMT;
 use crate::fp::Fp;
 use crate::helper::extract_token_amount;
 use crate::keys::Point;
 use crate::keys::{EphemeralPubKey, PrivateKey, PublicKey};
-use crate::tree::SparseMerkleTree;
-use crate::u256_to_h160;
 use crate::Coin;
+use crate::{fmt, u256_to_h160};
 
 use axum::Json;
 use bindings::owshen::{SentFilter, SpendFilter};
@@ -32,8 +32,8 @@ pub async fn coins(
     if let Some(sync_task) = &prov.syncing_task {
         if sync_task.is_finished() {
             let task = prov.syncing_task.take().unwrap();
-            let (tree, coins) = task.await??;
-            prov.tree = tree;
+            let (fmt, coins) = task.await??;
+            prov.fmt = fmt;
             prov.coins = coins;
             *prov.syncing.lock().unwrap() = None;
         } else {
@@ -61,13 +61,14 @@ pub async fn coins(
         };
         const UPDATE_THRESHOLD: u64 = 5;
 
-        let root: U256 = contract.method("root", ())?.call().await?;
+        // let root: U256 = contract.method("root", ())?.call().await?;
+        let head: U256 = contract.method("head", ())?.call().await?;
         if let Some(cache) = &cache {
-            if Into::<U256>::into(cache.tree.root()) == root
+            if Into::<U256>::into(cache.fmt.head()) == head
                 && curr_block_number.wrapping_sub(cache.height as u64) < UPDATE_THRESHOLD
             {
                 prov.coins = cache.coins.clone();
-                prov.tree = cache.tree.clone();
+                prov.fmt = cache.fmt.clone();
                 return Ok(Json(GetCoinsResponse {
                     coins: cache.coins.clone(),
                     syncing: None,
@@ -75,10 +76,10 @@ pub async fn coins(
             }
         }
 
-        let tree = cache
-            .as_ref()
-            .map(|c| c.tree.clone())
-            .unwrap_or(SparseMerkleTree::new(16));
+        let fmt = match cache.clone() {
+            Some(cache) => cache.fmt.clone(),
+            None => prov.genesis.fmt.clone(),
+        };
 
         let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));
         prov.syncing = syncing_arc.clone();
@@ -112,35 +113,22 @@ pub async fn coins(
         } else {
             spent_events = prov
                 .node_manager
-                .get_spend_events(curr, curr_block_number)
+                .get_spend_events(curr + 1, curr_block_number)
                 .await;
             sent_events = prov
                 .node_manager
-                .get_sent_events(curr, curr_block_number)
+                .get_sent_events(curr + 1, curr_block_number)
                 .await;
         }
 
-        let is_genesis_processed = cache.is_some();
-        let all_events = if is_genesis_processed {
-            sent_events
-        } else {
-            prov.genesis
-                .events
-                .iter()
-                .cloned()
-                .map(|e| e.into())
-                .chain(sent_events.into_iter())
-                .collect::<Vec<_>>()
-        };
-
-        let mut tree_task = tree.clone();
+        let mut fmt_task = fmt.clone();
         let mut my_coins: Vec<Coin> = cache.map(|c| c.coins).unwrap_or_default();
 
         let task = tokio::task::spawn_blocking(move || {
             sync_coins(
-                &mut tree_task,
+                &mut fmt_task,
                 &priv_key,
-                &all_events,
+                &sent_events,
                 &spent_events,
                 &mut my_coins,
                 curr_block_number,
@@ -164,28 +152,28 @@ pub async fn coins(
 }
 
 fn sync_coins(
-    tree_task: &mut SparseMerkleTree,
+    fmt_task: &mut FMT,
     priv_key: &PrivateKey,
-    all_events: &[SentFilter],
+    sent_events: &[SentFilter],
     spent_events: &[SpendFilter],
     my_coins: &mut Vec<Coin>,
     curr_block_number: u64,
     wallet_cache_path: &std::path::PathBuf,
     syncing_arc: &Arc<std::sync::Mutex<Option<f32>>>,
-) -> Result<(SparseMerkleTree, Vec<Coin>), eyre::Report> {
+) -> Result<(FMT, Vec<Coin>), eyre::Report> {
     let mut cnt = 0;
-    for chunk in all_events.chunks(128) {
-        let progress = (cnt as f32) / all_events.len() as f32;
+    for chunk in sent_events.chunks(128) {
+        let progress = (cnt as f32) / sent_events.len() as f32;
         log::info!(
             "Processing events {}-{} of {}... ({}%)\r",
             cnt,
             cnt + chunk.len(),
-            all_events.len(),
+            sent_events.len(),
             (progress * 100.0) as u32
         );
         *syncing_arc.lock().unwrap() = Some(progress);
         for e in chunk.iter() {
-            tree_task.set(e.index.low_u64(), Fp::try_from(e.commitment)?);
+            fmt_task.set(Fp::try_from(e.commitment)?);
         }
         for new_coin in chunk
             .par_iter()
@@ -250,9 +238,9 @@ fn sync_coins(
 
     let wallet_cache = WalletCache {
         coins: my_coins.clone(),
-        tree: tree_task.clone(),
+        fmt: fmt_task.clone(),
         height: curr_block_number as u64,
     };
     std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
-    Ok::<(SparseMerkleTree, Vec<Coin>), eyre::Report>((tree_task.clone(), my_coins.clone()))
+    Ok::<(FMT, Vec<Coin>), eyre::Report>((fmt_task.clone(), my_coins.clone()))
 }

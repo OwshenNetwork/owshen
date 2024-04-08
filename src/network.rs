@@ -217,7 +217,7 @@ impl NodeManager {
             let mut step = 1024;
             let mut events = Vec::new();
 
-            while from < to {
+            while from <= to {
                 if let Some(new_spent_events) = timeout(std::time::Duration::from_secs(10), async {
                     contract
                         .event::<SpendFilter>()
@@ -260,7 +260,7 @@ impl NodeManager {
             let mut step = 1024;
             let mut events = Vec::new();
 
-            while from < to {
+            while from <= to {
                 if let Some(new_sent_events) = timeout(std::time::Duration::from_secs(10), async {
                     contract
                         .event::<SentFilter>()

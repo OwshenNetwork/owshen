@@ -121,12 +121,33 @@ async fn initialize_config(
         .await
     } else {
         if let Some(c) = &config {
-            c.poseidon_contract_address
+            c.poseidon4_contract_address
         } else {
             panic!("No config file!");
         }
     };
-    println!("posidon address {:?}", poseidon4_addr);
+    println!("posidon4 address {:?}", poseidon4_addr);
+
+    let poseidon2_addr = if deploy_hash_function {
+        log::info!("Deploying hash function...");
+        deploy_codes(
+            provider.clone(),
+            include_str!("../assets/poseidon2.abi"),
+            include_str!("../assets/poseidon2.evm"),
+            private_key.clone(),
+            from_address,
+            is_test,
+            chain_id,
+        )
+        .await
+    } else {
+        if let Some(c) = &config {
+            c.poseidon2_contract_address
+        } else {
+            panic!("No config file!");
+        }
+    };
+    println!("posidon2 address {:?}", poseidon2_addr);
 
     let client = Arc::new(SignerMiddleware::new(provider.clone(), wallet));
     let nonce = provider
@@ -167,7 +188,7 @@ async fn initialize_config(
 
     let genesis = if genesis_feed {
         log::info!("Filling the genesis tree... (This might take some time)");
-        let genesis = genesis::fill_genesis(16, dive_contract_address);
+        let genesis = genesis::fill_genesis(dive_contract_address);
         std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis).unwrap()).unwrap();
         Some(genesis)
     } else {
@@ -199,7 +220,8 @@ async fn initialize_config(
             client,
             (
                 poseidon4_addr,
-                Into::<U256>::into(genesis.smt.genesis_root()),
+                poseidon2_addr,
+                Into::<U256>::into(genesis.fmt.get_last_checkpoint()),
             ),
         )
         .unwrap()
@@ -304,7 +326,8 @@ async fn initialize_config(
         dive_contract_address,
         erc20_abi: dive_contract.abi().clone(),
         token_contracts: network_manager,
-        poseidon_contract_address: poseidon4_addr.clone(),
+        poseidon4_contract_address: poseidon4_addr.clone(),
+        poseidon2_contract_address: poseidon2_addr.clone(),
     };
 }
 

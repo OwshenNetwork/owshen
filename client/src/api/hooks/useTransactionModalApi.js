@@ -161,7 +161,8 @@ export const useTransactionModalApi = (tokenContract) => {
 
         try {
           const txResponse = await contract.send(
-            result.data.root,
+            result.data.checkpoint_head,
+            result.data.latest_values_commitment_head,
             proof,
             receiver_ephemeral,
             sender_ephemeral,
@@ -238,7 +239,8 @@ export const useTransactionModalApi = (tokenContract) => {
         const ephemeral = [ax, ay];
         try {
           const txResponse = await contract.withdraw(
-            result.data.root,
+            result.data.checkpoint_head,
+            result.data.latest_values_commitment_head,
             proof,
             ephemeral,
             [result.data.nullifier, 0],

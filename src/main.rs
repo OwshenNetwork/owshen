@@ -1,6 +1,7 @@
 mod apis;
 mod commands;
 mod config;
+mod fmt;
 mod fp;
 mod genesis;
 mod hash;
@@ -8,8 +9,8 @@ mod helper;
 mod keys;
 mod network;
 mod poseidon;
+mod poseidon2;
 mod proof;
-mod tree;
 
 use bindings::owshen::Point as OwshenPoint;
 use colored::Colorize;
@@ -19,7 +20,6 @@ use eyre::Result;
 use helper::{h160_to_u256, u256_to_h160};
 use keys::Point;
 use structopt::StructOpt;
-use tree::SparseMerkleTree;
 
 #[macro_use]
 extern crate lazy_static;
@@ -44,7 +44,8 @@ impl Default for Config {
             owshen_contract_abi: Abi::default(),
             erc20_abi: Abi::default(),
             token_contracts: NetworkManager::new(),
-            poseidon_contract_address: H160::default(),
+            poseidon4_contract_address: H160::default(),
+            poseidon2_contract_address: H160::default(),
         }
     }
 }

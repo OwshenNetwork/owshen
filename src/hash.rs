@@ -1,8 +1,13 @@
 use crate::fp::Fp;
 use crate::poseidon::poseidon;
+use crate::poseidon2::poseidon2;
 
 pub fn hash4(vals: [Fp; 4]) -> Fp {
     poseidon(vals)
+}
+
+pub fn hash2(vals: [Fp; 2]) -> Fp {
+    poseidon2(vals)
 }
 
 #[cfg(test)]

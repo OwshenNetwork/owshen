@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "./SparseMerkleTree.sol";
+import "./FMT.sol";
 import "./MiMC.sol";
 import "./CoinWithdrawVerifier.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -36,17 +36,19 @@ contract Owshen {
     CoinWithdrawVerifier coin_withdraw_verifier;
     mapping(uint256 => bool) nullifiers;
 
-    IHasher mimc;
-    SparseMerkleTree tree;
-    uint256 public depositIndex = 4 ** 15;
+    IPoseidon4 mimc;
+
+    FMT fmt;
+    uint256 public depositIndex = 0;
+    uint256 constant CHECKPOINT_INTERVAL = 1024;
 
     /**
      * @dev The constructor
      */
-    constructor(IHasher _hasher, uint256 _genesis_root) {
-        tree = new SparseMerkleTree(_hasher, _genesis_root);
-        mimc = _hasher;
+    constructor(IPoseidon4 _poseidon4, IPoseidon2 _poseidon2, uint256 _genesis_root) {
+        mimc = _poseidon4;
         coin_withdraw_verifier = new CoinWithdrawVerifier();
+        fmt = new FMT(_poseidon2, _genesis_root);
     }
 
     function deposit(
@@ -59,7 +61,7 @@ contract Owshen {
         uint256 leaf = mimc.poseidon(
             [_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]
         );
-        tree.set(depositIndex, leaf);
+        fmt.set(leaf);
         _processDeposit(msg.sender, address(this), _tokenAddress, _amount);
         emit Sent(
             _ephemeral,
@@ -86,12 +88,14 @@ contract Owshen {
     }
 
     function spend(
-        Proof calldata proof,
-        uint256 _root,
+        Proof calldata _proof,
+        uint256 _checkpoint_head,
+        uint256 _latest_values_commitment_head,
         uint256[2] calldata _nullifiers,
         uint256[2] memory _commitments
     ) internal {
-        require(tree.is_known_root(_root), "Invalid root");
+        require(fmt.is_known_checkpoint_head(_checkpoint_head) || depositIndex < CHECKPOINT_INTERVAL, "Invalid checkpoint head");
+        require(fmt.is_known_latest_value_head(_latest_values_commitment_head) || depositIndex % CHECKPOINT_INTERVAL == 0, "Invalid latest values commitment head");
 
         require(_nullifiers[0] != _nullifiers[1], "Nullifiers needs to be different");
 
@@ -103,10 +107,10 @@ contract Owshen {
 
         require(
             coin_withdraw_verifier.verifyProof(
-                proof.a,
-                proof.b,
-                proof.c,
-                [_root, _nullifiers[0], _nullifiers[1], _commitments[0], _commitments[1]]
+                _proof.a,
+                _proof.b,
+                _proof.c,
+                [_checkpoint_head, _latest_values_commitment_head, _nullifiers[0], _nullifiers[1], _commitments[0], _commitments[1]]
             ),
             "Invalid proof"
         );
@@ -114,7 +118,8 @@ contract Owshen {
     }
 
     function withdraw(
-        uint256 _root,
+        uint256 _checkpoint_head,
+        uint256 _latest_values_commitment_head,
         Proof calldata _proof,
         Point calldata _ephemeral,
         uint256[2] calldata _nullifiers,
@@ -126,8 +131,10 @@ contract Owshen {
     ) public {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
         uint256 null_commitment = mimc.poseidon([uint256(uint160(_to)), 0, _amount, uint_tokenaddress]);
-        spend(_proof, _root, _nullifiers, [null_commitment, _commitment]);
-        tree.set(depositIndex, _commitment);
+
+        spend(_proof, _checkpoint_head, _latest_values_commitment_head, _nullifiers, [null_commitment, _commitment]);
+        fmt.set(_commitment);
+
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
         emit Sent(
@@ -144,7 +151,8 @@ contract Owshen {
     }
 
     function send(
-        uint256 _root,
+        uint256 _checkpoint_head,
+        uint256 _latest_values_commitment_head,
         Proof calldata _proof,
         Point calldata _receiver_ephemeral,
         Point calldata _sender_ephemeral,
@@ -156,8 +164,8 @@ contract Owshen {
         uint256 _sender_amount_hint,
         bool _is_dual_output
     ) public {
-        spend(_proof, _root, _nullifiers, [_commitments[1], _commitments[0]]);
-        tree.set(depositIndex, _commitments[1]);
+        spend(_proof, _checkpoint_head, _latest_values_commitment_head, _nullifiers, [_commitments[1], _commitments[0]]);
+        fmt.set(_commitments[1]);
         emit Sent(
             _receiver_ephemeral,
             depositIndex,
@@ -168,7 +176,7 @@ contract Owshen {
         );
         depositIndex += 1;
         if (_is_dual_output) {
-            tree.set(depositIndex, _commitments[0]);
+            fmt.set(_commitments[0]);
             emit Sent(
                 _sender_ephemeral,
                 depositIndex,
@@ -204,8 +212,8 @@ contract Owshen {
         }
     }
 
-    function root() public view returns (uint256) {
-        return tree.root();
+    function head() public view returns (uint256) {
+        return fmt.getLastCommitment();
     }
 
     function getUintTokenAddress(

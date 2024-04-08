@@ -23,9 +23,9 @@ use tower_http::{cors::CorsLayer, services::ServeFile};
 use crate::{
     apis,
     config::{Config, Context, EventsLatestStatus, NetworkManager, NodeManager, Peer, Wallet},
+    fmt::FMT,
     genesis::Genesis,
     keys::{PrivateKey, PublicKey},
-    tree::SparseMerkleTree,
 };
 
 #[derive(StructOpt, Debug)]
@@ -150,7 +150,7 @@ async fn serve_wallet(
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
         genesis: genesis.unwrap(),
-        tree: SparseMerkleTree::new(16),
+        fmt: FMT::new(),
         events_latest_status: EventsLatestStatus {
             last_sent_event: 0,
             last_spent_event: 0,
@@ -170,21 +170,23 @@ async fn serve_wallet(
         syncing_task: None,
     }));
 
-    let context_sync = context.clone();
-    tokio::spawn(async move {
-        loop {
-            log::info!("Syncing with peers...");
-            let now = std::time::Instant::now();
+    if peer2peer {
+        let context_sync = context.clone();
+        tokio::spawn(async move {
+            loop {
+                log::info!("Syncing with peers...");
+                let now = std::time::Instant::now();
 
-            let mut node_manager = context_sync.lock().await.node_manager.clone();
-            node_manager.sync_with_peers();
+                let mut node_manager = context_sync.lock().await.node_manager.clone();
+                node_manager.sync_with_peers();
 
-            context_sync.lock().await.node_manager = node_manager;
+                context_sync.lock().await.node_manager = node_manager;
 
-            log::info!("Syncing with peers took: {:?}", now.elapsed());
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        }
-    });
+                log::info!("Syncing with peers took: {:?}", now.elapsed());
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            }
+        });
+    }
 
     let info_addr: PublicKey = pub_key.clone();
     let context_coin = context.clone();

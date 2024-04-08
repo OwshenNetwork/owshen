@@ -4,41 +4,29 @@ include "poseidon.circom";
 include "utils.circom";
 include "babyjub.circom";
 
-template CSwap() {
-    signal input in[3];
-    signal input s[2];
-    signal input v;
-    signal output out[4];
 
-    signal s0_and_s1;
-    signal s0_or_s1;
-    s0_and_s1 <== s[0] * s[1];
-    s0_or_s1 <== s[0] + s[1] - s0_and_s1;
-
-    signal out1p;
-    signal out2p;
-
-    out[0] <== (in[0] - v) * s0_or_s1 + v;
-    out1p <== (v - in[0]) * s[0] + in[0];
-    out[1] <== (in[1] - out1p) * s[1] + out1p;
-    out2p <== (in[2] - v) * s[0] + v;
-    out[2] <== (out2p - in[1]) * s[1] + in[1];
-    out[3] <== (v - in[2]) * s0_and_s1 + in[2];
-}
-
-template CoinWithdraw(NUM_INPS, NUM_OUTS) {
+template CoinWithdraw(NUM_INPS, NUM_OUTS, BATCH_SIZE) {
     signal input token_address;
 
     signal input index[NUM_INPS];
     signal input amount[NUM_INPS];
     signal input secret[NUM_INPS];
-    signal input proof[NUM_INPS][16][3];
+
+    signal input user_checkpoint_head;
+    signal input user_latest_values_commitment_head;
+    signal input value[NUM_INPS];
+    signal input between_values[NUM_INPS][BATCH_SIZE];
+    signal input checkpoint_commitments[BATCH_SIZE];
+    signal input checkpoints[BATCH_SIZE];
+    signal input latest_values[BATCH_SIZE];
+    signal input is_in_latest_commits[NUM_INPS];
 
     signal input new_amount[NUM_OUTS];
     signal input pk_ax[NUM_OUTS];
     signal input pk_ay[NUM_OUTS];
 
-    signal output root;
+    signal output checkpoint_head;
+    signal output latest_values_commitment_head;
     signal output nullifier[NUM_INPS];
     signal output new_commitment[NUM_OUTS];
 
@@ -49,7 +37,7 @@ template CoinWithdraw(NUM_INPS, NUM_OUTS) {
     component is_zero[NUM_INPS];
     for(var i = 0; i < NUM_INPS; i++) {
         is_zero[i] = IsZero();
-        is_zero[i].in <== index[i];
+        is_zero[i].in <== secret[i];
 
         masked_amounts[i] <== amount[i] * (1 - is_zero[i].out);
         sum_amount += masked_amounts[i];
@@ -76,18 +64,46 @@ template CoinWithdraw(NUM_INPS, NUM_OUTS) {
     }
     total_amount === sum_new_amount;
 
-    signal inters[NUM_INPS][17];
-
-    component bd[NUM_INPS];
     component pk[NUM_INPS];
-    component hashers[NUM_INPS][16];
-    component swaps[NUM_INPS][16];
     component commiter_hasher[NUM_INPS];
     component nullifier_hasher[NUM_INPS];
-    for(var i = 0; i < NUM_INPS; i++) {
-        bd[i] = BitDecompose(32);
-        bd[i].num <== index[i];
+    signal between_commitments[NUM_INPS][BATCH_SIZE];
+    component between_commitments_hash[NUM_INPS][BATCH_SIZE];
+    component is_between_commitment_contained[NUM_INPS];
+    component is_value_contained[NUM_INPS];
 
+    component checkpoints_hasher[BATCH_SIZE];
+    signal checkpoints_hash[BATCH_SIZE];
+    checkpoints_hash[0] <== checkpoints[0];
+    for(var j = 1; j < BATCH_SIZE; j++) {
+        checkpoints_hasher[j] = Poseidon(2);
+        checkpoints_hasher[j].inputs[0] <== checkpoints_hash[j - 1];
+        checkpoints_hasher[j].inputs[1] <== checkpoint_commitments[j];
+        checkpoints_hash[j] <== checkpoints_hasher[j].out;
+    }
+    component is_head_contained = Contains(BATCH_SIZE);
+    is_head_contained.value <== user_checkpoint_head;
+    is_head_contained.values <== checkpoints_hash;
+    is_head_contained.out === 1;
+    checkpoint_head <== user_checkpoint_head;
+
+    component latest_values_hasher[BATCH_SIZE];
+    signal latest_values_hash[BATCH_SIZE];
+    component is_user_values_contained_in_latest_values[NUM_INPS];
+    latest_values_hash[0] <== latest_values[0];
+    for(var i = 1; i < BATCH_SIZE; i++) {
+        latest_values_hasher[i] = Poseidon(2);
+        latest_values_hasher[i].inputs[0] <== latest_values_hash[i - 1];
+        latest_values_hasher[i].inputs[1] <== latest_values[i];
+        latest_values_hash[i] <== latest_values_hasher[i].out;
+    }
+    component is_latest_values_head_contained = Contains(BATCH_SIZE);
+    is_latest_values_head_contained.value <== user_latest_values_commitment_head;
+    is_latest_values_head_contained.values <== latest_values_hash;
+    is_latest_values_head_contained.out === 1;
+    latest_values_commitment_head <== user_latest_values_commitment_head;
+
+    for(var i = 0; i < NUM_INPS; i++) {
         pk[i] = BabyPbk();
         pk[i].in <== secret[i];
 
@@ -96,7 +112,8 @@ template CoinWithdraw(NUM_INPS, NUM_OUTS) {
         commiter_hasher[i].inputs[1] <== pk[i].Ay;
         commiter_hasher[i].inputs[2] <== amount[i];
         commiter_hasher[i].inputs[3] <== token_address;
-        inters[i][0] <== commiter_hasher[i].out;
+        // TODO: validate commitment not just calculation
+        // value[i] === (1 - is_zero[i].out) * commiter_hasher[i].out;
 
         nullifier_hasher[i] = Poseidon(4); // TODO: Switch to Poseidon2
         nullifier_hasher[i].inputs[0] <== secret[i];
@@ -105,25 +122,25 @@ template CoinWithdraw(NUM_INPS, NUM_OUTS) {
         nullifier_hasher[i].inputs[3] <== 0;
         nullifier[i] <== (1 - is_zero[i].out) * nullifier_hasher[i].out;
 
-        for(var j = 0; j < 16; j++) {
-            swaps[i][j] = CSwap();
-            swaps[i][j].s[0] <== bd[i].bits[2 * j];
-            swaps[i][j].s[1] <== bd[i].bits[2 * j + 1];
-            swaps[i][j].v <== inters[i][j];
-            swaps[i][j].in <== proof[i][j];
-
-            hashers[i][j] = Poseidon(4);
-            hashers[i][j].inputs <== swaps[i][j].out;
-            inters[i][j+1] <== hashers[i][j].out;
+        between_commitments[i][0] <== between_values[i][0];
+        for(var j = 1; j < BATCH_SIZE; j++) {
+            between_commitments_hash[i][j] = Poseidon(2);
+            between_commitments_hash[i][j].inputs[0] <== between_commitments[i][j - 1];
+            between_commitments_hash[i][j].inputs[1] <== between_values[i][j];
+            between_commitments[i][j] <== between_commitments_hash[i][j].out;
         }
 
-        if(i == 0) {
-            root <== inters[i][16];
-        }
+        is_between_commitment_contained[i] = Contains(BATCH_SIZE);
+        is_between_commitment_contained[i].value <== between_commitments[i][BATCH_SIZE - 1];
+        is_between_commitment_contained[i].values <== checkpoint_commitments;
+        is_between_commitment_contained[i].out === 1 * (1 - is_in_latest_commits[i]);
 
-        0 === (root - inters[i][16]) * (1 - is_zero[i].out);
+        is_user_values_contained_in_latest_values[i] = Contains(BATCH_SIZE);
+        is_user_values_contained_in_latest_values[i].value <== value[i];
+        is_user_values_contained_in_latest_values[i].values <== latest_values;
+        is_user_values_contained_in_latest_values[i].out === 1 * is_in_latest_commits[i];
     }
  }
 
- component main = CoinWithdraw(2, 2);
+ component main = CoinWithdraw(2, 2, 1024);
  

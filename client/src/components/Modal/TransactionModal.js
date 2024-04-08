@@ -151,7 +151,8 @@ const TransactionModal = ({
           tokenContract,
           tokenAmount,
           chainId,
-          findMatchingCoin
+          findMatchingCoin,
+          setIsOpen,
         );
       }
     } catch (error) {

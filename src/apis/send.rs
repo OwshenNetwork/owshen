@@ -1,4 +1,5 @@
 use crate::config::Context;
+use crate::fmt::FMTProof;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
@@ -22,7 +23,8 @@ pub struct GetSendRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetSendResponse {
     proof: Proof,
-    pub root: U256,
+    pub checkpoint_head: U256,
+    pub latest_values_commitment_head: U256,
     pub nullifier: U256,
     pub receiver_commitment: U256,
     pub sender_commitment: U256,
@@ -47,16 +49,15 @@ pub async fn send(
     let receiver_address = req.receiver_address;
     let address = req.address;
     let coins = context_send.lock().await.coins.clone();
-    let merkle_root = context_send.lock().await.tree.clone();
-    // Find a coin with the specified index
+    let fmt = context_send.lock().await.fmt.clone();
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
 
     match filtered_coin {
         Some(coin) => {
             let u32_index: u32 = index.low_u32();
             let u64_index: u64 = index.low_u64();
-            // get merkle proof
-            let merkle_proof = merkle_root.get(u64_index);
+
+            let fmt_proof = fmt.get(u64_index);
 
             let address_pub_key = PublicKey::from_str(&address)?;
             let (_, address_ephemeral, address_stealth_pub_key) =
@@ -116,10 +117,7 @@ pub async fn send(
             let indices: Vec<u32> = vec![u32_index, 0];
             let amounts: Vec<U256> = vec![amount, U256::from(0)];
             let secrets: Vec<Fp> = vec![coin.priv_key.secret, Fp::default()];
-            let proofs: Vec<Vec<[Fp; 3]>> = vec![
-                merkle_proof.proof.clone().try_into().unwrap(),
-                merkle_proof.proof.clone().try_into().unwrap(),
-            ];
+            let proofs: Vec<FMTProof> = vec![fmt_proof.clone(), fmt_proof.clone()];
             let new_amounts: Vec<U256> = vec![u256_new_amount, remaining_amount.into()];
             let pks: Vec<PublicKey> =
                 vec![receiver_address_stealth_pub_key, address_stealth_pub_key];
@@ -137,12 +135,14 @@ pub async fn send(
                 prover_path,
             );
 
-            let root: U256 = merkle_root.root().into();
-
+            let checkpoint_head: U256 = fmt_proof.checkpoint_head.into();
+            let latest_values_commitment_head: U256 =
+                fmt_proof.latest_values_commitment_head.into();
             match proof {
                 Ok(proof) => Ok(Json(GetSendResponse {
                     proof: proof,
-                    root: root,
+                    checkpoint_head: checkpoint_head,
+                    latest_values_commitment_head: latest_values_commitment_head,
                     nullifier: coin.nullifier,
                     obfuscated_receiver_amount: obfuscated_receiver_remaining_amount_with_secret,
                     obfuscated_sender_amount: obfuscated_sender_remaining_amount_with_secret,
@@ -162,7 +162,8 @@ pub async fn send(
             log::warn!("No coin with index {} found", index);
             Ok(Json(GetSendResponse {
                 proof: Proof::default(),
-                root: U256::default(),
+                checkpoint_head: U256::default(),
+                latest_values_commitment_head: U256::default(),
                 obfuscated_receiver_token_address: U256::default(),
                 obfuscated_sender_token_address: U256::default(),
                 nullifier: U256::default(),

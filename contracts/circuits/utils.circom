@@ -49,3 +49,21 @@ template IsZero() {
     out <== -in*inv +1;
     in*out === 0;
 }
+
+template Contains(LENGTH) {
+    signal input value;
+    signal input values[LENGTH];
+    signal output out;
+
+    component is_diff_zero[LENGTH];
+    var tmp = 0;
+    for(var i = 0; i < LENGTH; i++) {
+        is_diff_zero[i] = IsZero();
+        is_diff_zero[i].in <== value - values[i];
+        tmp += is_diff_zero[i].out;
+    }
+    component contained = IsZero();
+    contained.in <== tmp;
+
+    out <== 1 - contained.out;
+}
