@@ -4,8 +4,8 @@ use crate::fp::Fp;
 use crate::helper::extract_token_amount;
 use crate::keys::Point;
 use crate::keys::{EphemeralPubKey, PrivateKey, PublicKey};
+use crate::u256_to_h160;
 use crate::Coin;
-use crate::{fmt, u256_to_h160};
 
 use axum::Json;
 use bindings::owshen::{SentFilter, SpendFilter};

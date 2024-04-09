@@ -1,6 +1,5 @@
 use crate::fp::Fp;
 use crate::hash::hash2;
-use ethers::prelude::*;
 use serde::{Deserialize, Serialize};
 
 const CHECKPOINT_INTERVAL: u64 = 1024;
@@ -123,6 +122,7 @@ impl FMT {
         }
     }
 
+    #[allow(dead_code)]
     pub fn verify(index: u64, proof: &FMTProof) -> bool {
         assert_eq!(proof.checkpoints.len(), proof.checkpoint_commitments.len());
 

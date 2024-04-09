@@ -170,15 +170,6 @@ impl PublicKey {
     ) -> (EphemeralPrivKey, EphemeralPubKey, PublicKey) {
         self.derive(Fp::random(rng))
     }
-
-    pub fn null() -> Self {
-        Self {
-            point: Point {
-                x: 0.into(),
-                y: 0.into(),
-            },
-        }
-    }
 }
 
 impl Entropy {
