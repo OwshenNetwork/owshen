@@ -111,11 +111,14 @@ async fn serve_wallet(
 ) -> Result<()> {
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
 
-    let params_file: String = if test {
-        "contracts/circuits/coin_withdraw_0001.zkey".to_string()
-    } else {
-        format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path)
-    };
+    let params_file: Option<PathBuf> = Some(
+        if test {
+            "contracts/circuits/coin_withdraw_0001.zkey".to_string()
+        } else {
+            format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path)
+        }
+        .into(),
+    );
     let send_params_file = params_file.clone();
     let genesis_path = if test {
         "owshen-genesis.dat".to_string()

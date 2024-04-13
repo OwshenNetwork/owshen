@@ -21,7 +21,10 @@ async fn initialize_wallet(mnemonic: Option<Mnemonic>) -> Wallet {
         Entropy::generate(&mut rand::thread_rng())
     };
 
-    let wallet = Wallet { entropy };
+    let wallet = Wallet {
+        entropy,
+        params: None,
+    };
 
     println!(
         "{} {}",

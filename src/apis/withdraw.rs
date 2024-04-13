@@ -9,6 +9,7 @@ use crate::proof::{prove, Proof};
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::Mutex;
 
@@ -39,7 +40,7 @@ pub async fn withdraw(
     priv_key: PrivateKey,
     witness_gen_path: String,
     prover_path: String,
-    params_file: String,
+    params_file: Option<PathBuf>,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
     let owshen_address = req.owshen_address;
@@ -107,7 +108,7 @@ pub async fn withdraw(
                 proofs,
                 new_amounts,
                 pks,
-                params_file,
+                params_file.ok_or(eyre::Report::msg("Parameter file is not set!"))?,
                 witness_gen_path,
                 prover_path,
             );

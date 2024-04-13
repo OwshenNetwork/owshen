@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
 
 use bindings::owshen::{SentFilter, SpendFilter};
 use ethers::{abi::Abi, prelude::*, types::H160};
@@ -114,6 +114,7 @@ pub struct TokenInfo {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Wallet {
     pub entropy: Entropy,
+    pub params: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
