@@ -15,13 +15,15 @@ use axum::{
     Json, Router,
 };
 use eyre::Result;
+
+use serde_json::json;
 use structopt::StructOpt;
 use tokio::{fs::File, sync::Mutex, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
 use tower_http::{cors::CorsLayer, services::ServeFile};
 
 use crate::{
-    apis,
+    apis::{self},
     config::{Config, Context, EventsLatestStatus, NetworkManager, NodeManager, Peer, Wallet},
     fmt::FMT,
     genesis::Genesis,
@@ -65,12 +67,6 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
     };
 
     let wallet_path = db.unwrap_or(wallet_path.clone());
-    let wallet = std::fs::read_to_string(&wallet_path)
-        .map(|s| {
-            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
-            w
-        })
-        .ok();
 
     let config = std::fs::read_to_string(&config_path)
         .map(|s| {
@@ -79,15 +75,11 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
         })
         .ok();
 
-    if let (Some(wallet), Some(config)) = (&wallet, &config) {
-        let priv_key = wallet.entropy.clone().into();
-        let pub_key = PublicKey::from(priv_key);
-
+    if let Some(config) = &config {
         let _ = serve_wallet(
             ip,
             port,
-            priv_key,
-            pub_key,
+            wallet_path,
             config.token_contracts.clone(),
             bootstrap_peers,
             peer2peer,
@@ -95,14 +87,26 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
             config.clone(),
         )
         .await;
+    } else {
+        log::error!("Owshen is not initialized!");
     }
+}
+
+fn read_priv_key(wallet_path: PathBuf) -> Option<PrivateKey> {
+    let wallet = std::fs::read_to_string(wallet_path)
+        .map(|s| {
+            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
+            w
+        })
+        .ok();
+
+    wallet.map(|w| w.entropy.clone().into())
 }
 
 async fn serve_wallet(
     ip: String,
     port: u16,
-    priv_key: PrivateKey,
-    pub_key: PublicKey,
+    wallet_path: PathBuf,
     token_contracts: NetworkManager,
     bootstrap_peers: Vec<Peer>,
     peer2peer: bool,
@@ -191,7 +195,6 @@ async fn serve_wallet(
         });
     }
 
-    let info_addr: PublicKey = pub_key.clone();
     let context_coin = context.clone();
     let context_withdraw = context.clone();
     let context_send = context.clone();
@@ -199,6 +202,12 @@ async fn serve_wallet(
     let contest_set_network = context.clone();
     let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
     let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
+
+    let withdraw_wallet_path = wallet_path.clone();
+    let coins_wallet_path = wallet_path.clone();
+    let info_wallet_path = wallet_path.clone();
+    let send_wallet_path = wallet_path.clone();
+    let init_wallet_path = wallet_path.clone();
 
     let app = Router::new()
         .route("/", get(move || serve_index(test)))
@@ -228,11 +237,16 @@ async fn serve_wallet(
             "/coins",
             get(move || async move {
                 handle_error(
-                    apis::coins(
-                        context_coin,
-                        priv_key,
-                        owshen_contract_deployment_block_number,
-                    )
+                    async {
+                        let priv_key = read_priv_key(coins_wallet_path)
+                            .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
+                        apis::coins(
+                            context_coin,
+                            priv_key,
+                            owshen_contract_deployment_block_number,
+                        )
+                        .await
+                    }
                     .await,
                 )
             }),
@@ -242,14 +256,19 @@ async fn serve_wallet(
             get(
                 move |extract::Query(req): extract::Query<apis::GetWithdrawRequest>| async move {
                     handle_error(
-                        apis::withdraw(
-                            Query(req),
-                            context_withdraw,
-                            priv_key,
-                            witness_gen_path,
-                            prover_path,
-                            params_file,
-                        )
+                        async {
+                            let priv_key = read_priv_key(withdraw_wallet_path)
+                                .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
+                            apis::withdraw(
+                                Query(req),
+                                context_withdraw,
+                                priv_key,
+                                witness_gen_path,
+                                prover_path,
+                                params_file,
+                            )
+                            .await
+                        }
                         .await,
                     )
                 },
@@ -260,14 +279,19 @@ async fn serve_wallet(
             get(
                 move |extract::Query(req): extract::Query<apis::GetSendRequest>| async move {
                     handle_error(
-                        apis::send(
-                            Query(req),
-                            context_send,
-                            priv_key,
-                            send_witness_gen_path,
-                            send_prover_path,
-                            send_params_file,
-                        )
+                        async {
+                            let priv_key = read_priv_key(send_wallet_path)
+                                .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
+                            apis::send(
+                                Query(req),
+                                context_send,
+                                priv_key,
+                                send_witness_gen_path,
+                                send_prover_path,
+                                send_params_file,
+                            )
+                            .await
+                        }
                         .await,
                     )
                 },
@@ -284,7 +308,20 @@ async fn serve_wallet(
         .route(
             "/info",
             get(move || async move {
-                handle_error(apis::info(info_addr, context_info, token_contracts, test).await)
+                handle_error(
+                    async {
+                        let priv_key = read_priv_key(info_wallet_path)
+                            .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
+                        Ok(apis::info(
+                            PublicKey::from(priv_key),
+                            context_info,
+                            token_contracts,
+                            test,
+                        )
+                        .await?)
+                    }
+                    .await,
+                )
             }),
         )
         .route(
@@ -292,6 +329,14 @@ async fn serve_wallet(
             post(
                 move |extract::Query(req): extract::Query<apis::SetNetworkRequest>| async move {
                     handle_error(apis::set_network(Query(req), contest_set_network, test).await)
+                },
+            ),
+        )
+        .route(
+            "/init",
+            post(
+                move |req: extract::Json<apis::PostInitRequest>| async move {
+                    handle_error(apis::init(init_wallet_path, req).await)
                 },
             ),
         )
@@ -347,8 +392,14 @@ fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoRe
         Ok(a) => a.into_response(),
         Err(e) => {
             log::error!("{}", e);
-            let error_message = format!("Internal server error: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(error_message)).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({
+                    "error": true,
+                    "message": e.to_string()
+                })),
+            )
+                .into_response()
         }
     }
 }
