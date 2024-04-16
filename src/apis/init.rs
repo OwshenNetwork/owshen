@@ -7,12 +7,14 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum PostInitRequest {
     Generate,
     Import(Vec<String>),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum PostInitResponse {
     Generated(Vec<String>),
     Imported,
