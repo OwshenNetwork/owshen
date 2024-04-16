@@ -208,6 +208,7 @@ async fn serve_wallet(
     let info_wallet_path = wallet_path.clone();
     let send_wallet_path = wallet_path.clone();
     let init_wallet_path = wallet_path.clone();
+    let set_params_path_wallet_path = wallet_path.clone();
 
     let app = Router::new()
         .route("/", get(move || serve_index(test)))
@@ -329,6 +330,14 @@ async fn serve_wallet(
             post(
                 move |extract::Query(req): extract::Query<apis::SetNetworkRequest>| async move {
                     handle_error(apis::set_network(Query(req), contest_set_network, test).await)
+                },
+            ),
+        )
+        .route(
+            "/set-params-path",
+            post(
+                move |req: extract::Query<apis::SetParamsPathRequest>| async move {
+                    handle_error(apis::set_params_path(req, set_params_path_wallet_path).await)
                 },
             ),
         )
