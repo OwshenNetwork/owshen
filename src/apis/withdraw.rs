@@ -135,20 +135,7 @@ pub async fn withdraw(
         }
         None => {
             log::warn!("No coin with index {} found", index);
-            Ok(Json(GetWithdrawResponse {
-                proof: Proof::default(),
-                checkpoint_head: U256::default(),
-                latest_values_commitment_head: U256::default(),
-                token: H160::default(),
-                amount: U256::default(),
-                obfuscated_remaining_amount: U256::default(),
-                nullifier: U256::default(),
-                commitment: U256::default(),
-                ephemeral: Point {
-                    x: Fp::default(),
-                    y: Fp::default(),
-                },
-            }))
+            Err(eyre::Report::msg("Coin not found!"))
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 
 use bindings::owshen::{SentFilter, SpendFilter};
 use ethers::{abi::Abi, prelude::*, types::H160};
@@ -40,9 +40,7 @@ pub struct Network {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Peer {
-    pub ip: String,
-    pub port: u16,
-
+    pub addr: SocketAddr,
     pub current_block: u64,
 }
 
@@ -50,15 +48,11 @@ impl FromStr for Peer {
     type Err = eyre::Report;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split(':');
-        let ip = parts.next().ok_or_else(|| eyre::eyre!("Invalid ip"))?;
-        let port = parts
-            .next()
-            .ok_or_else(|| eyre::eyre!("Invalid port"))?
-            .parse()?;
+        let addr: SocketAddr = s
+            .parse()
+            .map_err(|_| eyre::eyre!("Invalid socket address"))?;
         Ok(Peer {
-            ip: ip.to_string(),
-            port,
+            addr,
             current_block: 0,
         })
     }
@@ -66,7 +60,7 @@ impl FromStr for Peer {
 
 impl PartialEq for Peer {
     fn eq(&self, other: &Self) -> bool {
-        self.ip == other.ip && self.port == other.port
+        self.addr == other.addr
     }
 }
 
@@ -78,8 +72,7 @@ pub struct EventsLatestStatus {
 
 #[derive(Clone, Debug)]
 pub struct NodeManager {
-    pub ip: Option<String>,
-    pub port: Option<u16>,
+    pub external_addr: Option<SocketAddr>,
 
     pub network: Option<Network>,
     pub peers: Vec<Peer>,

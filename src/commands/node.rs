@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::{path::PathBuf, sync::Arc};
 
 use axum::extract::Query;
@@ -23,10 +23,10 @@ pub struct NodeOpt {
     #[structopt(long)]
     config: Option<PathBuf>,
 
-    #[structopt(long, default_value = "127.0.0.1")]
-    ip: String,
-    #[structopt(long, default_value = "8888")]
-    port: u16,
+    #[structopt(long, default_value = "127.0.0.1:8888")]
+    external: SocketAddr,
+    #[structopt(long, default_value = "0.0.0.0:8888")]
+    interface: SocketAddr,
 
     #[structopt(long, parse(try_from_str))]
     bootstrap_peers: Vec<Peer>,
@@ -38,8 +38,8 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
     let NodeOpt {
         endpoint,
         config,
-        ip,
-        port,
+        external,
+        interface,
         bootstrap_peers,
         peer2peer,
     } = opt;
@@ -52,15 +52,10 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
         })
         .ok();
 
-    // validate ip and port
-    let _ = ip.parse::<IpAddr>().expect("Invalid ip address");
-    let _ = SocketAddr::new(ip.parse().unwrap(), port);
-
     let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
     let context = Arc::new(Mutex::new(NodeContext {
         node_manager: NodeManager {
-            ip: Some(ip.clone()),
-            port: Some(port.clone()),
+            external_addr: Some(external.clone()),
             network: Some(Network {
                 provider: Arc::new(provider),
                 config: config.unwrap_or_default(),
@@ -125,12 +120,9 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
         )
         .layer(CorsLayer::permissive());
 
-    let ip_addr: IpAddr = ip.parse().expect("failed to parse ip");
-    let addr = SocketAddr::new(ip_addr, port);
-
     let backend = async {
-        log::info!("Server started at: {:?}", addr);
-        axum::Server::bind(&addr)
+        log::info!("Server started at: {:?}", interface);
+        axum::Server::bind(&interface)
             .serve(app.into_make_service())
             .await?;
         Ok::<(), eyre::Error>(())

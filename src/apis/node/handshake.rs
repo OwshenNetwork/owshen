@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -8,9 +8,7 @@ use crate::config::{NodeContext, Peer};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetHandShakeRequest {
-    pub ip: Option<String>,
-    pub port: Option<u16>,
-
+    pub addr: Option<SocketAddr>,
     pub is_client: bool,
 }
 
@@ -25,14 +23,11 @@ pub async fn handshake(
 ) -> Result<Json<GetHandShakeResponse>, eyre::Report> {
     let mut context = context.lock().await;
 
-    if let Some(ip) = req.ip {
-        if let Some(port) = req.port {
-            context.node_manager.add_peer(Peer {
-                ip,
-                port,
-                current_block: 0,
-            });
-        }
+    if let Some(addr) = req.addr {
+        context.node_manager.add_peer(Peer {
+            addr: addr,
+            current_block: 0,
+        });
     }
 
     Ok(Json(GetHandShakeResponse {

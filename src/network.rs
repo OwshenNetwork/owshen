@@ -11,11 +11,9 @@ use crate::{
 
 impl NodeManager {
     pub fn add_peer(&mut self, peer: Peer) {
-        if let Some(ip) = self.ip.clone() {
-            if let Some(port) = self.port.clone() {
-                if peer.ip == ip && peer.port == port {
-                    return;
-                }
+        if let Some(ext_addr) = self.external_addr.clone() {
+            if peer.addr == ext_addr {
+                return;
             }
         }
 
@@ -29,8 +27,7 @@ impl NodeManager {
     }
 
     pub fn remove_peer(&mut self, peer: Peer) {
-        self.peers
-            .retain(|p| p.ip != peer.ip || p.port != peer.port);
+        self.peers.retain(|p| p.addr != peer.addr);
     }
 
     fn update_peer(&mut self, peer: Peer) {
@@ -49,16 +46,11 @@ impl NodeManager {
 
         for mut peer in self.get_peers() {
             let mut url = format!(
-                "http://{}:{}/handshake?is_client={}",
-                peer.ip, peer.port, self.is_client
+                "http://{}/handshake?is_client={}",
+                peer.addr, self.is_client
             );
             if !self.is_client {
-                url = format!(
-                    "{}&ip={}&port={}",
-                    url,
-                    self.ip.clone().unwrap(),
-                    self.port.clone().unwrap()
-                );
+                url = format!("{}&addr={}", url, self.external_addr.clone().unwrap());
             }
             let resp = client.get(&url).send();
 
@@ -96,11 +88,7 @@ impl NodeManager {
         }
         if elected_peer.is_some() {
             self.elected_peer = elected_peer;
-            log::info!(
-                "Elected peer: ip: {}, port: {}",
-                self.elected_peer.clone().unwrap().ip,
-                self.elected_peer.clone().unwrap().port
-            );
+            log::info!("Elected peer: {}", self.elected_peer.clone().unwrap().addr);
         }
 
         log::info!("Synced with peers: {}", self.get_peers().len());
@@ -112,7 +100,7 @@ impl NodeManager {
             .build()
             .unwrap();
 
-        let url = format!("http://{}:{}/get-peers", peer.ip, peer.port);
+        let url = format!("http://{}/get-peers", peer.addr);
         let resp = client.get(&url).send();
 
         if let Ok(resp) = resp {
@@ -159,8 +147,8 @@ impl NodeManager {
 
             loop {
                 let url = format!(
-                    "http://{}:{}/events?from_spend={}&from_sent={}&length={}",
-                    elected_peer.ip, elected_peer.port, from_spend, from_sent, step
+                    "http://{}/events?from_spend={}&from_sent={}&length={}",
+                    elected_peer.addr, from_spend, from_sent, step
                 );
                 let client = reqwest::blocking::Client::builder()
                     .timeout(Duration::from_secs(1))

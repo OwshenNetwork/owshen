@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -11,8 +11,7 @@ pub struct GetStatusResponse {
     pub up: bool,
     pub peers: Vec<Peer>,
     pub current_block_number: u64,
-    pub ip: String,
-    pub port: u16,
+    pub addr: SocketAddr,
 }
 
 pub async fn status(
@@ -24,7 +23,10 @@ pub async fn status(
         up: true,
         peers: context.node_manager.peers.clone(),
         current_block_number: context.currnet_block_number,
-        ip: context.node_manager.ip.clone().unwrap_or_default(),
-        port: context.node_manager.port.unwrap_or_default(),
+        addr: context
+            .node_manager
+            .external_addr
+            .clone()
+            .ok_or(eyre::eyre!("Not a node!"))?,
     }))
 }

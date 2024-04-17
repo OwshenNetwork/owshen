@@ -163,8 +163,7 @@ async fn serve_wallet(
             last_spent_event: 0,
         },
         node_manager: NodeManager {
-            ip: None,
-            port: None,
+            external_addr: None,
 
             network: None,
             peers: bootstrap_peers,

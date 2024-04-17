@@ -161,26 +161,7 @@ pub async fn send(
         }
         None => {
             log::warn!("No coin with index {} found", index);
-            Ok(Json(GetSendResponse {
-                proof: Proof::default(),
-                checkpoint_head: U256::default(),
-                latest_values_commitment_head: U256::default(),
-                obfuscated_receiver_token_address: U256::default(),
-                obfuscated_sender_token_address: U256::default(),
-                nullifier: U256::default(),
-                obfuscated_receiver_amount: U256::default(),
-                obfuscated_sender_amount: U256::default(),
-                receiver_commitment: U256::default(),
-                sender_commitment: U256::default(),
-                sender_ephemeral: Point {
-                    x: Fp::default(),
-                    y: Fp::default(),
-                },
-                receiver_ephemeral: Point {
-                    x: Fp::default(),
-                    y: Fp::default(),
-                },
-            }))
+            Err(eyre::Report::msg("Coin not found!"))
         }
     }
 }
