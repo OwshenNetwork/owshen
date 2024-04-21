@@ -1,3 +1,4 @@
+use crate::commands::wallet::Mode;
 use crate::keys::PublicKey;
 use crate::{fmt::FMTProof, fp::Fp};
 
@@ -16,6 +17,12 @@ pub struct Proof {
     pub public: Vec<U256>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ProveResult {
+    Proof(Proof),
+    JsonInput(String),
+}
+
 pub fn prove<P: AsRef<Path>>(
     token_address: U256,
 
@@ -31,7 +38,8 @@ pub fn prove<P: AsRef<Path>>(
     params: P,
     witness_gen_path: String,
     prover_path: String,
-) -> Result<Proof> {
+    mode: &Mode,
+) -> Result<ProveResult> {
     let mut inputs_file = NamedTempFile::new()?;
 
     let json_input = format!(
@@ -102,6 +110,10 @@ pub fn prove<P: AsRef<Path>>(
     write!(inputs_file, "{}", json_input)?;
 
     log::info!("Circuit input: {}", json_input);
+
+    if *mode == Mode::Windows {
+        return Ok(ProveResult::JsonInput(json_input));
+    }
 
     let witness_file = NamedTempFile::new()?;
     let wtns_gen_output = Command::new(witness_gen_path)
@@ -177,5 +189,5 @@ pub fn prove<P: AsRef<Path>>(
         public: data[8..].to_vec(),
     };
 
-    Ok(proof)
+    Ok(ProveResult::Proof(proof))
 }

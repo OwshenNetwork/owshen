@@ -1,10 +1,11 @@
+use crate::commands::wallet::Mode;
 use crate::config::Context;
 use crate::fmt::FMTProof;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
 use crate::keys::{Point, PrivateKey, PublicKey};
-use crate::proof::{prove, Proof};
+use crate::proof::{prove, Proof, ProveResult};
 
 use axum::{extract::Query, response::Json};
 use ethers::prelude::*;
@@ -23,7 +24,7 @@ pub struct GetWithdrawRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetWithdrawResponse {
-    proof: Proof,
+    proof: ProveResult,
     pub checkpoint_head: U256,
     pub latest_values_commitment_head: U256,
     pub token: H160,
@@ -41,6 +42,7 @@ pub async fn withdraw(
     witness_gen_path: String,
     prover_path: String,
     params_file: Option<PathBuf>,
+    mode: Mode,
 ) -> Result<Json<GetWithdrawResponse>, eyre::Report> {
     let index = req.index;
     let owshen_address = req.owshen_address;
@@ -100,7 +102,7 @@ pub async fn withdraw(
 
             let pks: Vec<PublicKey> = vec![null_pub_key, stealth_pub_key];
 
-            let proof: std::result::Result<Proof, eyre::Error> = prove(
+            let proof: std::result::Result<ProveResult, eyre::Error> = prove(
                 hint_token_address,
                 indices,
                 amounts,
@@ -111,23 +113,46 @@ pub async fn withdraw(
                 params_file.ok_or(eyre::Report::msg("Parameter file is not set!"))?,
                 witness_gen_path,
                 prover_path,
+                &mode.clone(),
             );
 
-            let checkpoint_head: U256 = fmt_proof.checkpoint_head.into();
-            let latest_values_commitment_head: U256 =
-                fmt_proof.latest_values_commitment_head.into();
             match proof {
-                Ok(proof) => Ok(Json(GetWithdrawResponse {
-                    proof,
-                    checkpoint_head,
-                    latest_values_commitment_head,
-                    token: coin.uint_token,
-                    amount,
-                    obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
-                    nullifier: coin.nullifier,
-                    commitment: u256_calc_commitment,
-                    ephemeral: ephemeral.point,
-                })),
+                Ok(prove_result) => {
+                    let proof_data = if mode == Mode::Windows {
+                        match prove_result {
+                            ProveResult::JsonInput(json) => ProveResult::JsonInput(json),
+                            _ => {
+                                return Err(eyre::Report::msg(
+                                    "Expected JSON input for Windows mode",
+                                ))
+                            }
+                        }
+                    } else {
+                        match prove_result {
+                            ProveResult::Proof(proof) => ProveResult::Proof(proof),
+                            _ => {
+                                return Err(eyre::Report::msg(
+                                    "Expected proof object for non-Windows mode",
+                                ))
+                            }
+                        }
+                    };
+
+                    let checkpoint_head: U256 = fmt_proof.checkpoint_head.into();
+                    let latest_values_commitment_head: U256 =
+                        fmt_proof.latest_values_commitment_head.into();
+                    Ok(Json(GetWithdrawResponse {
+                        proof: proof_data,
+                        checkpoint_head,
+                        latest_values_commitment_head,
+                        token: coin.uint_token,
+                        amount,
+                        obfuscated_remaining_amount: obfuscated_remaining_amount_with_secret,
+                        nullifier: coin.nullifier,
+                        commitment: u256_calc_commitment,
+                        ephemeral: ephemeral.point,
+                    }))
+                }
                 Err(_e) => Err(eyre::Report::msg(
                     "Something wrong while creating proof for withdraw",
                 )),

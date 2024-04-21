@@ -1,4 +1,4 @@
-.PHONY = test clean install
+.PHONY: test clean install windows
 
 rapidsnark/package/bin/prover:
 	cd rapidsnark && git submodule init
@@ -65,4 +65,3 @@ appimage: rapidsnark/package/bin/prover
 	mkdir -p ~/release
 
 	~/appimagetool-x86_64.AppImage ~/Owshen-Production.AppDir
-
