@@ -4,7 +4,7 @@ use std::{path::PathBuf, sync::Arc};
 use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{extract, Json, Router};
 use ethers::providers::{Http, Middleware, Provider};
 use structopt::StructOpt;
@@ -30,6 +30,9 @@ pub struct NodeOpt {
     bootstrap_peers: Vec<Peer>,
     #[structopt(long)]
     peer2peer: bool,
+
+    #[structopt(long)]
+    relayer: Option<String>,
 }
 
 pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
@@ -40,6 +43,7 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
         interface,
         bootstrap_peers,
         peer2peer,
+        relayer,
     } = opt;
 
     let config: Config = std::fs::read_to_string(&config).map(|s| {
@@ -65,6 +69,7 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
         spent_events: vec![],
         sent_events: vec![],
         currnet_block_number: 0,
+        mempool: vec![],
     }));
 
     let context_sync = context.clone();
@@ -94,6 +99,8 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
     let context_events = context.clone();
     let context_get_peers = context.clone();
     let context_handshake = context.clone();
+    let context_get_mempool = context.clone();
+    let context_post_tx = context.clone();
 
     let app = Router::new()
         .route(
@@ -120,6 +127,26 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
                 },
             ),
         )
+        .route(
+            "/",
+            get(move || async { Json(serde_json::json!({"ok": true})) }),
+        )
+        .route(
+            "/transact",
+            post(
+                move |extract::Json(req): extract::Json<apis::PostTransactRequest>| async move {
+                    handle_error(async { apis::transact(context_post_tx, req).await }.await)
+                },
+            ),
+        )
+        .route(
+            "/mempool",
+            get(
+                move |extract::Query(req): extract::Query<apis::GetMempoolRequest>| async move {
+                    handle_error(async { apis::mempool(context_get_mempool, req).await }.await)
+                },
+            ),
+        )
         .layer(CorsLayer::permissive());
 
     let backend = async {
@@ -138,12 +165,25 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
 
             log::info!("Sleeping for {} seconds...", NODE_UPDATE_INTERVAL);
             tokio::time::sleep(tokio::time::Duration::from_secs(NODE_UPDATE_INTERVAL)).await;
+
+            if let Some(priv_key) = &relayer {
+                relay_txs(priv_key.clone(), context.clone()).await.unwrap(); // TODO: handle exceptions of the loop
+            }
         }
         Ok::<(), eyre::Error>(())
     };
 
     tokio::try_join!(backend, sync_job)?;
 
+    Ok(())
+}
+
+async fn relay_txs(priv_key: String, context: Arc<Mutex<NodeContext>>) -> Result<(), eyre::Report> {
+    let txs = context.lock().await.mempool.clone();
+    for _tx in txs.iter() {
+        log::info!("Should relay tx with priv-key: {}", priv_key);
+        // TODO
+    }
     Ok(())
 }
 

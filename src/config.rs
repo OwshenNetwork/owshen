@@ -30,12 +30,26 @@ pub struct Context {
     >,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OwshenSend {}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OwshenWithdraw {}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum OwshenTransaction {
+    Send(OwshenSend),
+    Withdraw(OwshenWithdraw),
+}
+
 pub struct NodeContext {
     pub node_manager: NodeManager,
 
     pub spent_events: Vec<SpendFilter>,
     pub sent_events: Vec<SentFilter>,
     pub currnet_block_number: u64,
+
+    pub mempool: Vec<OwshenTransaction>,
 }
 
 #[derive(Clone, Debug)]

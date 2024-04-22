@@ -20,3 +20,5 @@ pub use node::status;
 pub use node::{events, GetEventsRequest, GetEventsResponse};
 pub use node::{get_peers, GetPeersResponse};
 pub use node::{handshake, GetHandShakeRequest, GetHandShakeResponse};
+pub use node::{mempool, GetMempoolRequest};
+pub use node::{transact, PostTransactRequest};

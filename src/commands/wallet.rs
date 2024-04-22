@@ -12,7 +12,7 @@ use axum::{
     http::{Response, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, get_service, post},
-    Json, Router,
+    Router,
 };
 use mime_guess::from_ext;
 use std::path::Path;
@@ -20,7 +20,6 @@ use tower_http::services::ServeFile;
 
 use eyre::Result;
 
-use serde_json::json;
 use structopt::StructOpt;
 use tokio::{fs::File, sync::Mutex, task};
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -61,6 +60,8 @@ impl std::str::FromStr for Mode {
         }
     }
 }
+
+use super::utils::handle_error;
 
 #[derive(StructOpt, Debug)]
 pub struct WalletOpt {
@@ -480,23 +481,6 @@ async fn serve_wallet(
 
         server.await.map_err(eyre::Report::new)?;
         Ok(())
-    }
-}
-
-fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {
-    match result {
-        Ok(a) => a.into_response(),
-        Err(e) => {
-            log::error!("{}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "error": true,
-                    "message": e.to_string()
-                })),
-            )
-                .into_response()
-        }
     }
 }
 

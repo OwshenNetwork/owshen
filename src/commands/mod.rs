@@ -8,6 +8,7 @@ pub(crate) mod mint;
 pub(crate) mod node;
 pub(crate) mod participate;
 pub(crate) mod spend;
+pub(crate) mod utils;
 pub(crate) mod wallet;
 
 pub use burn::{burn, BurnOpt};
