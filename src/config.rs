@@ -6,10 +6,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     checkpointed_hashchain::CheckpointedHashchain,
+    fp::Fp,
     genesis::Genesis,
+    hash::hash2,
+    helper::u256_to_h160,
     keys::{Entropy, PrivateKey, PublicKey},
 };
 
+use sha2::{Digest, Sha256};
 pub const NODE_UPDATE_INTERVAL: u64 = 5;
 
 pub struct Context {
@@ -107,9 +111,99 @@ pub struct TokenInfo {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BurnAddress {
+    pub address: H160,
+    pub preimage: U256,
+    pub used: Option<bool>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BurntCoin {
+    pub amount: U256,
+    pub salt: U256,
+    pub encrypted: bool,
+}
+
+impl BurntCoin {
+    pub fn get_balance(&self) -> U256 {
+        if !self.encrypted {
+            self.amount
+        } else {
+            hash2([
+                Fp::try_from(self.amount).unwrap(),
+                Fp::try_from(self.salt).unwrap(),
+            ])
+            .into()
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Wallet {
     pub entropy: Entropy,
     pub params: Option<PathBuf>,
+    pub burnt_addresses: Vec<BurnAddress>,
+    pub burnt_coins: Vec<BurntCoin>,
+}
+
+impl Wallet {
+    pub fn derive_burn_addr(&self) -> BurnAddress {
+        let random_number = rand::random::<u64>().to_string();
+        let mut preimage = self.entropy.to_mnemonic().unwrap().to_string() + &random_number;
+        let mut hasher = Sha256::new();
+        hasher.update(preimage);
+        preimage = format!("{:X}", hasher.finalize());
+        let reminder = U256::from_str_radix(
+            "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+            10,
+        )
+        .unwrap();
+        let u256_preimage = U256::from_str(&preimage).unwrap() % reminder;
+        let fp_preimage = Fp::try_from(u256_preimage).unwrap();
+        let hashed_preimage: U256 = hash2([fp_preimage, fp_preimage]).into();
+        let address = u256_to_h160(hashed_preimage);
+        BurnAddress {
+            address: address,
+            preimage: u256_preimage,
+            used: Some(false),
+        }
+    }
+
+    pub fn get_burn_address_info_by_address(&self, address: H160) -> Option<&BurnAddress> {
+        self.burnt_addresses.iter().find(|&x| x.address == address)
+    }
+
+    pub fn set_used_burn_address(&mut self, address: H160) {
+        let index = self
+            .burnt_addresses
+            .iter()
+            .position(|x| x.address == address)
+            .unwrap();
+        self.burnt_addresses[index].used = Some(true);
+    }
+
+    pub fn derive_burnt_coin(&self, amount: U256, encryted: bool) -> BurntCoin {
+        let reminder = U256::from_str_radix(
+            "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+            10,
+        )
+        .unwrap();
+        let random_number: U256 = U256::from(rand::random::<u128>()) % reminder;
+
+        BurntCoin {
+            amount: amount,
+            salt: random_number,
+            encrypted: encryted,
+        }
+    }
+
+    pub fn save_wallet(&self, path: PathBuf) -> Result<(), eyre::Report> {
+        let resp = std::fs::write(path, serde_json::to_string(&self).unwrap());
+        match resp {
+            Ok(_) => Ok(()),
+            Err(e) => Err(eyre::eyre!("Error saving wallet: {}", e)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

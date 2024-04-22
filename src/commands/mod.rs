@@ -1,11 +1,23 @@
+pub(crate) mod burn;
+pub(crate) mod claim;
 pub(crate) mod deploy;
+pub(crate) mod dive;
 pub(crate) mod info;
 pub(crate) mod init;
+pub(crate) mod mint;
 pub(crate) mod node;
+pub(crate) mod participate;
+pub(crate) mod spend;
 pub(crate) mod wallet;
 
+pub use burn::{burn, BurnOpt};
+pub use claim::{claim, ClaimOpt};
 pub use deploy::{deploy, DeployOpt};
+pub use dive::{dive, DiveOpt};
 pub use info::{info, InfoOpt};
 pub use init::{init, InitOpt};
+pub use mint::{mint, MintOpt};
 pub use node::{node, NodeOpt};
+pub use participate::{participate, ParticipateOpt};
+pub use spend::{spend, SpendOpt};
 pub use wallet::{wallet, WalletOpt};

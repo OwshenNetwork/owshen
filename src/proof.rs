@@ -194,3 +194,381 @@ pub fn prove<P: AsRef<Path>>(
 
     Ok(ProveResult::Proof(extract_proof(&proof_obj, &pubs_obj)?))
 }
+
+pub fn mpt_last_prove<P: AsRef<Path>>(
+    salt: U256,
+    encrypted: bool,
+    prefix_account_rlp: Vec<u8>,
+    proof: EIP1186ProofResponse,
+    burn_preimage: String,
+
+    params: P,
+    witness_gen_path: String,
+    prover_path: String,
+) -> Result<(Proof, U256)> {
+    let mut inputs_file = NamedTempFile::new()?;
+
+    let max_blocks = 4;
+    let max_lower_len = 99;
+    let max_prefix_len = max_blocks * 136 - max_lower_len;
+
+    let prefix_account_rlp_len = prefix_account_rlp.len();
+    let prefix_account_rlp = {
+        let mut prefix_account_rlp = prefix_account_rlp;
+        prefix_account_rlp.extend(vec![0; max_prefix_len - prefix_account_rlp_len]);
+        prefix_account_rlp
+    };
+
+    let json_input = format!(
+        "{{
+            \"salt\": {},
+            \"encrypted\": {},
+            \"nonce\": {},
+            \"balance\": {},
+            \"storageHash\": {},
+            \"codeHash\": {},
+            \"burn_preimage\": \"{}\",
+            \"lowerLayerPrefixLen\": {},
+            \"lowerLayerPrefix\": {}
+        }}",
+        serde_json::to_string(&salt.to_string()).ok().unwrap(),
+        if encrypted { 1 } else { 0 },
+        serde_json::to_string(&proof.nonce.to_string())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof.balance.to_string())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof.storage_hash.as_bytes().to_vec())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&proof.code_hash.as_bytes().to_vec())
+            .ok()
+            .unwrap(),
+        burn_preimage,
+        prefix_account_rlp_len,
+        serde_json::to_string(&prefix_account_rlp).ok().unwrap()
+    );
+
+    write!(inputs_file, "{}", json_input)?;
+
+    log::info!("Circuit input: {}", json_input);
+
+    let witness_file = NamedTempFile::new()?;
+    let wtns_gen_output = Command::new(witness_gen_path.clone())
+        .arg(inputs_file.path())
+        .arg(witness_file.path())
+        .output()?;
+
+    if !wtns_gen_output.stdout.is_empty() {
+        log::info!(
+            "Witness generator output: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stdout)
+        );
+    }
+    if !wtns_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating witnesses: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(wtns_gen_output.stdout.len(), 0);
+    assert_eq!(wtns_gen_output.stderr.len(), 0);
+
+    let proof_file = NamedTempFile::new()?;
+    let pub_inp_file = NamedTempFile::new()?;
+    let proof_gen_output = Command::new(prover_path)
+        .arg(params.as_ref().as_os_str())
+        .arg(witness_file.path())
+        .arg(proof_file.path())
+        .arg(pub_inp_file.path())
+        .output()?;
+
+    if !proof_gen_output.stdout.is_empty() {
+        log::info!(
+            "Proof generator output: {}",
+            String::from_utf8_lossy(&proof_gen_output.stdout)
+        );
+    }
+
+    if !proof_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating proof: {}",
+            String::from_utf8_lossy(&proof_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(proof_gen_output.stdout.len(), 0);
+    assert_eq!(proof_gen_output.stderr.len(), 0);
+
+    let generatecall_output = Command::new("snarkjs")
+        .arg("generatecall")
+        .arg(pub_inp_file.path())
+        .arg(proof_file.path())
+        .output()?;
+
+    let mut calldata = std::str::from_utf8(&generatecall_output.stdout)?.to_string();
+    calldata = calldata
+        .replace("\"", "")
+        .replace("[", "")
+        .replace("]", "")
+        .replace(" ", "")
+        .replace("\n", "");
+
+    let data = calldata
+        .split(",")
+        .map(|k| U256::from_str_radix(k, 16))
+        .collect::<Result<Vec<U256>, _>>()?;
+
+    let proof = Proof {
+        a: data[0..2].try_into()?,
+        b: [data[2..4].try_into()?, data[4..6].try_into()?],
+        c: data[6..8].try_into()?,
+        public: data[8..].to_vec(),
+    };
+
+    let output_reader = std::fs::File::open("output.json")?;
+    let output: Vec<String> = serde_json::from_reader(output_reader)?;
+    let commit_upper = U256::from_str_radix(&output[0], 10).unwrap();
+
+    Ok((proof, commit_upper))
+}
+
+pub fn mpt_path_prove<P: AsRef<Path>>(
+    salt: U256,
+    lower: Vec<u8>,
+    upper: Vec<u8>,
+    is_top: bool,
+
+    params: P,
+    witness_gen_path: String,
+    prover_path: String,
+) -> Result<(Proof, U256)> {
+    let mut inputs_file = NamedTempFile::new()?;
+
+    let max_blocks = 4;
+    let num_lower_layer_bytes = lower.len();
+    let num_upper_layer_bytes = if is_top { 1 } else { upper.len() };
+    let lower_layer = {
+        let mut lower_layer = lower;
+        lower_layer.extend(vec![0; max_blocks * 136 - num_lower_layer_bytes]);
+        lower_layer
+    };
+    let upper_layer = {
+        let mut upper_layer = upper.clone();
+        upper_layer.extend(vec![0; max_blocks * 136 - upper.len()]);
+        upper_layer
+    };
+
+    let json_input = format!(
+        "{{
+            \"salt\": {},
+            \"numLowerLayerBytes\": {},
+            \"numUpperLayerBytes\": {},
+            \"lowerLayerBytes\": {},
+            \"upperLayerBytes\": {},
+            \"isTop\": {}
+        }}",
+        serde_json::to_string(&salt.to_string()).ok().unwrap(),
+        num_lower_layer_bytes,
+        num_upper_layer_bytes,
+        serde_json::to_string(&lower_layer).ok().unwrap(),
+        serde_json::to_string(&upper_layer).ok().unwrap(),
+        if is_top { 1 } else { 0 }
+    );
+
+    write!(inputs_file, "{}", json_input)?;
+
+    log::info!("Circuit input: {}", json_input);
+
+    let witness_file = NamedTempFile::new()?;
+    let wtns_gen_output = Command::new(witness_gen_path.clone())
+        .arg(inputs_file.path())
+        .arg(witness_file.path())
+        .output()?;
+
+    if !wtns_gen_output.stdout.is_empty() {
+        log::info!(
+            "Witness generator output: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stdout)
+        );
+    }
+    if !wtns_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating witnesses: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(wtns_gen_output.stdout.len(), 0);
+    assert_eq!(wtns_gen_output.stderr.len(), 0);
+
+    let proof_file = NamedTempFile::new()?;
+    let pub_inp_file = NamedTempFile::new()?;
+    let proof_gen_output = Command::new(prover_path)
+        .arg(params.as_ref().as_os_str())
+        .arg(witness_file.path())
+        .arg(proof_file.path())
+        .arg(pub_inp_file.path())
+        .output()?;
+
+    if !proof_gen_output.stdout.is_empty() {
+        log::info!(
+            "Proof generator output: {}",
+            String::from_utf8_lossy(&proof_gen_output.stdout)
+        );
+    }
+    if !proof_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating proof: {}",
+            String::from_utf8_lossy(&proof_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(proof_gen_output.stdout.len(), 0);
+    assert_eq!(proof_gen_output.stderr.len(), 0);
+
+    let generatecall_output = Command::new("snarkjs")
+        .arg("generatecall")
+        .arg(pub_inp_file.path())
+        .arg(proof_file.path())
+        .output()?;
+
+    let mut calldata = std::str::from_utf8(&generatecall_output.stdout)?.to_string();
+    calldata = calldata
+        .replace("\"", "")
+        .replace("[", "")
+        .replace("]", "")
+        .replace(" ", "")
+        .replace("\n", "");
+
+    let data = calldata
+        .split(",")
+        .map(|k| U256::from_str_radix(k, 16))
+        .collect::<Result<Vec<U256>, _>>()?;
+
+    let proof = Proof {
+        a: data[0..2].try_into()?,
+        b: [data[2..4].try_into()?, data[4..6].try_into()?],
+        c: data[6..8].try_into()?,
+        public: data[8..].to_vec(),
+    };
+
+    let output_reader = std::fs::File::open("output.json")?;
+    let output: Vec<String> = serde_json::from_reader(output_reader)?;
+    let commit_upper = U256::from_str_radix(&output[0], 10).unwrap();
+
+    Ok((proof, commit_upper))
+}
+
+pub fn spend_prove<P: AsRef<Path>>(
+    balance: U256,
+    salt: U256,
+
+    withdrawn_balance: U256,
+    remaining_coin_salt: U256,
+
+    params: P,
+    witness_gen_path: String,
+    prover_path: String,
+) -> Result<Proof> {
+    let mut inputs_file = NamedTempFile::new()?;
+
+    let json_input = format!(
+        "{{
+            \"balance\": {},
+            \"salt\": {},
+            \"withdrawnBalance\": {},
+            \"remainingCoinSalt\": {}
+        }}",
+        serde_json::to_string(&balance.to_string()).ok().unwrap(),
+        serde_json::to_string(&salt.to_string()).ok().unwrap(),
+        serde_json::to_string(&withdrawn_balance.to_string())
+            .ok()
+            .unwrap(),
+        serde_json::to_string(&remaining_coin_salt.to_string())
+            .ok()
+            .unwrap()
+    );
+
+    write!(inputs_file, "{}", json_input)?;
+
+    log::info!("Circuit input: {}", json_input);
+
+    let witness_file = NamedTempFile::new()?;
+    let wtns_gen_output = Command::new(witness_gen_path)
+        .arg(inputs_file.path())
+        .arg(witness_file.path())
+        .output()?;
+
+    if !wtns_gen_output.stdout.is_empty() {
+        log::info!(
+            "Witness generator output: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stdout)
+        );
+    }
+    if !wtns_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating witnesses: {}",
+            String::from_utf8_lossy(&wtns_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(wtns_gen_output.stdout.len(), 0);
+    assert_eq!(wtns_gen_output.stderr.len(), 0);
+
+    let proof_file = NamedTempFile::new()?;
+    let pub_inp_file = NamedTempFile::new()?;
+    let proof_gen_output = Command::new(prover_path)
+        .arg(params.as_ref().as_os_str())
+        .arg(witness_file.path())
+        .arg(proof_file.path())
+        .arg(pub_inp_file.path())
+        .output()?;
+
+    if !proof_gen_output.stdout.is_empty() {
+        log::info!(
+            "Proof generator output: {}",
+            String::from_utf8_lossy(&proof_gen_output.stdout)
+        );
+    }
+
+    if !proof_gen_output.stderr.is_empty() {
+        log::error!(
+            "Error while generating proof: {}",
+            String::from_utf8_lossy(&proof_gen_output.stderr)
+        );
+    }
+
+    assert_eq!(proof_gen_output.stdout.len(), 0);
+    assert_eq!(proof_gen_output.stderr.len(), 0);
+
+    let generatecall_output = Command::new("snarkjs")
+        .arg("generatecall")
+        .arg(pub_inp_file.path())
+        .arg(proof_file.path())
+        .output()?;
+
+    let mut calldata = std::str::from_utf8(&generatecall_output.stdout)?.to_string();
+    calldata = calldata
+        .replace("\"", "")
+        .replace("[", "")
+        .replace("]", "")
+        .replace(" ", "")
+        .replace("\n", "");
+
+    let data = calldata
+        .split(",")
+        .map(|k| U256::from_str_radix(k, 16))
+        .collect::<Result<Vec<U256>, _>>()?;
+
+    let proof = Proof {
+        a: data[0..2].try_into()?,
+        b: [data[2..4].try_into()?, data[4..6].try_into()?],
+        c: data[6..8].try_into()?,
+        public: data[8..].to_vec(),
+    };
+
+    Ok(proof)
+}

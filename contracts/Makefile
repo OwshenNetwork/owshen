@@ -58,5 +58,5 @@ src/CoinWithdrawVerifier.sol: circuits/coin_withdraw_0001.zkey
 	sed -i 's/Groth16Verifier/CoinWithdrawVerifier/' src/CoinWithdrawVerifier.sol
 
 clean:
-	rm -rf src/CoinWithdrawVerifier.sol test/CoinWithdrawVerifier.t.sol
+	rm -rf src/CoinWithdrawVerifier.sol test/CoinWithdrawVerifier.t.sol src/MptLastVerifier.sol test/MptLastVerifier.t.sol
 	cd circuits && rm -rf *.sym *.r1cs *.json *.zkey *.wtns coin_withdraw_js/ coin_withdraw_cpp/ coin_withdraw_calldata

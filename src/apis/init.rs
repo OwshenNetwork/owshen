@@ -44,6 +44,8 @@ pub async fn init(
         serde_json::to_string(&Wallet {
             entropy,
             params: None,
+            burnt_addresses: vec![],
+            burnt_coins: vec![],
         })?,
     )?;
     Ok(Json(resp))

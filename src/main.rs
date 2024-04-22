@@ -29,6 +29,12 @@ enum OwshenCliOpt {
     Wallet(commands::WalletOpt),
     Deploy(commands::DeployOpt),
     Node(commands::NodeOpt),
+    Burn(commands::BurnOpt),
+    Mint(commands::MintOpt),
+    Dive(commands::DiveOpt),
+    Participate(commands::ParticipateOpt),
+    Claim(commands::ClaimOpt),
+    Spend(commands::SpendOpt),
 }
 
 impl Into<OwshenPoint> for Point {
@@ -71,6 +77,25 @@ async fn main() -> Result<()> {
         }
         OwshenCliOpt::Node(node_opt) => {
             commands::node(node_opt).await?;
+        }
+
+        OwshenCliOpt::Burn(burn_opt) => {
+            commands::burn(burn_opt, wallet_path).await;
+        }
+        OwshenCliOpt::Mint(mint_opt) => {
+            commands::mint(mint_opt, wallet_path).await;
+        }
+        OwshenCliOpt::Dive(dive_opt) => {
+            commands::dive(dive_opt).await;
+        }
+        OwshenCliOpt::Participate(participate_opt) => {
+            commands::participate(participate_opt).await;
+        }
+        OwshenCliOpt::Claim(claim_opt) => {
+            commands::claim(claim_opt).await;
+        }
+        OwshenCliOpt::Spend(spend_opt) => {
+            commands::spend(spend_opt, wallet_path).await;
         }
     }
 

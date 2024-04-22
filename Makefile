@@ -10,6 +10,7 @@ rapidsnark/package/bin/prover:
 
 bindings: contracts/src/*.sol
 	rm -rf bindings
+	cd circuits && make build
 	cd contracts && make build
 	cd contracts && forge bind --bindings-path ../bindings --root . --crate-name bindings
 
@@ -23,6 +24,7 @@ clean:
 	cd rapidsnark && make clean
 	rm -rf bindings
 	cd contracts && make clean
+	cd circuits && make clean
 
 appimage: rapidsnark/package/bin/prover
 	mkdir -p ~/Owshen-Production.AppDir/usr/bin

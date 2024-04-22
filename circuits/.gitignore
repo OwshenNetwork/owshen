@@ -1,0 +1,11 @@
+*.sol
+*.sym
+*.r1cs
+*.json
+*.zkey
+*.ptau
+*.wtns
+*_calldata
+*_js/
+*_cpp
+out/

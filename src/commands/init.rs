@@ -24,6 +24,8 @@ async fn initialize_wallet(mnemonic: Option<Mnemonic>) -> Result<Wallet, eyre::R
     let wallet = Wallet {
         entropy,
         params: None,
+        burnt_addresses: vec![],
+        burnt_coins: vec![],
     };
 
     println!(

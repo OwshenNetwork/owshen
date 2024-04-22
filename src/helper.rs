@@ -1,6 +1,7 @@
-use crate::fp::Fp;
 use crate::hash::hash4;
 use crate::keys::PublicKey;
+use crate::{fp::Fp, proof::Proof};
+use bindings::dive_token::Groth16Proof;
 use ethers::types::{H160, U256};
 
 pub fn extract_token_amount(
@@ -70,4 +71,19 @@ pub fn h160_to_u256(h160_val: H160) -> U256 {
     bytes[12..32].copy_from_slice(h160_val.as_bytes());
 
     U256::from_big_endian(&bytes)
+}
+
+pub fn to_wei(amount: f64) -> U256 {
+    U256::from((amount * 1e18) as u64)
+}
+
+pub fn proof_to_groth16_proof(proof: Proof) -> Groth16Proof {
+    Groth16Proof {
+        a: [proof.a[0].into(), proof.a[1].into()],
+        b: [
+            [proof.b[0][0].into(), proof.b[0][1].into()],
+            [proof.b[1][0].into(), proof.b[1][1].into()],
+        ],
+        c: [proof.c[0].into(), proof.c[1].into()],
+    }
 }

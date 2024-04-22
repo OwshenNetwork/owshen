@@ -15,8 +15,12 @@ docs/
 
 src/CoinWithdrawVerifier.sol
 src/RewardWithdrawVerifier.sol
+src/Mpt*Verifier.sol
+src/SpendVerifier.sol
 test/CoinWithdrawVerifier.t.sol
 test/RewardWithdrawVerifier.t.sol
+test/Mpt*Verifier.t.sol
+test/SpendVerifier.t.sol
 circuits/*.sym
 circuits/*.r1cs
 circuits/*.json

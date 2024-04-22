@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
-use bindings::{owshen::Owshen, simple_erc_20::SimpleErc20};
+use bindings::{dive_token::DiveToken, owshen::Owshen, simple_erc_20::SimpleErc20};
 use ethers::{
     abi::Abi,
     core::k256::{elliptic_curve::SecretKey, Secp256k1},
@@ -155,13 +155,9 @@ async fn initialize_config(
     log::info!("Deployer address: {:?}", from_address);
     let dive_contract_address = if deploy_dive {
         log::info!("Deploying DIVE token...");
-        SimpleErc20::deploy(
+        DiveToken::deploy(
             client.clone(),
-            (
-                U256::from_str_radix("89900000000000000000000", 10).unwrap(),
-                String::from("dive_token"),
-                String::from("DIVE"),
-            ),
+            (U256::from_str_radix("89900000000000000000000", 10).unwrap(),),
         )?
         .legacy()
         .from(from_address)
@@ -178,8 +174,7 @@ async fn initialize_config(
     };
     log::info!("DIVE token address {:?}", dive_contract_address);
 
-    let erc20_abi = serde_json::from_str::<Abi>(include_str!("../assets/erc20.abi"))?;
-    let dive_contract = Contract::new(dive_contract_address, erc20_abi, client.clone());
+    let dive_contract = DiveToken::new(dive_contract_address, client.clone());
 
     let genesis = if genesis_feed {
         log::info!("Filling the genesis tree... (This might take some time)");
