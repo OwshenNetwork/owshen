@@ -6,7 +6,6 @@ use std::{
     sync::Arc,
 };
 
-use axum::body::Bytes;
 use axum::{
     body::Body,
     extract::{self, Query},
@@ -15,8 +14,7 @@ use axum::{
     routing::{get, get_service, post},
     Json, Router,
 };
-use ethers::types::Withdrawal;
-use mime_guess::{from_ext, Mime};
+use mime_guess::from_ext;
 use std::path::Path;
 use tower_http::services::ServeFile;
 
@@ -30,8 +28,8 @@ use tower_http::cors::CorsLayer;
 
 use crate::{
     apis::{self},
+    checkpointed_hashchain::CheckpointedHashchain,
     config::{Config, Context, EventsLatestStatus, NetworkManager, NodeManager, Peer, Wallet},
-    fmt::FMT,
     genesis::Genesis,
     keys::{PrivateKey, PublicKey},
 };
@@ -104,7 +102,7 @@ pub struct WalletOpt {
     #[structopt(long)]
     db: Option<PathBuf>,
     #[structopt(long)]
-    config: Option<PathBuf>,
+    config: PathBuf,
     #[structopt(long, default_value = "127.0.0.1")]
     ip: String,
     #[structopt(long, default_value = "9000")]
@@ -119,7 +117,7 @@ pub struct WalletOpt {
     test: bool,
 }
 
-pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) {
+pub async fn wallet(opt: WalletOpt, wallet_path: PathBuf) -> Result<(), eyre::Report> {
     let WalletOpt {
         db,
         config,
@@ -133,34 +131,25 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
 
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
     let config_path = if test {
-        config.unwrap_or_else(|| config_path.clone())
+        config
     } else {
         PathBuf::from(format!("{}/usr/share/networks/Sepolia.json", app_dir_path))
     };
 
     let config = match mode {
-        Mode::Windows => {
-            // Use embedded assets for Windows mode
-            let config = ConfigAsset::get("Localhost.json")
-                .and_then(|file| serde_json::from_slice::<Config>(&file.data).ok())
-                .expect("Failed to load embedded config");
-
-            config
-        }
-        _ => {
-            let config = std::fs::read_to_string(&config_path)
-                .map(|s| serde_json::from_str(&s).expect("Invalid config file!"))
-                .expect("Failed to read config file");
-
-            config
-        }
+        Mode::Windows => serde_json::from_slice::<Config>(
+            &ConfigAsset::get("Localhost.json")
+                .ok_or(eyre::eyre!("Asset not found!"))?
+                .data,
+        )?,
+        _ => serde_json::from_str(&std::fs::read_to_string(&config_path)?)?,
     };
 
     let wallet_path = db.unwrap_or(wallet_path.clone());
     let send_mode = mode.clone();
     let withdrawal_mode = mode.clone();
 
-    let _ = serve_wallet(
+    serve_wallet(
         ip,
         port,
         wallet_path,
@@ -173,18 +162,9 @@ pub async fn wallet(opt: WalletOpt, config_path: PathBuf, wallet_path: PathBuf) 
         send_mode,
         withdrawal_mode,
     )
-    .await;
-}
+    .await?;
 
-fn read_priv_key(wallet_path: PathBuf) -> Option<PrivateKey> {
-    let wallet = std::fs::read_to_string(wallet_path)
-        .map(|s| {
-            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
-            w
-        })
-        .ok();
-
-    wallet.map(|w| w.entropy.clone().into())
+    Ok(())
 }
 
 fn read_priv_key(wallet_path: PathBuf) -> Option<PrivateKey> {
@@ -213,51 +193,43 @@ async fn serve_wallet(
 ) -> Result<()> {
     let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
 
-    let params_file: Option<PathBuf> = Some(
-        if test {
-            "contracts/circuits/coin_withdraw_0001.zkey".to_string()
-        } else {
-            format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path)
-        }
-        .into(),
-    );
-    let send_params_file = params_file.clone();
-
-    let genesis_path = if test {
-        "owshen-genesis.dat".to_string()
-    } else {
-        format!(
-            "{}/usr/share/genesis/{}-owshen-genesis.dat",
-            app_dir_path, config.name
+    let (params_file, genesis_path, witness_gen_path, prover_path): (
+        PathBuf,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+    ) = if test {
+        (
+            "contracts/circuits/coin_withdraw_0001.zkey".into(),
+            "owshen-genesis.dat".into(),
+            "contracts/circuits/coin_withdraw_cpp/coin_withdraw".into(),
+            "rapidsnark/package/bin/prover".into(),
         )
-    };
-
-    let witness_gen_path = if test {
-        "contracts/circuits/coin_withdraw_cpp/coin_withdraw".into()
     } else {
-        format!("{}/usr/bin/coin_withdraw", app_dir_path).to_string()
-    };
-
-    let prover_path = if test {
-        "rapidsnark/package/bin/prover".to_string()
-    } else {
-        format!("{}/usr/bin/prover", app_dir_path).to_string()
+        (
+            format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path).into(),
+            format!(
+                "{}/usr/share/genesis/{}-owshen-genesis.dat",
+                app_dir_path, config.name
+            )
+            .into(),
+            format!("{}/usr/bin/coin_withdraw", app_dir_path).into(),
+            format!("{}/usr/bin/prover", app_dir_path).into(),
+        )
     };
 
     let send_witness_gen_path = witness_gen_path.clone();
     let send_prover_path = prover_path.clone();
-    let genesis: Option<Genesis> = if let Ok(f) = std::fs::read(genesis_path) {
-        bincode::deserialize(&f).ok()
-    } else {
-        None
-    };
+    let send_params_file = params_file.clone();
+
+    let genesis: Genesis = bincode::deserialize(&std::fs::read(genesis_path)?)?;
 
     let owshen_contract_deployment_block_number = config.owshen_contract_deployment_block_number;
 
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
-        fmt: FMT::new(),
-        genesis: genesis.unwrap(),
+        genesis,
+        chc: CheckpointedHashchain::new(),
         events_latest_status: EventsLatestStatus {
             last_sent_event: 0,
             last_spent_event: 0,
@@ -280,15 +252,22 @@ async fn serve_wallet(
         let context_sync = context.clone();
         tokio::spawn(async move {
             loop {
-                log::info!("Syncing with peers...");
-                let now = std::time::Instant::now();
+                if let Err(e) = async {
+                    log::info!("Syncing with peers...");
+                    let now = std::time::Instant::now();
 
-                let mut node_manager = context_sync.lock().await.node_manager.clone();
-                node_manager.sync_with_peers();
+                    let mut node_manager = context_sync.lock().await.node_manager.clone();
+                    node_manager.sync_with_peers()?;
 
-                context_sync.lock().await.node_manager = node_manager;
+                    context_sync.lock().await.node_manager = node_manager;
 
-                log::info!("Syncing with peers took: {:?}", now.elapsed());
+                    log::info!("Syncing with peers took: {:?}", now.elapsed());
+                    Ok::<(), eyre::Report>(())
+                }
+                .await
+                {
+                    log::error!("Error occurred while syncing with peers: {}", e);
+                }
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
         });
@@ -405,7 +384,7 @@ async fn serve_wallet(
                                 priv_key,
                                 witness_gen_path,
                                 prover_path,
-                                params_file,
+                                Some(params_file),
                                 withdrawal_mode,
                             )
                             .await
@@ -429,7 +408,7 @@ async fn serve_wallet(
                                 priv_key,
                                 send_witness_gen_path,
                                 send_prover_path,
-                                send_params_file,
+                                Some(send_params_file),
                                 send_mode,
                             )
                             .await
@@ -473,22 +452,6 @@ async fn serve_wallet(
                     handle_error(
                         apis::set_network(Query(req), contest_set_network, test, config).await,
                     )
-                },
-            ),
-        )
-        .route(
-            "/set-params-path",
-            post(
-                move |req: extract::Query<apis::SetParamsPathRequest>| async move {
-                    handle_error(apis::set_params_path(req, set_params_path_wallet_path).await)
-                },
-            ),
-        )
-        .route(
-            "/init",
-            post(
-                move |req: extract::Json<apis::PostInitRequest>| async move {
-                    handle_error(apis::init(init_wallet_path, req).await)
                 },
             ),
         )

@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 const CHECKPOINT_INTERVAL: u64 = 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FMT {
+pub struct CheckpointedHashchain {
     values: Vec<Fp>,
     checkpoints: Vec<Fp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FMTProof {
+pub struct CheckpointedHashchainProof {
     pub checkpoint_head: Fp,
     pub latest_values_commitment_head: Fp,
 
@@ -25,7 +25,7 @@ pub struct FMTProof {
     pub is_in_latest_commits: bool,
 }
 
-impl FMT {
+impl CheckpointedHashchain {
     pub fn new() -> Self {
         Self {
             values: vec![],
@@ -49,14 +49,14 @@ impl FMT {
             if self.checkpoints.is_empty() {
                 self.checkpoints.push(commitment);
             } else {
-                let perv_checkpoint = *self.checkpoints.last().unwrap_or(&Fp::default());
+                let perv_checkpoint = self.checkpoints.last().cloned().unwrap_or_default();
                 let checkpoint = hash2([perv_checkpoint, commitment]);
                 self.checkpoints.push(checkpoint);
             }
         }
     }
 
-    pub fn get(&self, index: u64) -> FMTProof {
+    pub fn get(&self, index: u64) -> CheckpointedHashchainProof {
         let value = self.values[index as usize];
 
         let mut is_in_latest_commits = false;
@@ -99,8 +99,7 @@ impl FMT {
         let mut latest_values = self.values
             [(self.values.len() as u64 / CHECKPOINT_INTERVAL * CHECKPOINT_INTERVAL) as usize..]
             .to_vec();
-        let mut latest_values_commitment_head =
-            latest_values.first().unwrap_or(&Fp::default()).clone();
+        let mut latest_values_commitment_head = latest_values.first().cloned().unwrap_or_default();
         for i in 1..latest_values.len() {
             latest_values_commitment_head =
                 hash2([latest_values_commitment_head, latest_values[i]]);
@@ -110,8 +109,8 @@ impl FMT {
             latest_values.push(Fp::from(0));
         }
 
-        FMTProof {
-            checkpoint_head: self.checkpoints.last().unwrap_or(&Fp::default()).clone(),
+        CheckpointedHashchainProof {
+            checkpoint_head: self.checkpoints.last().cloned().unwrap_or_default(),
             latest_values_commitment_head: latest_values_commitment_head,
             value,
             between_values,
@@ -123,7 +122,7 @@ impl FMT {
     }
 
     #[allow(dead_code)]
-    pub fn verify(index: u64, proof: &FMTProof) -> bool {
+    pub fn verify(index: u64, proof: &CheckpointedHashchainProof) -> bool {
         assert_eq!(proof.checkpoints.len(), proof.checkpoint_commitments.len());
 
         for i in 0..proof.checkpoints.len() {
@@ -166,11 +165,11 @@ impl FMT {
     }
 
     pub fn head(&self) -> Fp {
-        *self.values.last().unwrap_or(&Fp::default())
+        self.values.last().cloned().unwrap_or_default()
     }
 
     pub fn get_last_checkpoint(&self) -> Fp {
-        *self.checkpoints.last().unwrap_or(&Fp::default())
+        self.checkpoints.last().cloned().unwrap_or_default()
     }
 }
 
@@ -179,21 +178,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_fmt() {
-        let mut fmt = FMT::new();
-        fmt.set(Fp::from(123));
-        fmt.set(Fp::from(234));
-        fmt.set(Fp::from(345));
-        fmt.set(Fp::from(456));
-        fmt.set(Fp::from(567));
-        fmt.set(Fp::from(678));
-        fmt.set(Fp::from(789));
-        fmt.set(Fp::from(890));
-        fmt.set(Fp::from(901));
-        let proof = fmt.get(2);
-        assert!(FMT::verify(1, &proof));
+    fn test_chc() {
+        let mut chc = CheckpointedHashchain::new();
+        chc.set(Fp::from(123));
+        chc.set(Fp::from(234));
+        chc.set(Fp::from(345));
+        chc.set(Fp::from(456));
+        chc.set(Fp::from(567));
+        chc.set(Fp::from(678));
+        chc.set(Fp::from(789));
+        chc.set(Fp::from(890));
+        chc.set(Fp::from(901));
+        let proof = chc.get(2);
+        assert!(CheckpointedHashchain::verify(1, &proof));
 
-        let proof = fmt.get(7);
-        assert!(FMT::verify(1, &proof));
+        let proof = chc.get(7);
+        assert!(CheckpointedHashchain::verify(1, &proof));
     }
 }

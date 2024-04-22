@@ -46,11 +46,6 @@ impl EphemeralPrivKey {
     }
 }
 
-#[derive(Clone, Debug, Copy, Serialize, Deserialize)]
-pub struct Cipher {
-    a: Point,
-    b: Point,
-}
 struct PublicKeyStr;
 
 lazy_static! {
@@ -144,14 +139,6 @@ impl From<PrivateKey> for PublicKey {
 }
 
 impl PublicKey {
-    #[allow(dead_code)]
-    pub fn encrypt(&self, random: Fp, msg: Point) -> Cipher {
-        Cipher {
-            a: *BASE * random,
-            b: msg + self.point * random,
-        }
-    }
-
     pub fn derive(&self, r: Fp) -> (EphemeralPrivKey, EphemeralPubKey, PublicKey) {
         let ephemeral = *BASE * r;
         let shared_secret = self.point * r;
@@ -231,10 +218,6 @@ impl PrivateKey {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn decrypt(&self, cipher: Cipher) -> Point {
-        cipher.b - cipher.a * self.secret
-    }
     pub fn nullifier(&self, index: u32) -> Fp {
         hash4([self.secret, Fp::from(index as u64), 0.into(), 0.into()])
     }
@@ -349,20 +332,6 @@ mod tests {
         assert!(master_pub_key != stealth_pub_key);
         let stealth_priv_key = master_priv_key.derive(stealth_eph_pub_key);
         assert_eq!(PublicKey::from(stealth_priv_key), stealth_pub_key);
-    }
-
-    #[test]
-    fn test_encrypt() {
-        let priv_key = PrivateKey {
-            secret: 23456.into(),
-        };
-        let pub_key: PublicKey = priv_key.into();
-        let msg = G.mul(123456.into());
-        let rnd: Fp = 987654.into();
-        let enc = pub_key.encrypt(rnd, msg);
-        let dec = priv_key.decrypt(enc);
-
-        assert_eq!(dec, msg);
     }
 
     #[test]

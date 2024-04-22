@@ -49,12 +49,15 @@ lazy_static! {
 pub async fn set_network(
     Query(req): Query<SetNetworkRequest>,
     ctx: Arc<Mutex<Context>>,
-    test: bool,
+    _test: bool,
     config: Config,
 ) -> Result<Json<SetNetworkResponse>, eyre::Report> {
     let chain_id = req.chain_id;
-    let (provider_url, config_path) = NETWORK_CONFIG_MAP.get(&chain_id).unwrap().clone();
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
+    let (provider_url, _config_path) = NETWORK_CONFIG_MAP
+        .get(&chain_id)
+        .ok_or(eyre::eyre!("Unsupported network!"))?
+        .clone();
+    // let app_dir_path = std::env::var("APPDIR").unwrap_or_default();
 
     // let config_path = if test {
     //     std::fs::read_to_string(&config_path)

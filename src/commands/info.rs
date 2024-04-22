@@ -10,19 +10,11 @@ use crate::{
 #[derive(StructOpt, Debug)]
 pub struct InfoOpt {}
 
-pub async fn info(_opt: InfoOpt, wallet_path: PathBuf) {
-    let wallet = std::fs::read_to_string(&wallet_path)
-        .map(|s| {
-            let w: Wallet = serde_json::from_str(&s).expect("Invalid wallet file!");
-            w
-        })
-        .ok();
-    if let Some(wallet) = &wallet {
-        println!(
-            "Owshen Address: {}",
-            PublicKey::from(PrivateKey::from(wallet.entropy.clone()))
-        );
-    } else {
-        println!("Wallet is not initialized!");
-    }
+pub async fn info(_opt: InfoOpt, wallet_path: PathBuf) -> Result<(), eyre::Report> {
+    let wallet: Wallet = serde_json::from_str(&std::fs::read_to_string(&wallet_path)?)?;
+    println!(
+        "Owshen Address: {}",
+        PublicKey::from(PrivateKey::from(wallet.entropy.clone()))
+    );
+    Ok(())
 }

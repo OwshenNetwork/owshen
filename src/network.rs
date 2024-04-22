@@ -35,14 +35,13 @@ impl NodeManager {
         self.add_peer(peer);
     }
 
-    pub fn sync_with_peers(&mut self) {
+    pub fn sync_with_peers(&mut self) -> Result<(), eyre::Report> {
         let mut elected_peer: Option<Peer> = None;
         let mut max_length: u64 = 0;
 
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(1))
-            .build()
-            .unwrap();
+            .build()?;
 
         for mut peer in self.get_peers() {
             let mut url = format!(
@@ -50,7 +49,13 @@ impl NodeManager {
                 peer.addr, self.is_client
             );
             if !self.is_client {
-                url = format!("{}&addr={}", url, self.external_addr.clone().unwrap());
+                url = format!(
+                    "{}&addr={}",
+                    url,
+                    self.external_addr
+                        .clone()
+                        .ok_or(eyre::eyre!("Caller not a node!"))?
+                );
             }
             let resp = client.get(&url).send();
 
@@ -58,7 +63,7 @@ impl NodeManager {
                 if resp.status().is_success() {
                     let body = resp.text();
                     if let Ok(body) = body {
-                        let handshake: GetHandShakeResponse = serde_json::from_str(&body).unwrap();
+                        let handshake: GetHandShakeResponse = serde_json::from_str(&body)?;
                         log::info!(
                             "Synced with peer: {} - {}",
                             url,
@@ -72,7 +77,7 @@ impl NodeManager {
                             max_length = handshake.current_block_number;
                         }
 
-                        self._add_batch_peer_peers(peer.clone());
+                        self._add_batch_peer_peers(peer.clone())?;
                     } else {
                         log::error!("Failed to parse response from peer: {}", url);
                         self.remove_peer(peer.clone());
@@ -86,19 +91,20 @@ impl NodeManager {
                 self.remove_peer(peer.clone());
             }
         }
-        if elected_peer.is_some() {
-            self.elected_peer = elected_peer;
-            log::info!("Elected peer: {}", self.elected_peer.clone().unwrap().addr);
+        if let Some(elected_peer) = elected_peer {
+            log::info!("Elected peer: {}", elected_peer.addr);
+            self.elected_peer = Some(elected_peer);
         }
 
         log::info!("Synced with peers: {}", self.get_peers().len());
+
+        Ok(())
     }
 
-    fn _add_batch_peer_peers(&mut self, peer: Peer) {
+    fn _add_batch_peer_peers(&mut self, peer: Peer) -> Result<(), eyre::Report> {
         let client = reqwest::blocking::Client::builder()
             .timeout(Duration::from_secs(1))
-            .build()
-            .unwrap();
+            .build()?;
 
         let url = format!("http://{}/get-peers", peer.addr);
         let resp = client.get(&url).send();
@@ -107,7 +113,7 @@ impl NodeManager {
             if resp.status().is_success() {
                 let body = resp.text();
                 if let Ok(body) = body {
-                    let peers: GetPeersResponse = serde_json::from_str(&body).unwrap();
+                    let peers: GetPeersResponse = serde_json::from_str(&body)?;
                     for p in peers.peers {
                         self.add_peer(p);
                     }
@@ -123,6 +129,7 @@ impl NodeManager {
             log::error!("Failed to get peers with peer: {}", url);
             self.remove_peer(peer);
         }
+        Ok(())
     }
 
     pub fn set_provider_network(&mut self, provider_network: Network) {
@@ -135,13 +142,11 @@ impl NodeManager {
 
     pub fn get_events_from_elected_peer(
         &self,
-        mut from_spend: u64,
-        mut from_sent: u64,
-    ) -> (Vec<SpendFilter>, Vec<SentFilter>, u64) {
-        let elected_peer = self.elected_peer.clone();
-
-        if let Some(elected_peer) = elected_peer {
-            let step: u64 = 256;
+        mut from_spend: usize,
+        mut from_sent: usize,
+    ) -> Result<(Vec<SpendFilter>, Vec<SentFilter>, u64), eyre::Report> {
+        if let Some(elected_peer) = self.elected_peer.clone() {
+            let step: usize = 256;
             let mut spend_events = Vec::new();
             let mut sent_events = Vec::new();
 
@@ -152,15 +157,14 @@ impl NodeManager {
                 );
                 let client = reqwest::blocking::Client::builder()
                     .timeout(Duration::from_secs(1))
-                    .build()
-                    .unwrap();
+                    .build()?;
                 let resp = client.get(&url).send();
 
                 if let Ok(resp) = resp {
                     if resp.status().is_success() {
                         let body = resp.text();
                         if let Ok(body) = body {
-                            let json_resp: GetEventsResponse = serde_json::from_str(&body).unwrap();
+                            let json_resp: GetEventsResponse = serde_json::from_str(&body)?;
                             if json_resp.spend_events.is_empty() && json_resp.sent_events.is_empty()
                             {
                                 break;
@@ -182,14 +186,10 @@ impl NodeManager {
                     break;
                 }
             }
-            (
-                spend_events,
-                sent_events,
-                self.elected_peer.clone().unwrap().current_block,
-            )
+            Ok((spend_events, sent_events, elected_peer.current_block))
         } else {
             log::error!("Elected peer is not set");
-            (vec![], vec![], 0)
+            Ok((vec![], vec![], 0))
         }
     }
 

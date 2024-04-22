@@ -1,5 +1,5 @@
+use crate::checkpointed_hashchain::CheckpointedHashchain;
 use crate::config::{Context, WalletCache};
-use crate::fmt::FMT;
 use crate::fp::Fp;
 use crate::helper::extract_token_amount;
 use crate::keys::Point;
@@ -32,8 +32,8 @@ pub async fn coins(
     if let Some(sync_task) = &prov.syncing_task {
         if sync_task.is_finished() {
             let task = prov.syncing_task.take().unwrap();
-            let (fmt, coins) = task.await??;
-            prov.fmt = fmt;
+            let (chc, coins) = task.await??;
+            prov.chc = chc;
             prov.coins = coins;
             *prov.syncing.lock().unwrap() = None;
         } else {
@@ -53,7 +53,9 @@ pub async fn coins(
             Arc::clone(&network.provider),
         );
         let curr_block_number = network.provider.get_block_number().await?.as_u64();
-        let wallet_cache_path = home::home_dir().unwrap().join(".owshen-wallet-cache");
+        let wallet_cache_path = home::home_dir()
+            .ok_or(eyre::eyre!("Cannot extract home directory!"))?
+            .join(".owshen-wallet-cache");
         let cache: Option<WalletCache> = if let Ok(f) = std::fs::read(&wallet_cache_path) {
             bincode::deserialize(&f).ok()
         } else {
@@ -64,11 +66,11 @@ pub async fn coins(
         // let root: U256 = contract.method("root", ())?.call().await?;
         let head: U256 = contract.method("head", ())?.call().await?;
         if let Some(cache) = &cache {
-            if Into::<U256>::into(cache.fmt.head()) == head
+            if Into::<U256>::into(cache.chc.head()) == head
                 && curr_block_number.wrapping_sub(cache.height as u64) < UPDATE_THRESHOLD
             {
                 prov.coins = cache.coins.clone();
-                prov.fmt = cache.fmt.clone();
+                prov.chc = cache.chc.clone();
                 return Ok(Json(GetCoinsResponse {
                     coins: cache.coins.clone(),
                     syncing: None,
@@ -76,9 +78,9 @@ pub async fn coins(
             }
         }
 
-        let fmt = match cache.clone() {
-            Some(cache) => cache.fmt.clone(),
-            None => prov.genesis.fmt.clone(),
+        let chc = match cache.clone() {
+            Some(cache) => cache.chc.clone(),
+            None => prov.genesis.chc.clone(),
         };
 
         let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));
@@ -102,12 +104,12 @@ pub async fn coins(
         let mut sent_events: Vec<SentFilter> = vec![];
 
         if prov.node_manager.is_peer2peer {
-            let from_spent: u64 = prov.events_latest_status.last_spent_event;
-            let from_sent: u64 = prov.events_latest_status.last_sent_event;
+            let from_spent = prov.events_latest_status.last_spent_event;
+            let from_sent = prov.events_latest_status.last_sent_event;
             let (tmp_spent_events, tmp_sent_events, _) = prov
                 .node_manager
                 .clone()
-                .get_events_from_elected_peer(from_spent, from_sent);
+                .get_events_from_elected_peer(from_spent, from_sent)?;
             spent_events = tmp_spent_events;
             sent_events = tmp_sent_events;
         } else {
@@ -121,12 +123,12 @@ pub async fn coins(
                 .await;
         }
 
-        let mut fmt_task = fmt.clone();
+        let mut chc_task = chc.clone();
         let mut my_coins: Vec<Coin> = cache.map(|c| c.coins).unwrap_or_default();
 
         let task = tokio::task::spawn_blocking(move || {
             sync_coins(
-                &mut fmt_task,
+                &mut chc_task,
                 &priv_key,
                 &sent_events,
                 &spent_events,
@@ -152,7 +154,7 @@ pub async fn coins(
 }
 
 fn sync_coins(
-    fmt_task: &mut FMT,
+    chc_task: &mut CheckpointedHashchain,
     priv_key: &PrivateKey,
     sent_events: &[SentFilter],
     spent_events: &[SpendFilter],
@@ -160,7 +162,7 @@ fn sync_coins(
     curr_block_number: u64,
     wallet_cache_path: &std::path::PathBuf,
     syncing_arc: &Arc<std::sync::Mutex<Option<f32>>>,
-) -> Result<(FMT, Vec<Coin>), eyre::Report> {
+) -> Result<(CheckpointedHashchain, Vec<Coin>), eyre::Report> {
     let mut cnt = 0;
     for chunk in sent_events.chunks(128) {
         let progress = (cnt as f32) / sent_events.len() as f32;
@@ -173,7 +175,7 @@ fn sync_coins(
         );
         *syncing_arc.lock().unwrap() = Some(progress);
         for e in chunk.iter() {
-            fmt_task.set(Fp::try_from(e.commitment)?);
+            chc_task.set(Fp::try_from(e.commitment)?);
         }
         for new_coin in chunk
             .par_iter()
@@ -194,14 +196,14 @@ fn sync_coins(
                 let hint_token_address = sent_event.hint_token_address;
                 let commitment = Fp::try_from(sent_event.commitment).ok()?;
                 let shared_secret = stealth_priv.shared_secret(ephemeral);
-                match extract_token_amount(
+                if let Ok(Some((fp_hint_token_address, fp_hint_amount))) = extract_token_amount(
                     hint_token_address,
                     hint_amount,
                     shared_secret,
                     commitment,
                     stealth_pub,
                 ) {
-                    Ok(Some((fp_hint_token_address, fp_hint_amount))) => Some(Coin {
+                    Some(Coin {
                         index,
                         uint_token: u256_to_h160(fp_hint_token_address.into()),
                         amount: fp_hint_amount.into(),
@@ -209,9 +211,9 @@ fn sync_coins(
                         priv_key: stealth_priv,
                         pub_key: stealth_pub,
                         commitment: sent_event.commitment,
-                    }),
-                    Ok(None) => None,
-                    Err(_) => None,
+                    })
+                } else {
+                    None
                 }
             })
             .collect::<Vec<_>>()
@@ -222,25 +224,16 @@ fn sync_coins(
         }
         cnt += chunk.len();
     }
+
     for spend_event in spent_events {
-        for _coin in my_coins.clone() {
-            let coin_position = my_coins
-                .iter()
-                .position(|_coin| _coin.nullifier == spend_event.nullifier);
-            match coin_position {
-                Some(index) => {
-                    my_coins.remove(index);
-                }
-                None => {}
-            }
-        }
+        my_coins.retain(|c| c.nullifier != spend_event.nullifier);
     }
 
     let wallet_cache = WalletCache {
         coins: my_coins.clone(),
-        fmt: fmt_task.clone(),
+        chc: chc_task.clone(),
         height: curr_block_number as u64,
     };
     std::fs::write(&wallet_cache_path, bincode::serialize(&wallet_cache)?)?;
-    Ok::<(FMT, Vec<Coin>), eyre::Report>((fmt_task.clone(), my_coins.clone()))
+    Ok::<(CheckpointedHashchain, Vec<Coin>), eyre::Report>((chc_task.clone(), my_coins.clone()))
 }

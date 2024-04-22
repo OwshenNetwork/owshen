@@ -1,7 +1,7 @@
 mod apis;
+mod checkpointed_hashchain;
 mod commands;
 mod config;
-mod fmt;
 mod fp;
 mod genesis;
 mod hash;
@@ -9,13 +9,11 @@ mod helper;
 mod keys;
 mod network;
 mod poseidon;
-mod poseidon2;
 mod proof;
 
 use bindings::owshen::Point as OwshenPoint;
 use colored::Colorize;
-use config::{Coin, Config, NetworkManager, GOERLI_ENDPOINT};
-use ethers::{abi::Abi, prelude::*, types::H160};
+use config::{Coin, NetworkManager};
 use eyre::Result;
 use helper::{h160_to_u256, u256_to_h160};
 use keys::Point;
@@ -31,23 +29,6 @@ enum OwshenCliOpt {
     Wallet(commands::WalletOpt),
     Deploy(commands::DeployOpt),
     Node(commands::NodeOpt),
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            name: String::new(),
-            endpoint: GOERLI_ENDPOINT.to_string(),
-            dive_contract_address: H160::default(),
-            owshen_contract_address: H160::default(),
-            owshen_contract_deployment_block_number: U64::default(),
-            owshen_contract_abi: Abi::default(),
-            erc20_abi: Abi::default(),
-            token_contracts: NetworkManager::new(),
-            poseidon4_contract_address: H160::default(),
-            poseidon2_contract_address: H160::default(),
-        }
-    }
 }
 
 impl Into<OwshenPoint> for Point {
@@ -66,7 +47,6 @@ async fn main() -> Result<()> {
         .init();
 
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
-    let config_path = home::home_dir().unwrap().join(".config-wallet.json");
 
     log::info!(
         "{} {}",
@@ -78,19 +58,19 @@ async fn main() -> Result<()> {
 
     match opt {
         OwshenCliOpt::Init(init_opt) => {
-            commands::init(init_opt, wallet_path).await;
+            commands::init(init_opt, wallet_path).await?;
         }
         OwshenCliOpt::Deploy(deploy_opt) => {
-            commands::deploy(deploy_opt, config_path).await;
+            commands::deploy(deploy_opt).await?;
         }
         OwshenCliOpt::Wallet(wallet_opt) => {
-            commands::wallet(wallet_opt, config_path, wallet_path).await;
+            commands::wallet(wallet_opt, wallet_path).await?;
         }
         OwshenCliOpt::Info(info_opt) => {
-            commands::info(info_opt, wallet_path).await;
+            commands::info(info_opt, wallet_path).await?;
         }
         OwshenCliOpt::Node(node_opt) => {
-            commands::node(node_opt, config_path).await;
+            commands::node(node_opt).await?;
         }
     }
 
@@ -99,15 +79,16 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use ethers::abi::Abi;
+    use ethers::providers::{Http, Provider};
     use ethers::utils::Ganache;
 
     use std::sync::Arc;
 
     use ethers::core::types::Bytes;
     use ethers::middleware::contract::ContractFactory;
+    use ethers::middleware::Middleware;
+    use ethers::types::U256;
     use std::str::FromStr;
 
     #[tokio::test]

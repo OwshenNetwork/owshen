@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "./FMT.sol";
-import "./MiMC.sol";
+import "./CheckpointedHashchain.sol";
+import "./IPoseidon.sol";
 import "./CoinWithdrawVerifier.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/contracts/utils/Strings.sol";
@@ -36,9 +36,9 @@ contract Owshen {
     CoinWithdrawVerifier coin_withdraw_verifier;
     mapping(uint256 => bool) nullifiers;
 
-    IPoseidon4 mimc;
+    IPoseidon4 poseidon4;
 
-    FMT fmt;
+    CheckpointedHashchain chc;
     uint256 public depositIndex = 0;
     uint256 constant CHECKPOINT_INTERVAL = 1024;
 
@@ -46,44 +46,25 @@ contract Owshen {
      * @dev The constructor
      */
     constructor(IPoseidon4 _poseidon4, IPoseidon2 _poseidon2, uint256 _genesis_root) {
-        mimc = _poseidon4;
+        poseidon4 = _poseidon4;
         coin_withdraw_verifier = new CoinWithdrawVerifier();
-        fmt = new FMT(_poseidon2, _genesis_root);
+        chc = new CheckpointedHashchain(_poseidon2, _genesis_root);
     }
 
-    function deposit(
-        Point calldata _pub_key,
-        Point calldata _ephemeral,
-        address _tokenAddress,
-        uint256 _amount
-    ) public payable {
+    function deposit(Point calldata _pub_key, Point calldata _ephemeral, address _tokenAddress, uint256 _amount)
+        public
+        payable
+    {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
-        uint256 leaf = mimc.poseidon(
-            [_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]
-        );
-        fmt.set(leaf);
+        uint256 leaf = poseidon4.poseidon([_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]);
+        chc.set(leaf);
         _processDeposit(msg.sender, address(this), _tokenAddress, _amount);
-        emit Sent(
-            _ephemeral,
-            depositIndex,
-            block.timestamp,
-            _amount,
-            uint_tokenaddress,
-            leaf
-        );
+        emit Sent(_ephemeral, depositIndex, block.timestamp, _amount, uint_tokenaddress, leaf);
         depositIndex += 1;
     }
 
-    function _processDeposit(
-        address _from,
-        address _to,
-        address _token,
-        uint256 _amount
-    ) internal {
-        require(
-            msg.value == 0,
-            "ETH value is supposed to be 0 for ERC20 instance"
-        );
+    function _processDeposit(address _from, address _to, address _token, uint256 _amount) internal {
+        require(msg.value == 0, "ETH value is supposed to be 0 for ERC20 instance");
         IERC20(_token).transferFrom(_from, _to, _amount);
     }
 
@@ -94,8 +75,14 @@ contract Owshen {
         uint256[2] calldata _nullifiers,
         uint256[2] memory _commitments
     ) internal {
-        require(fmt.is_known_checkpoint_head(_checkpoint_head) || depositIndex < CHECKPOINT_INTERVAL, "Invalid checkpoint head");
-        require(fmt.is_known_latest_value_head(_latest_values_commitment_head) || depositIndex % CHECKPOINT_INTERVAL == 0, "Invalid latest values commitment head");
+        require(
+            chc.is_known_checkpoint_head(_checkpoint_head) || depositIndex < CHECKPOINT_INTERVAL,
+            "Invalid checkpoint head"
+        );
+        require(
+            chc.is_known_latest_value_head(_latest_values_commitment_head) || depositIndex % CHECKPOINT_INTERVAL == 0,
+            "Invalid latest values commitment head"
+        );
 
         require(_nullifiers[0] != _nullifiers[1], "Nullifiers needs to be different");
 
@@ -110,11 +97,17 @@ contract Owshen {
                 _proof.a,
                 _proof.b,
                 _proof.c,
-                [_checkpoint_head, _latest_values_commitment_head, _nullifiers[0], _nullifiers[1], _commitments[0], _commitments[1]]
+                [
+                    _checkpoint_head,
+                    _latest_values_commitment_head,
+                    _nullifiers[0],
+                    _nullifiers[1],
+                    _commitments[0],
+                    _commitments[1]
+                ]
             ),
             "Invalid proof"
         );
-
     }
 
     function withdraw(
@@ -130,20 +123,15 @@ contract Owshen {
         uint256 _commitment
     ) public {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
-        uint256 null_commitment = mimc.poseidon([uint256(uint160(_to)), 0, _amount, uint_tokenaddress]);
+        uint256 null_commitment = poseidon4.poseidon([uint256(uint160(_to)), 0, _amount, uint_tokenaddress]);
 
         spend(_proof, _checkpoint_head, _latest_values_commitment_head, _nullifiers, [null_commitment, _commitment]);
-        fmt.set(_commitment);
+        chc.set(_commitment);
 
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
         emit Sent(
-            _ephemeral,
-            depositIndex,
-            block.timestamp,
-            _obfuscated_remaining_amount,
-            uint_tokenaddress,
-            _commitment
+            _ephemeral, depositIndex, block.timestamp, _obfuscated_remaining_amount, uint_tokenaddress, _commitment
         );
         emit Spend(_nullifiers[0]);
         emit Spend(_nullifiers[1]);
@@ -165,7 +153,7 @@ contract Owshen {
         bool _is_dual_output
     ) public {
         spend(_proof, _checkpoint_head, _latest_values_commitment_head, _nullifiers, [_commitments[1], _commitments[0]]);
-        fmt.set(_commitments[1]);
+        chc.set(_commitments[1]);
         emit Sent(
             _receiver_ephemeral,
             depositIndex,
@@ -176,7 +164,7 @@ contract Owshen {
         );
         depositIndex += 1;
         if (_is_dual_output) {
-            fmt.set(_commitments[0]);
+            chc.set(_commitments[0]);
             emit Sent(
                 _sender_ephemeral,
                 depositIndex,
@@ -201,9 +189,7 @@ contract Owshen {
     /**
      * @dev whether an array of nullifiers is already spent
      */
-    function isSpentArray(
-        uint256[] calldata _nullifierHashes
-    ) external view returns (bool[] memory spent) {
+    function isSpentArray(uint256[] calldata _nullifierHashes) external view returns (bool[] memory spent) {
         spent = new bool[](_nullifierHashes.length);
         for (uint256 i = 0; i < _nullifierHashes.length; i++) {
             if (isSpent(_nullifierHashes[i])) {
@@ -213,12 +199,10 @@ contract Owshen {
     }
 
     function head() public view returns (uint256) {
-        return fmt.getLastCommitment();
+        return chc.getLastCommitment();
     }
 
-    function getUintTokenAddress(
-        address _token_address
-    ) private pure returns (uint256) {
+    function getUintTokenAddress(address _token_address) private pure returns (uint256) {
         return uint256(uint160(_token_address));
     }
 }

@@ -1,6 +1,6 @@
 mod genesis_data;
 
-use crate::fmt::FMT;
+use crate::checkpointed_hashchain::CheckpointedHashchain;
 use crate::fp::Fp;
 use crate::h160_to_u256;
 use crate::hash::hash4;
@@ -41,7 +41,7 @@ impl Into<SentFilter> for Entry {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Genesis {
     pub total: Fp,
-    pub fmt: FMT,
+    pub chc: CheckpointedHashchain,
     pub events: Vec<Entry>,
 }
 
@@ -77,18 +77,18 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
 }
 
 pub fn fill_genesis(dive_token_address: H160) -> Genesis {
-    let mut fmt = FMT::new();
+    let mut chc = CheckpointedHashchain::new();
     let mut total: Fp = Fp::default();
     let events = gen_genesis_events(dive_token_address);
     for event in events.iter() {
-        fmt.set(event.commitment);
+        chc.set(event.commitment);
         total += event.hint_amount;
     }
     if events.len() % 1024 != 0 {
         for _ in 0..(1024 - events.len() % 1024) {
-            fmt.set(Fp::default());
+            chc.set(Fp::default());
         }
     }
 
-    Genesis { total, fmt, events }
+    Genesis { total, chc, events }
 }

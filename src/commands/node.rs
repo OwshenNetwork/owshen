@@ -12,16 +12,14 @@ use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
 use crate::apis;
-use crate::config::{
-    Config, Network, NodeContext, NodeManager, Peer, GOERLI_ENDPOINT, NODE_UPDATE_INTERVAL,
-};
+use crate::config::{Config, Network, NodeContext, NodeManager, Peer, NODE_UPDATE_INTERVAL};
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct NodeOpt {
-    #[structopt(long, default_value = GOERLI_ENDPOINT)]
+    #[structopt(long)]
     endpoint: String,
     #[structopt(long)]
-    config: Option<PathBuf>,
+    config: PathBuf,
 
     #[structopt(long, default_value = "127.0.0.1:8888")]
     external: SocketAddr,
@@ -34,7 +32,7 @@ pub struct NodeOpt {
     peer2peer: bool,
 }
 
-pub async fn node(opt: NodeOpt, config_path: PathBuf) {
+pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
     let NodeOpt {
         endpoint,
         config,
@@ -44,21 +42,18 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
         peer2peer,
     } = opt;
 
-    let config_path = config.unwrap_or(config_path.clone());
-    let config: Option<Config> = std::fs::read_to_string(&config_path)
-        .map(|s| {
-            let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
-            c
-        })
-        .ok();
+    let config: Config = std::fs::read_to_string(&config).map(|s| {
+        let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
+        c
+    })?;
 
-    let provider = Provider::<Http>::try_from(endpoint.clone()).unwrap();
+    let provider = Provider::<Http>::try_from(endpoint.clone())?;
     let context = Arc::new(Mutex::new(NodeContext {
         node_manager: NodeManager {
             external_addr: Some(external.clone()),
             network: Some(Network {
                 provider: Arc::new(provider),
-                config: config.unwrap_or_default(),
+                config,
             }),
             peers: bootstrap_peers,
             elected_peer: None,
@@ -75,15 +70,22 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
     let context_sync = context.clone();
     tokio::spawn(async move {
         loop {
-            log::info!("Syncing with peers...");
-            let now = std::time::Instant::now();
+            if let Err(e) = async {
+                log::info!("Syncing with peers...");
+                let now = std::time::Instant::now();
 
-            let mut node_manager = context_sync.lock().await.node_manager.clone();
-            node_manager.sync_with_peers();
+                let mut node_manager = context_sync.lock().await.node_manager.clone();
+                node_manager.sync_with_peers()?;
 
-            context_sync.lock().await.node_manager = node_manager;
+                context_sync.lock().await.node_manager = node_manager;
 
-            log::info!("Syncing with peers took: {:?}", now.elapsed());
+                log::info!("Syncing with peers took: {:?}", now.elapsed());
+                Ok::<(), eyre::Report>(())
+            }
+            .await
+            {
+                log::error!("Error occurred while syncing with peers: {}", e);
+            }
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     });
@@ -132,7 +134,7 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
     let sync_job = async {
         loop {
             log::info!("Updating events...");
-            update_events(context.clone()).await;
+            update_events(context.clone()).await?;
 
             log::info!("Sleeping for {} seconds...", NODE_UPDATE_INTERVAL);
             tokio::time::sleep(tokio::time::Duration::from_secs(NODE_UPDATE_INTERVAL)).await;
@@ -140,21 +142,23 @@ pub async fn node(opt: NodeOpt, config_path: PathBuf) {
         Ok::<(), eyre::Error>(())
     };
 
-    _ = tokio::try_join!(backend, sync_job);
+    tokio::try_join!(backend, sync_job)?;
+
+    Ok(())
 }
 
-async fn update_events(context: Arc<Mutex<NodeContext>>) {
+async fn update_events(context: Arc<Mutex<NodeContext>>) -> Result<(), eyre::Report> {
     let mut context = context.lock().await;
     let network = context.node_manager.get_provider_network().clone();
 
     if let Some(network) = network {
         if context.node_manager.is_peer2peer {
-            let from_spent: u64 = context.spent_events.len().try_into().unwrap();
-            let from_sent: u64 = context.sent_events.len().try_into().unwrap();
+            let from_spent = context.spent_events.len();
+            let from_sent = context.sent_events.len();
             let (spent_events, sent_events, peer_current_block_number) = context
                 .node_manager
                 .clone()
-                .get_events_from_elected_peer(from_spent, from_sent);
+                .get_events_from_elected_peer(from_spent, from_sent)?;
 
             if peer_current_block_number >= context.currnet_block_number {
                 context.spent_events.extend(spent_events.clone());
@@ -170,13 +174,8 @@ async fn update_events(context: Arc<Mutex<NodeContext>>) {
                 log::info!("No new events");
             }
         } else {
-            let curr_block_number = network.provider.get_block_number().await;
-            if let Err(e) = curr_block_number {
-                log::error!("Failed to get current block number: {}", e);
-                return;
-            }
+            let curr_block_number = network.provider.get_block_number().await?.as_u64();
 
-            let curr_block_number = curr_block_number.unwrap().as_u64();
             let curr = context.currnet_block_number;
 
             let spent_events = context
@@ -189,7 +188,7 @@ async fn update_events(context: Arc<Mutex<NodeContext>>) {
                 .await;
 
             log::info!(
-                "new events: {} spent, {} sent",
+                "New events: {} spent, {} sent",
                 spent_events.len(),
                 sent_events.len()
             );
@@ -200,6 +199,8 @@ async fn update_events(context: Arc<Mutex<NodeContext>>) {
     } else {
         log::error!("Provider is not set");
     }
+
+    Ok(())
 }
 
 fn handle_error<T: IntoResponse>(result: Result<T, eyre::Report>) -> impl IntoResponse {

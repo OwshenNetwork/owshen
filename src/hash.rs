@@ -1,9 +1,9 @@
 use crate::fp::Fp;
-use crate::poseidon::poseidon;
-use crate::poseidon2::poseidon2;
+use crate::poseidon::poseidon2;
+use crate::poseidon::poseidon4;
 
 pub fn hash4(vals: [Fp; 4]) -> Fp {
-    poseidon(vals)
+    poseidon4(vals)
 }
 
 pub fn hash2(vals: [Fp; 2]) -> Fp {

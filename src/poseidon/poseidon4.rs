@@ -419,7 +419,7 @@ fn mix(inp: [Fp; T], m: &Vec<Vec<Fp>>) -> [Fp; T] {
     out
 }
 
-pub fn poseidon(inp: [Fp; 4]) -> Fp {
+pub fn poseidon4(inp: [Fp; 4]) -> Fp {
     const T: usize = 5;
     const ROUNDS_F: usize = 8;
     const ROUNDS_P: usize = 60;

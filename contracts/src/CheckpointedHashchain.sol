@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "./MiMC.sol";
+import "./IPoseidon.sol";
 
-
-contract FMT {
-    IPoseidon2 mimc;
+contract CheckpointedHashchain {
+    IPoseidon2 hasher;
     uint256 last_commitment;
     uint256 checkpoint;
     uint256 head;
     uint256 idx;
 
-    uint256 constant CHECKPOINT_INTERVAL = 1024; // TODO: change to 1024
+    uint256 constant CHECKPOINT_INTERVAL = 1024;
 
     mapping(uint256 => uint256) public headCommitmentsHistory;
     uint32 public constant HEAD_HISTORY_SIZE = 30;
@@ -22,7 +21,7 @@ contract FMT {
     uint32 public currentCheckpointIndex = 0;
 
     constructor(IPoseidon2 _hasher, uint256 _genesis_root) {
-        mimc = _hasher;
+        hasher = _hasher;
         last_commitment = 0;
         checkpoint = _genesis_root;
         head = 0;
@@ -31,7 +30,7 @@ contract FMT {
 
     function set(uint256 _commitment) public {
         last_commitment = _commitment;
-        head = head == 0 ? _commitment : mimc.poseidon([head, _commitment]);
+        head = head == 0 ? _commitment : hasher.poseidon([head, _commitment]);
         idx += 1;
 
         uint32 newHeadIndex = (currentHeadIndex + 1) % HEAD_HISTORY_SIZE;
@@ -39,10 +38,9 @@ contract FMT {
         headCommitmentsHistory[newHeadIndex] = head;
 
         if (idx % CHECKPOINT_INTERVAL == 0) {
-            checkpoint = checkpoint == 0 ? head : mimc.poseidon([checkpoint, head]);
+            checkpoint = checkpoint == 0 ? head : hasher.poseidon([checkpoint, head]);
 
-            uint32 newCheckpointIndex = (currentCheckpointIndex + 1) %
-                CHECKPOINT_HISTORY_SIZE;
+            uint32 newCheckpointIndex = (currentCheckpointIndex + 1) % CHECKPOINT_HISTORY_SIZE;
             currentCheckpointIndex = newCheckpointIndex;
             checkpointCommitmentsHistory[newCheckpointIndex] = checkpoint;
 
@@ -50,9 +48,7 @@ contract FMT {
         }
     }
 
-    function is_known_checkpoint_head(
-        uint256 _checkpoint
-    ) public view returns (bool) {
+    function is_known_checkpoint_head(uint256 _checkpoint) public view returns (bool) {
         if (_checkpoint == 0) {
             return false;
         }
@@ -66,9 +62,7 @@ contract FMT {
         return false;
     }
 
-    function is_known_latest_value_head(
-        uint256 _head
-    ) public view returns (bool) {
+    function is_known_latest_value_head(uint256 _head) public view returns (bool) {
         if (_head == 0) {
             return false;
         }
