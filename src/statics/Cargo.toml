@@ -1,0 +1,7 @@
+[package]
+name = "statics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rust-embed = { version = "6.3.0", features = ["include-exclude"] }

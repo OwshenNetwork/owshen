@@ -33,42 +33,7 @@ use crate::{
     genesis::Genesis,
     keys::{PrivateKey, PublicKey},
 };
-use rust_embed::RustEmbed;
-
-#[derive(RustEmbed, Debug)]
-#[folder = "client/build"]
-#[include = "*.html"]
-#[include = "*.json"]
-#[include = "*.txt"]
-#[include = "*.ico"]
-struct Asset;
-
-#[derive(RustEmbed, Debug)]
-#[folder = "client/build/static/"]
-#[include = "js/*"]
-#[include = "css/*"]
-#[include = "media/*"]
-struct Statics;
-
-#[derive(RustEmbed, Debug)]
-#[folder = "contracts/circuits/coin_withdraw_js"]
-#[include = "*.wasm"]
-#[include = "*.js"]
-
-struct CircuitsStatics;
-
-#[derive(RustEmbed, Debug)]
-#[folder = "contracts/circuits"]
-#[include = "*.zkey"]
-
-struct ZkStatics;
-
-#[derive(RustEmbed, Debug)]
-#[folder = "."]
-#[include = "*.json"]
-#[include = "*.dat"]
-
-struct ConfigAsset;
+use statics::*;
 
 enum ResourceType {
     Statics,

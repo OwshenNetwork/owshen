@@ -1,3 +1,4 @@
+workspace = { members = ["src/statics"] }
 [package]
 name = "owshen"
 version = "0.1.4"
@@ -42,3 +43,6 @@ reqwest = { version = "0.11.24", features = ["blocking"] }
 rust-embed = { version = "6.3.0", features = ["include-exclude"] }
 mime_guess = "2.0"
 sha2 = "0.10.8"
+
+[dependencies.statics]
+path = "src/statics"
