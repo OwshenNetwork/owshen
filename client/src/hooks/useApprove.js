@@ -8,11 +8,16 @@ export const useApprove = (tokenAddress, ownerAddress, spenderAddress, ABI) => {
 
   useEffect(() => {
     const initializeContract = async () => {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      if (tokenAddress && ABI) {
-        const contract = new ethers.Contract(tokenAddress, ABI, signer);
-        setContract(contract);
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        if (tokenAddress && ABI) {
+          const contract = new ethers.Contract(tokenAddress, ABI, signer);
+          setContract(contract);
+        }
+      } catch (error) {
+        console.error("Error initializing contract:", error);
+        // Handle the error appropriately, e.g., show a message to the user
       }
     };
     initializeContract();

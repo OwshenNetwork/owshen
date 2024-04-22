@@ -5,16 +5,19 @@ import {
   setReceivedCoins,
   setReceivedCoinsLoading,
   setIsTest,
+  setIsOwshenWalletExist
 } from "../../store/containerSlice";
 import { useDispatch } from "react-redux";
-import { toast } from "react-toastify"; // Assuming you're using react-toastify for toast notifications
+import { toast } from "react-toastify";
 
 export const useMainApi = () => {
   const dispatch = useDispatch();
 
   const setChainId = async (chain_id) => {
     if (!chain_id) {
-      toast.error("Your wallet is not connected. Please connect your wallet to proceed.");
+      toast.error(
+        "Your wallet is not connected. Please connect your wallet to proceed."
+      );
       return;
     }
     await axios
@@ -22,15 +25,14 @@ export const useMainApi = () => {
         params: { chain_id },
       })
       .then(() => {
-        GetCoins();
-        GetInfo();
+        getInfo();
       })
       .catch((error) => {
         console.error("Error:", error);
       });
   };
 
-  const GetCoins = () => {
+  const getCoins = () => {
     dispatch(setReceivedCoinsLoading(true));
     const coinsIntervalId = setInterval(() => {
       axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -46,24 +48,33 @@ export const useMainApi = () => {
     return () => clearInterval(coinsIntervalId);
   };
 
-  const GetInfo = () => {
-    axios.get(`${coreEndpoint}/info`).then(({ data }) => {
-      dispatch(
-        setOwshen({
-          type: "SET_OWSHEN",
-          payload: {
-            wallet: data.address,
-            contract_address: data.owshen_contract,
-            contract_abi: data.owshen_abi,
-            dive_address: data.dive_contract,
-            dive_abi: data.erc20_abi,
-            token_contracts: data.token_contracts,
-          },
-        })
-      );
-      dispatch(setIsTest(data.isTest));
-    });
+  const getInfo = () => {
+    axios
+      .get(`${coreEndpoint}/info`)
+      .then(({ data }) => {
+        dispatch(
+          setOwshen({
+            type: "SET_OWSHEN",
+            payload: {
+              wallet: data.address,
+              contract_address: data.owshen_contract,
+              contract_abi: data.owshen_abi,
+              dive_address: data.dive_contract,
+              dive_abi: data.erc20_abi,
+              token_contracts: data.token_contracts,
+            },
+          })
+        );
+        dispatch(setIsTest(data.isTest));
+        dispatch(setIsOwshenWalletExist(true));
+        getCoins();
+      })
+      .catch((error) => {
+        console.error("Error fetching info:", error);
+        // Optionally, display an error message to the user
+        dispatch(setIsOwshenWalletExist(false));
+      });
   };
 
-  return { setChainId, GetCoins, GetInfo };
+  return { setChainId, getCoins, getInfo };
 };

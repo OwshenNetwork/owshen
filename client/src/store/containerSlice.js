@@ -30,8 +30,10 @@ const containerSlice = createSlice({
     netWorkDetails: {
       name: "",
       chainId: 0,
-      contractName:null
+      contractName: null,
     },
+    isWalletConnected: false,
+    isOwshenWalletExist: true,
   },
   reducers: {
     setUserDetails(state, { payload }) {
@@ -105,10 +107,16 @@ const containerSlice = createSlice({
     setIsTest(state, { payload }) {
       state.isTest = payload;
     },
+    setIsWalletConnected(state, { payload }) {
+      state.isWalletConnected = payload;
+    },
     setNetworkDetails(state, { payload }) {
       state.netWorkDetails.name = payload.name;
       state.netWorkDetails.chainId = payload.chainId;
-      state.netWorkDetails.contractName=payload.contractName
+      state.netWorkDetails.contractName = payload.contractName;
+    },
+    setIsOwshenWalletExist(state, { payload }) {
+      state.isOwshenWalletExist = payload;
     },
   },
 });
@@ -140,10 +148,17 @@ export const selectIsTest = createSelector(
   (state) => state.container.isTest,
   (isTest) => isTest
 );
-
+export const selectIsWalletConnected = createSelector(
+  (state) => state.container.isWalletConnected,
+  (isWalletConnected) => isWalletConnected
+);
 export const selectSentCoin = createSelector(
   (state) => state.container.user.sentCoin,
   (coin) => coin
+);
+export const selectIsOwshenWalletExist = createSelector(
+  (state) => state.container.isOwshenWalletExist,
+  (isOwshenWalletExist) => isOwshenWalletExist
 );
 export const selectNetwork = createSelector(
   (state) => state.container.netWorkDetails,
@@ -157,6 +172,8 @@ export const {
   setReceivedCoinsLoading,
   setIsTest,
   setNetworkDetails,
+  setIsWalletConnected,
+  setIsOwshenWalletExist,
 } = containerSlice.actions;
 
 export default containerSlice.reducer;

@@ -77,7 +77,6 @@ export const chainIdOfWallet = async () => {
     return Number(chainId);
   } catch (error) {
     console.error("Error getting chain ID:", error);
-    throw error; // Re-throw the error so it can be handled by the calling code
   }
 };
 
@@ -99,4 +98,11 @@ export const validateTransaction = (
     return `Your wallet is currently on a different network. Please switch to the ${network.name} network to continue.`;
   }
   return null; // No error
+};
+
+export const copyWalletWords = (CopyWords) => {
+  navigator.clipboard.writeText(CopyWords);
+  toast.success(
+    "Your wallet phrases has been copied to your clipboard successfully!"
+  );
 };

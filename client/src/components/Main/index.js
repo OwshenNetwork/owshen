@@ -5,6 +5,8 @@ import {
   selectOwshen,
   selectIsTest,
   selectReceivedCoins,
+  selectIsWalletConnected,
+  selectIsOwshenWalletExist,
 } from "../../store/containerSlice";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
@@ -20,8 +22,7 @@ import {
   chainIdOfWallet,
 } from "../../utils/helper";
 import { isChainIdExist } from "../../utils/networkDetails";
-import MergeCoins from "../Modal/MergeCoins";
-
+import { useNavigate } from "react-router-dom";
 import "../../styles/main.css";
 import CopyIcon from "../../pics/icons/copy.png";
 import SendIcon from "../../pics/icons/send.png";
@@ -29,17 +30,20 @@ import SwapIcon from "../../pics/icons/swap.png";
 
 const Main = ({ children }) => {
   const address = useSelector(selectUserAddress);
+  const isOwshenWalletExist = useSelector(selectIsOwshenWalletExist);
   const { setChainId } = useMainApi();
-  const [networkChainId, setNetworkChainId] = useState(null);
+  const navigate = useNavigate();
   const OwshenWallet = useSelector(selectOwshen);
   const isTest = useSelector(selectIsTest);
   const receivedCoins = useSelector(selectReceivedCoins);
   const dispatch = useDispatch();
-
   const [tokenContract, setTokenContract] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isInprogress, setIsInprogress] = useState(false);
   const [isOpenWithdraw, setIsOpenWithdraw] = useState(false);
+  const isConnected = useSelector(selectIsWalletConnected);
+  const defaultChainId = isTest ? 11155111 : 1337;
+  const [networkChainId, setNetworkChainId] = useState(defaultChainId);
 
   useEffect(() => {
     // This code will run whenever `tokenContract` changes
@@ -49,25 +53,41 @@ const Main = ({ children }) => {
       );
     }
   }, [tokenContract, dispatch]); // Add `tokenContract` as a dependency
-
-  const getChainId = async () => {
-    const ChainId = await chainIdOfWallet();
-    setNetworkChainId(ChainId);
-  };
   useEffect(() => {
+    const getChainId = async () => {
+      if (window.ethereum) {
+        const ChainId = await chainIdOfWallet();
+        setNetworkChainId(ChainId);
+      }
+    };
+
     getChainId();
-  }, []);
+  }, [isConnected]);
 
   useEffect(() => {
     if (networkChainId && isChainIdExist(networkChainId)) {
       setChainId(networkChainId);
     }
-  }, [networkChainId, OwshenWallet.wallet, OwshenWallet.contract_address]);
+  }, [
+    networkChainId,
+    OwshenWallet.wallet,
+    OwshenWallet.contract_address,
+    isConnected,
+  ]);
+  useEffect(() => {
+    if (!isOwshenWalletExist) {
+      navigate("/walletSelection");
+    }
+  });
   const canOpenModal = () => {
     if (isTest) {
       return setIsInprogress(true);
     }
-    address ? setIsOpen(true) : toast.error("Your wallet is not connected. Please connect your wallet to proceed.");
+    address
+      ? setIsOpen(true)
+      : toast.error(
+          "Your wallet is not connected. Please connect your wallet to proceed."
+        );
   };
   const diveAmount = () => {
     let totalAmount = 0;

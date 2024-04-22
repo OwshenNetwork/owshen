@@ -14,7 +14,6 @@ import { toast } from "react-toastify";
 
 const SelectNetwork = () => {
   const dispatch = useDispatch();
-  const selectedNetwork = useSelector(selectNetwork);
   const [chainId, setChainId] = useState(null);
   const [network, setNetWork] = useState("Select Network");
   const isTest = useSelector(selectIsTest);

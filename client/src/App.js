@@ -8,7 +8,8 @@ import Header from "./components/Header";
 import { Provider } from "react-redux";
 import store from "./store/store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import AllRoutes from "./components/AllRoutes";
+import AllRoutes from "./Routes/index";
+import WalletConnectionChecker from "./components/WalletConnectionChecker";
 
 const App = () => {
   const queryClient = new QueryClient();
@@ -17,12 +18,13 @@ const App = () => {
     return localStorage.getItem("theme") === "true";
   });
   const bodyCS =
-    "lg:max-w-[1270px] mx-auto p-8 lg:min-w-[980px] lg:mt-14 h-5/6 min-h-screen lg:min-h-[726px] flex flex-col bg-white dark:bg-indigo-950 dark:text-white lg:rounded-lg lg:shadow-2xl ease-in-out duration-300";
+    "lg:max-w-[1270px] mx-auto p-8 lg:min-w-[980px] lg:mt-14  min-h-screen lg:min-h-[790px] flex flex-col bg-white dark:bg-indigo-950 dark:text-white lg:rounded-lg lg:shadow-2xl ease-in-out duration-300";
 
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
         <div className={`h-[90vh] ${isDarkTheme ? "dark" : ""}  `}>
+          <WalletConnectionChecker />
           <ToastContainer theme="colored" position="bottom-right" />
           <div className={bodyCS}>
             <Header isDarkTheme={isDarkTheme} setIsDarkTheme={setIsDarkTheme} />

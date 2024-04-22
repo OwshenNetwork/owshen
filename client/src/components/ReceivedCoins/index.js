@@ -11,7 +11,6 @@ import {
 import ReactLoading from "react-loading";
 import TransactionModal from "../Modal/TransactionModal";
 import InProgress from "../Modal/InProgress";
-import MergIcon from "../../pics/icons/merge-icon.png";
 import SendIcon from "../../pics/icons/send-inside.png";
 import SwapIcon from "../../pics/icons/swap-inside.png";
 import {
@@ -87,7 +86,7 @@ const ReceivedCoinList = () => {
             </div>
           </div>
         ) : receivedCoins?.length ? (
-          <div className="md:max-h-350 overflow-y-auto max-h-[29vh] ">
+          <div className="md:max-h-[310px] mb-1 overflow-y-auto max-h-[29vh] ">
             <ul>
               {receivedCoins?.map((coin, index) => (
                 <li
