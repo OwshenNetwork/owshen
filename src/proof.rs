@@ -38,12 +38,12 @@ fn extract_proof(
     ];
     let proof_b = [
         [
-            get(&proof_obj, "pi_b", &[0, 0])?,
             get(&proof_obj, "pi_b", &[0, 1])?,
+            get(&proof_obj, "pi_b", &[0, 0])?,
         ],
         [
-            get(&proof_obj, "pi_b", &[1, 0])?,
             get(&proof_obj, "pi_b", &[1, 1])?,
+            get(&proof_obj, "pi_b", &[1, 0])?,
         ],
     ];
     let proof_c = [

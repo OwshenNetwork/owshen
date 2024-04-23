@@ -144,9 +144,9 @@ export const useTransactionModalApi = (tokenContract) => {
         contract = contract.connect(signer);
 
         const proof = [
-          result.data.proof.a,
-          result.data.proof.b,
-          result.data.proof.c,
+          result.data.proof.Proof.a,
+          result.data.proof.Proof.b,
+          result.data.proof.Proof.c,
         ];
 
         const rax = utils.toBigInt(result.data.receiver_ephemeral.x);
@@ -228,9 +228,9 @@ export const useTransactionModalApi = (tokenContract) => {
         contract = contract.connect(signer);
 
         const proof = [
-          result.data.proof.a,
-          result.data.proof.b,
-          result.data.proof.c,
+          result.data.proof.Proof.a,
+          result.data.proof.Proof.b,
+          result.data.proof.Proof.c,
         ];
 
         const ax = utils.toBigInt(result.data.ephemeral.x);

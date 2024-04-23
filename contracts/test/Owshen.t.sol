@@ -9,7 +9,7 @@ contract OwshenTest is Test {
 
     function setUp() public {
         address cont;
-        owshen = new Owshen(IPoseidon4(cont), IPoseidon2(cont), 0);
+        owshen = new Owshen(IPoseidon4(cont), IPoseidon2(cont), 0, 0);
     }
 
     function testDeposit() public {

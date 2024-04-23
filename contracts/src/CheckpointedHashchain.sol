@@ -53,6 +53,10 @@ contract CheckpointedHashchain {
             return false;
         }
 
+        if (checkpoint == _checkpoint) {
+            return true;
+        }
+
         for (uint32 i = 0; i < CHECKPOINT_HISTORY_SIZE; i++) {
             if (checkpointCommitmentsHistory[i] == _checkpoint) {
                 return true;

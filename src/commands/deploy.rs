@@ -209,6 +209,7 @@ async fn initialize_config(
                 poseidon4_addr,
                 poseidon2_addr,
                 Into::<U256>::into(genesis.chc.get_last_checkpoint()),
+                Into::<U256>::into(genesis.chc.size()),
             ),
         )?
         .legacy()

@@ -45,10 +45,11 @@ contract Owshen {
     /**
      * @dev The constructor
      */
-    constructor(IPoseidon4 _poseidon4, IPoseidon2 _poseidon2, uint256 _genesis_root) {
+    constructor(IPoseidon4 _poseidon4, IPoseidon2 _poseidon2, uint256 _genesis_root, uint256 _deposit_index) {
         poseidon4 = _poseidon4;
         coin_withdraw_verifier = new CoinWithdrawVerifier();
         chc = new CheckpointedHashchain(_poseidon2, _genesis_root);
+        depositIndex = _deposit_index;
     }
 
     function deposit(Point calldata _pub_key, Point calldata _ephemeral, address _tokenAddress, uint256 _amount)

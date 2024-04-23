@@ -171,6 +171,10 @@ impl CheckpointedHashchain {
     pub fn get_last_checkpoint(&self) -> Fp {
         self.checkpoints.last().cloned().unwrap_or_default()
     }
+
+    pub fn size(&self) -> usize {
+        self.values.len()
+    }
 }
 
 #[cfg(test)]
