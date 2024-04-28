@@ -22,12 +22,13 @@ fn extract_proof(
     pubs_obj: &serde_json::Value,
 ) -> Result<Proof, eyre::Report> {
     fn get(mut v: &serde_json::Value, k: &str, inds: &[usize]) -> Result<U256, eyre::Report> {
-        v = v.get(k).ok_or(eyre::eyre!("Invalid proof object!"))?;
+        const INVALID_OBJ: &'static str = "Invalid proof object!";
+        v = v.get(k).ok_or(eyre::eyre!(INVALID_OBJ))?;
         for i in inds.iter() {
-            v = v.get(i).ok_or(eyre::eyre!("Invalid proof object!"))?;
+            v = v.get(i).ok_or(eyre::eyre!(INVALID_OBJ))?;
         }
         Ok(U256::from_str_radix(
-            v.as_str().ok_or(eyre::eyre!("Invalid proof object!"))?,
+            v.as_str().ok_or(eyre::eyre!(INVALID_OBJ))?,
             10,
         )?)
     }
@@ -241,23 +242,15 @@ pub fn mpt_last_prove<P: AsRef<Path>>(
             \"lowerLayerPrefixLen\": {},
             \"lowerLayerPrefix\": {}
         }}",
-            serde_json::to_string(&salt.to_string()).ok().unwrap(),
+            serde_json::to_string(&salt.to_string())?,
             if encrypted { 1 } else { 0 },
-            serde_json::to_string(&proof.nonce.to_string())
-                .ok()
-                .unwrap(),
-            serde_json::to_string(&proof.balance.to_string())
-                .ok()
-                .unwrap(),
-            serde_json::to_string(&proof.storage_hash.as_bytes().to_vec())
-                .ok()
-                .unwrap(),
-            serde_json::to_string(&proof.code_hash.as_bytes().to_vec())
-                .ok()
-                .unwrap(),
+            serde_json::to_string(&proof.nonce.to_string())?,
+            serde_json::to_string(&proof.balance.to_string())?,
+            serde_json::to_string(&proof.storage_hash.as_bytes().to_vec())?,
+            serde_json::to_string(&proof.code_hash.as_bytes().to_vec())?,
             burn_preimage,
             prefix_account_rlp_len,
-            serde_json::to_string(&prefix_account_rlp).ok().unwrap()
+            serde_json::to_string(&prefix_account_rlp)?
         ),
         params,
         witness_gen_path,
@@ -301,11 +294,11 @@ pub fn mpt_path_prove<P: AsRef<Path>>(
             \"upperLayerBytes\": {},
             \"isTop\": {}
         }}",
-            serde_json::to_string(&salt.to_string()).ok().unwrap(),
+            serde_json::to_string(&salt.to_string())?,
             num_lower_layer_bytes,
             num_upper_layer_bytes,
-            serde_json::to_string(&lower_layer).ok().unwrap(),
-            serde_json::to_string(&upper_layer).ok().unwrap(),
+            serde_json::to_string(&lower_layer)?,
+            serde_json::to_string(&upper_layer)?,
             if is_top { 1 } else { 0 }
         ),
         params,
@@ -335,14 +328,10 @@ pub fn spend_prove<P: AsRef<Path>>(
             \"withdrawnBalance\": {},
             \"remainingCoinSalt\": {}
         }}",
-            serde_json::to_string(&balance.to_string()).ok().unwrap(),
-            serde_json::to_string(&salt.to_string()).ok().unwrap(),
-            serde_json::to_string(&withdrawn_balance.to_string())
-                .ok()
-                .unwrap(),
-            serde_json::to_string(&remaining_coin_salt.to_string())
-                .ok()
-                .unwrap()
+            serde_json::to_string(&balance.to_string())?,
+            serde_json::to_string(&salt.to_string())?,
+            serde_json::to_string(&withdrawn_balance.to_string())?,
+            serde_json::to_string(&remaining_coin_salt.to_string())?
         ),
         params,
         witness_gen_path,
