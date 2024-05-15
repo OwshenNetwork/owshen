@@ -52,6 +52,7 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
     let dive_token_addr: Fp = h160_to_u256(dive_token_address).try_into().unwrap();
     let coeff = Fp::from_str_vartime("1000000000000000000").unwrap();
     GENESIS
+        .clone()
         .into_par_iter()
         .enumerate()
         .map(|(i, (addr, amnt))| {

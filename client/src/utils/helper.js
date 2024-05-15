@@ -66,7 +66,8 @@ export const SwitchNetwork = async (networkName) => {
   }
 };
 
-export const coreEndpoint = process.env.REACT_APP_OWSHEN_ENDPOINT;
+export const coreEndpoint =
+  process.env.REACT_APP_OWSHEN_ENDPOINT || "http://localhost:9000";
 
 export const chainIdOfWallet = async () => {
   try {

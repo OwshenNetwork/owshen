@@ -20,7 +20,7 @@ use crate::{
 #[derive(StructOpt, Debug)]
 pub struct DeployOpt {
     #[structopt(long)]
-    from: Option<String>,
+    from: String,
     #[structopt(long)]
     endpoint: String,
     #[structopt(long)]
@@ -28,17 +28,15 @@ pub struct DeployOpt {
     #[structopt(long)]
     config: PathBuf,
     #[structopt(long)]
-    test: bool,
-    #[structopt(long, default_value = "1337")]
-    id: String,
+    dev: bool,
+    #[structopt(long)]
+    chain_id: u64,
     #[structopt(long)]
     deploy_dive: bool,
     #[structopt(long)]
     deploy_hash_function: bool,
     #[structopt(long)]
     deploy_owshen: bool,
-    #[structopt(long)]
-    genesis: bool,
 }
 
 pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
@@ -47,12 +45,11 @@ pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
         endpoint,
         name,
         config,
-        test,
-        id,
+        dev,
+        chain_id,
         deploy_dive,
         deploy_hash_function,
         deploy_owshen,
-        genesis,
     } = opt;
 
     let cfg: Option<Config> = std::fs::read_to_string(&config)
@@ -64,15 +61,14 @@ pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
 
     let cfg = initialize_config(
         endpoint,
-        from.unwrap_or_default(),
+        from,
         name,
-        test,
-        id,
+        dev,
+        chain_id,
         cfg,
         deploy_dive,
         deploy_hash_function,
         deploy_owshen,
-        genesis,
     )
     .await?;
 
@@ -85,22 +81,20 @@ async fn initialize_config(
     endpoint: String,
     from: String,
     name: String,
-    is_test: bool,
-    chain_id: String,
+    dev: bool,
+    chain_id: u64,
     config: Option<Config>,
     deploy_dive: bool,
     deploy_hash_function: bool,
     deploy_owshen: bool,
-    genesis_feed: bool,
 ) -> Result<Config, eyre::Report> {
     let mut network_manager = NetworkManager::new();
     let provider = Arc::new(Provider::<Http>::try_from(endpoint.clone())?);
     let private_key_bytes = hex_decode(&from)?;
     let private_key: SecretKey<_> = SecretKey::from_slice(&private_key_bytes)?;
-    let chain_id: u64 = chain_id.parse()?;
     let wallet = wallet::from(private_key.clone()).with_chain_id(chain_id);
 
-    let from_address = if is_test {
+    let from_address = if dev {
         let accounts = provider.get_accounts().await?;
         accounts[0]
     } else {
@@ -115,7 +109,7 @@ async fn initialize_config(
             include_str!("../assets/poseidon4.evm"),
             private_key.clone(),
             from_address,
-            is_test,
+            dev,
             chain_id,
         )
         .await?
@@ -136,7 +130,7 @@ async fn initialize_config(
             include_str!("../assets/poseidon2.evm"),
             private_key.clone(),
             from_address,
-            is_test,
+            dev,
             chain_id,
         )
         .await?
@@ -176,25 +170,8 @@ async fn initialize_config(
 
     let dive_contract = DiveToken::new(dive_contract_address, client.clone());
 
-    let genesis = if genesis_feed {
-        log::info!("Filling the genesis tree... (This might take some time)");
-        let genesis = genesis::fill_genesis(dive_contract_address);
-        std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis)?)?;
-        Some(genesis)
-    } else {
-        log::info!("Loading existing genesis tree...");
-        if let Ok(f) = std::fs::read("owshen-genesis.dat") {
-            bincode::deserialize(&f).ok()
-        } else {
-            log::warn!("No existing genesis data found. Proceeding without it.");
-            None
-        }
-    };
-
-    let genesis = match genesis {
-        Some(ref g) => g,
-        None => panic!("Genesis data is required but not available"),
-    };
+    log::info!("Filling the genesis tree... (This might take some time)");
+    let genesis = genesis::fill_genesis(dive_contract_address);
 
     let new_nonce = provider.get_transaction_count(from_address, None).await?;
 
@@ -238,68 +215,41 @@ async fn initialize_config(
         }
     };
 
-    if is_test {
-        let provider_url = "http://127.0.0.1:8545";
-        let provider = Arc::new(Provider::<Http>::try_from(provider_url)?);
-        let accounts = provider.get_accounts().await?;
-        let from = accounts[0];
-        let test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                "test_token".to_string(),
-                "TEST".to_string(),
-            ),
-        )?
-        .legacy()
-        .from(from)
-        .send()
-        .await?;
-
-        let second_test_token = SimpleErc20::deploy(
-            provider.clone(),
-            (
-                U256::from_str_radix("1000000000000000000000", 10).unwrap(),
-                "test_token".to_string(),
-                "TEST".to_string(),
-            ),
-        )?
-        .legacy()
-        .from(from)
-        .send()
-        .await?;
-
-        let token_info1 = TokenInfo {
-            token_address: test_token.address(),
-            symbol: "WETH".to_string(),
-        };
-
-        let token_info2 = TokenInfo {
-            token_address: second_test_token.address(),
-            symbol: "USDC".to_string(),
-        };
-
-        let dive_info = TokenInfo {
-            token_address: dive_contract_address,
-            symbol: "DIVE".to_string(),
-        };
-
-        network_manager.add_network(
-            "Localhost".to_string(),
-            vec![token_info1, token_info2, dive_info],
-        );
-    }
-
-    let dive_info = TokenInfo {
+    let mut tokens = vec![TokenInfo {
         token_address: dive_contract_address,
         symbol: "DIVE".to_string(),
-    };
+    }];
 
-    network_manager.add_network(name.clone(), vec![dive_info]);
+    if dev {
+        let accounts = provider.get_accounts().await?;
+        let from = accounts[0];
+
+        for test_tkn_name in ["WETH", "USDC"] {
+            let tkn = SimpleErc20::deploy(
+                provider.clone(),
+                (
+                    U256::from_str_radix("1000000000000000000000", 10).unwrap(),
+                    test_tkn_name.to_string(),
+                    test_tkn_name.to_string(),
+                ),
+            )?
+            .legacy()
+            .from(from)
+            .send()
+            .await?;
+            tokens.push(TokenInfo {
+                token_address: tkn.address(),
+                symbol: test_tkn_name.to_string(),
+            })
+        }
+    }
+
+    network_manager.add_network(name.clone(), tokens);
 
     Ok(Config {
         name,
         endpoint,
+        chain_id,
         owshen_contract_address,
         owshen_contract_deployment_block_number,
         owshen_contract_abi,
@@ -317,7 +267,7 @@ async fn deploy_codes(
     bytecode: &str,
     private_key: SecretKey<Secp256k1>,
     from_address: H160, // Use private key instead of from address
-    is_test: bool,
+    dev: bool,
     chain_id: u64,
 ) -> Result<H160, eyre::Report> {
     let wallet = wallet::from(private_key).with_chain_id(chain_id);
@@ -328,7 +278,7 @@ async fn deploy_codes(
 
     let factory = ContractFactory::new(abi, bytecode, Arc::new(client_with_signer));
 
-    let contract = if is_test {
+    let contract = if dev {
         factory.deploy(())?.legacy().send().await?
     } else {
         let mut deployer = factory.deploy(())?.legacy();

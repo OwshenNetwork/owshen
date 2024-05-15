@@ -1,42 +1,21 @@
-import snarkjs from "snarkjs";
-import fs from "fs";
+//"Usage: node generate_witness.js <file.wasm> <input.json> <output.wtns>"
+import { builder } from "./witness_calc";
 
-export const prove = async (
-  tokenAddress,
-  index,
-  amount,
-  secret,
-  proof,
-  newAmount,
-  pk,
-  paramsPath,
-  witnessGenPath
+// get proper witness.bin
+export const generate_witness = async (
+  witnessCalculator,
+  wasm,
+  input,
+  wasm_file
 ) => {
-  try {
-    // Convert inputs to a format suitable for snarkjs
-    const inputs = {
-      tokenAddress,
-      index,
-      amount,
-      secret,
-      proof: proof.map((p) => p.map((q) => q.map((r) => r.toString(10)))),
-      new_amount: newAmount.map((na) => na.toString(10)),
-      pk_ax: pk.map((key) => key.point.x.toString(10)),
-      pk_ay: pk.map((key) => key.point.y.toString(10)),
-    };
+  const parsedInput = JSON.parse(input);
+  const response = await fetch(wasm_file);
+  const buffer = await response.arrayBuffer();
+  console.log("buffer", buffer);
 
-    const { proof: zkProof, publicSignals } = await snarkjs.groth16.fullProve(
-      inputs,
-      paramsPath,
-      witnessGenPath
-    );
+  let result = builder(buffer).then(async (witnessCalculator) => {
+    return await witnessCalculator.calculateWTNSBin(parsedInput, 0);
+  });
 
-    console.log("Proof:", zkProof);
-    console.log("Public signals:", publicSignals);
-
-    return zkProof;
-  } catch (error) {
-    console.error("Error generating zk-SNARK proof:", error);
-    throw error;
-  }
+  return result;
 };

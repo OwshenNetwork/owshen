@@ -24,7 +24,7 @@ const WalletSelection = () => {
       <div className="text-center flex h-full w-full justify-center items-center ">
         <div className="w-[470px] border-2 p-6 rounded-lg">
           <h3 className="text-2xl my-7">Welcome</h3>
-          <img src={Logo} className="w-32 mx-auto" />
+          <img src={Logo} alt="logo" className="w-32 mx-auto" />
           <div className="flex flex-col items-center mt-4">
             <Link className={`${btnCS}`} to="/walletSelection/importWallet">
               Import Owshen Wallet

@@ -8,6 +8,7 @@ import {
   selectIsWalletConnected,
   selectIsOwshenWalletExist,
 } from "../../store/containerSlice";
+import SetParamsModal from "../Modal/SetParamsModal";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { Tooltip } from "react-tooltip";
@@ -41,8 +42,10 @@ const Main = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isInprogress, setIsInprogress] = useState(false);
   const [isOpenWithdraw, setIsOpenWithdraw] = useState(false);
+  const [isOpenSetParams, setIsOpenSetParams] = useState(false);
+
   const isConnected = useSelector(selectIsWalletConnected);
-  const defaultChainId = isTest ? 11155111 : 1337;
+  const defaultChainId = isTest ? 11155111 : null;
   const [networkChainId, setNetworkChainId] = useState(defaultChainId);
 
   useEffect(() => {
@@ -60,7 +63,6 @@ const Main = ({ children }) => {
         setNetworkChainId(ChainId);
       }
     };
-
     getChainId();
   }, [isConnected]);
 
@@ -72,14 +74,30 @@ const Main = ({ children }) => {
     networkChainId,
     OwshenWallet.wallet,
     OwshenWallet.contract_address,
-    isConnected,
+    isConnected
   ]);
   useEffect(() => {
     if (!isOwshenWalletExist) {
       navigate("/walletSelection");
     }
   });
+  // const setParamsToastContent = (
+  //   <div className="text-center">
+  //     pleas set your params to do transaction
+  //     <button
+  //       className="!bg-white p-2 w-full text-black rounded my-2"
+  //       onClick={() => setIsOpenSetParams(true)}
+  //     >
+  //       open set params
+  //     </button>
+  //   </div>
+  // );
+
   const canOpenModal = () => {
+    // return toast.error(setParamsToastContent, {
+    //   closeOnClick: false,
+    //   className: "custom-toast-container",
+    // });
     if (isTest) {
       return setIsInprogress(true);
     }
@@ -97,7 +115,6 @@ const Main = ({ children }) => {
       const coin = receivedCoins[i];
       if (!processedIndices.has(coin?.index)) {
         totalAmount += +trueAmount(coin?.amount);
-
         processedIndices.add(coin?.index);
       }
     }
@@ -120,7 +137,7 @@ const Main = ({ children }) => {
         isOpen={isOpen}
         setIsOpen={setIsOpen}
       />
-
+      <SetParamsModal isOpen={isOpenSetParams} setIsOpen={setIsOpenSetParams} />
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
 
       <div className="mt-10 text-center">

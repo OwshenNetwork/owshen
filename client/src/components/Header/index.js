@@ -1,10 +1,11 @@
 import React, { useEffect } from "react";
 import Web3ModalComponent from "../WalletConnection";
-import Logo from "../../pics/icons/logo.png";
 import Drawer from "../Drawer";
 import MoonIcon from "../../pics/moon.png";
 import SunIcon from "../../pics/sun.png";
 import { Tooltip } from "react-tooltip";
+import { useMediaQuery } from 'react-responsive';
+
 
 const Header = ({ isDarkTheme, setIsDarkTheme }) => {
   useEffect(() => {
@@ -38,6 +39,8 @@ const Header = ({ isDarkTheme, setIsDarkTheme }) => {
       />
     </button>
   );
+  const isLargeScreen = useMediaQuery({ query: "(min-width: 1024px)" });
+
   return (
     <div className="header justify-between flex w-full  items-center">
       <div className="flex w-4/6 items-center justify-start">
@@ -46,17 +49,19 @@ const Header = ({ isDarkTheme, setIsDarkTheme }) => {
         {/* <img src={Logo} className="w-9 h-5 lg:w-[70px] lg:h-10" /> */}
         <h1 className="font-bold text-2xl lg:text-5xl pl-2 lg:pl-4">Owshen</h1>
       </div>
-      <div className="hidden lg:flex w-3/6 justify-end ml-auto">
-        {" "}
-        <Web3ModalComponent />
-        {darkThemButton}
-      </div>
-      <div className="lg:hidden flex w-3/6 justify-end mr-auto">
-        <Drawer>
-          {darkThemButton}
+      {isLargeScreen ? (
+        <div className="hidden lg:flex w-3/6 justify-end ml-auto">
           <Web3ModalComponent />
-        </Drawer>
-      </div>
+          {darkThemButton}
+        </div>
+      ) : (
+        <div className="lg:hidden flex w-3/6 justify-end mr-auto">
+          <Drawer>
+            {darkThemButton}
+            <Web3ModalComponent />
+          </Drawer>
+        </div>
+      )}
     </div>
   );
 };

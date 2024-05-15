@@ -28,7 +28,7 @@ const Drawer = ({ children }) => {
   return (
     <>
       <button onClick={toggleDrawer}>
-        <img className="w-7 dark:invert" src={MenuIcon} />
+        <img className="w-7 dark:invert" alt="MenuIcon" src={MenuIcon} />
       </button>
 
       {showOverlay && <div className="fixed inset-0 bg-black opacity-50"></div>}

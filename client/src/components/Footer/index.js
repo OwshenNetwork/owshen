@@ -6,13 +6,13 @@ const Footer = () => {
   return (
     <footer className="mt-auto flex  mx-auto dark:invert">
       <a href="https://twitter.com/OwshenNetwork">
-        <img src={TwitterIcon} className="w-8 mx-4" />
+        <img src={TwitterIcon} alt="TwitterIcon" className="w-8 mx-4" />
       </a>
       <a href="https://discord.gg/owshen">
-        <img src={DiscordIcon} className="mx-4 w-8" />
+        <img src={DiscordIcon} alt="DiscordIcon" className="mx-4 w-8" />
       </a>
       <a href="https://github.com/OwshenNetwork/owshen">
-        <img src={GithubIcon} className="mx-4 w-8" />
+        <img src={GithubIcon} alt="GithubIcon" className="mx-4 w-8" />
       </a>
     </footer>
   );

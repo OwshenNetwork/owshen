@@ -12,18 +12,29 @@ import {
 import { ethers, toBigInt } from "ethers";
 import { utils } from "web3";
 import { useApprove } from "../../hooks/useApprove";
+import { generate_witness } from "../../utils/proof";
+import { groth16 } from "snarkjs";
 
 export const useTransactionModalApi = (tokenContract) => {
   const address = useSelector(selectUserAddress);
   const OwshenWallet = useSelector(selectOwshen);
   const network = useSelector(selectNetwork);
   const isTest = useSelector(selectIsTest);
+
+  const witnessCalculator = `${coreEndpoint}/witness/witness_calculator.js`;
+  const zk_file = `${coreEndpoint}/zk/coin_withdraw_0001.zkey`;
+  const wasm = `${coreEndpoint}/witness/coin_withdraw.wasm`;
+
   const { approve, allowance } = useApprove(
     tokenContract,
     address,
     OwshenWallet.contract_address,
     OwshenWallet.dive_abi
   );
+
+  const options = {
+    gasLimit: 5000000,
+  };
 
   const newGetStealth = async (
     destOwshenWallet,
@@ -76,7 +87,8 @@ export const useTransactionModalApi = (tokenContract) => {
             pubKey,
             ephemeral,
             tokenContract,
-            utils.toBigInt(to_wei_token_amount)
+            utils.toBigInt(to_wei_token_amount),
+            options
           );
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -92,6 +104,17 @@ export const useTransactionModalApi = (tokenContract) => {
       .catch((error) => {
         return toast.error(`Internal server error: ${error}`);
       });
+  };
+
+  const formatProof = (proof) => {
+    return [
+      [proof.pi_a[0], proof.pi_a[1]],
+      [
+        [proof.pi_b[0][1], proof.pi_b[0][0]],
+        [proof.pi_b[1][1], proof.pi_b[1][0]],
+      ],
+      [proof.pi_c[0], proof.pi_c[1]],
+    ];
   };
 
   const send = async (
@@ -133,6 +156,28 @@ export const useTransactionModalApi = (tokenContract) => {
         let abi = OwshenWallet.contract_abi;
         let reciver_commitment = result.data.receiver_commitment;
         let sender_commitment = result.data.sender_commitment;
+
+        let proof =
+          OwshenWallet.mode === "Windows"
+            ? formatProof(
+                (
+                  await groth16.prove(
+                    new Uint8Array(await (await fetch(zk_file)).arrayBuffer()),
+                    await generate_witness(
+                      wasm,
+                      witnessCalculator,
+                      result.data.proof?.JsonInput,
+                      wasm
+                    )
+                  )
+                ).proof
+              )
+            : [
+                result.data.proof.Proof.a,
+                result.data.proof.Proof.b,
+                result.data.proof.Proof.c,
+              ];
+
         let provider = new ethers.BrowserProvider(window.ethereum);
 
         let contract = new ethers.Contract(
@@ -142,12 +187,6 @@ export const useTransactionModalApi = (tokenContract) => {
         );
         let signer = await provider.getSigner();
         contract = contract.connect(signer);
-
-        const proof = [
-          result.data.proof.Proof.a,
-          result.data.proof.Proof.b,
-          result.data.proof.Proof.c,
-        ];
 
         const rax = utils.toBigInt(result.data.receiver_ephemeral.x);
         const ray = utils.toBigInt(result.data.receiver_ephemeral.y);
@@ -191,17 +230,21 @@ export const useTransactionModalApi = (tokenContract) => {
       });
   };
 
-  const withdrawal = async (index, owshen, address, setIsOpen, tokenAmount) => {
-    if (!address)
+  const withdrawal = async (
+    index,
+    owshen,
+    address,
+    setIsOpen,
+    tokenAmount,
+    setIsLoading
+  ) => {
+    setIsLoading(true);
+    if (!address) {
+      setIsLoading(false); // Stop loading if address is not provided
       return toast.error(
         "Your wallet is not connected. Please connect your wallet to proceed."
       );
-    // if (tokenAmount > trueAmount(MaxBalanceOfWithdraw)) {
-    //   return toast.error(
-    //     "your entered amount for withdraw is grater than max value of the selected token"
-    //   );
-    // }
-    //Todo: its should be with dynamic decimal
+    }
     const desireAmount = utils.toWei(Number(tokenAmount), "ether");
     console.log("request withdrawal", index, owshen.wallet, desireAmount);
     axios
@@ -214,6 +257,27 @@ export const useTransactionModalApi = (tokenContract) => {
         },
       })
       .then(async (result) => {
+        let proof =
+          OwshenWallet.mode === "Windows"
+            ? formatProof(
+                (
+                  await groth16.prove(
+                    new Uint8Array(await (await fetch(zk_file)).arrayBuffer()),
+                    await generate_witness(
+                      wasm,
+                      witnessCalculator,
+                      result.data.proof?.JsonInput,
+                      wasm
+                    )
+                  )
+                ).proof
+              )
+            : [
+                result.data.proof.Proof.a,
+                result.data.proof.Proof.b,
+                result.data.proof.Proof.c,
+              ];
+
         let abi = owshen.contract_abi;
         let commitment = result.data.commitment;
         let provider = new ethers.BrowserProvider(window.ethereum);
@@ -226,12 +290,6 @@ export const useTransactionModalApi = (tokenContract) => {
 
         let signer = await provider.getSigner();
         contract = contract.connect(signer);
-
-        const proof = [
-          result.data.proof.Proof.a,
-          result.data.proof.Proof.b,
-          result.data.proof.Proof.c,
-        ];
 
         const ax = utils.toBigInt(result.data.ephemeral.x);
         const ay = utils.toBigInt(result.data.ephemeral.y);
@@ -249,20 +307,27 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.obfuscated_remaining_amount,
             address,
             commitment
-            // options
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();
           console.log("Transaction receipt", txReceipt);
           setIsOpen(false);
+          setIsLoading(false); // Stop loading if address is not provided
         } catch (error) {
+          setIsLoading(false); // Stop loading if address is not provided
           toast.error("Error while transferring tokens!");
           setIsOpen(false);
+          console.error("Error in ethers.js operations:", error);
         }
       })
       .catch((error) => {
+        setIsLoading(false); // Stop loading if address is not provided
         setIsOpen(false);
         return toast.error(`Internal server error: ${error}`);
+      })
+      .finally(() => {
+        setIsLoading(false); // Stop loading if address is not provided
+        setIsOpen(false);
       });
   };
   return { newGetStealth, send, withdrawal };

@@ -1,15 +1,15 @@
 import React, { useEffect } from "react";
 import {
   setIsWalletConnected,
-  selectIsWalletConnected,
+  // selectIsWalletConnected,
 } from "../../store/containerSlice";
-import { useDispatch, useSelector } from "react-redux";
-import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+// import { toast } from "react-toastify";
 
 const WalletConnectionChecker = () => {
   const wallet = window.ethereum;
   const dispatch = useDispatch();
-  const isConnected = useSelector(selectIsWalletConnected);
+  // const isConnected = useSelector(selectIsWalletConnected);
   useEffect(() => {
     const checkWalletConnection = async () => {
       if (window.ethereum) {

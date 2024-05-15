@@ -228,6 +228,7 @@ export function getLogoByContractAddress(contractAddress) {
 }
 
 export function getNameByContractAddress(contractAddress) {
+  // eslint-disable-next-line no-unused-vars
   for (const [_, currency] of Object.entries(currencies)) {
     for (const chainInfo of Object.values(currency.chain)) {
       if (chainInfo.contract === contractAddress) {
@@ -239,6 +240,7 @@ export function getNameByContractAddress(contractAddress) {
 }
 
 export function getDecimalByContractAddress(contractAddress) {
+  // eslint-disable-next-line no-unused-vars
   for (const [_, currency] of Object.entries(currencies)) {
     for (const chainInfo of Object.values(currency.chain)) {
       if (chainInfo.contract === contractAddress) {

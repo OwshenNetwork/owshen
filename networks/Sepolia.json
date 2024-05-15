@@ -1,0 +1,1111 @@
+{
+    "name": "Ethereum-Sepolia",
+    "endpoint": "https://ethereum-sepolia.blockpi.network/v1/rpc/public",
+    "chain_id": 11155111,
+    "dive_contract_address": "0x4dd6437b30529ed32a4b9763025ee7ef759c60e1",
+    "owshen_contract_address": "0x1fee68283bdd12ebc89b73b9395af06dba6bc176",
+    "owshen_contract_deployment_block_number": "0x5a0dba",
+    "owshen_contract_abi": [
+        {
+            "type": "constructor",
+            "inputs": [
+                {
+                    "internalType": "contract IPoseidon4",
+                    "name": "_poseidon4",
+                    "type": "address"
+                },
+                {
+                    "internalType": "contract IPoseidon2",
+                    "name": "_poseidon2",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_genesis_root",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_deposit_index",
+                    "type": "uint256"
+                }
+            ]
+        },
+        {
+            "type": "function",
+            "name": "deposit",
+            "inputs": [
+                {
+                    "internalType": "struct Owshen.Point",
+                    "name": "_pub_key",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "struct Owshen.Point",
+                    "name": "_ephemeral",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "address",
+                    "name": "_tokenAddress",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_amount",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "payable"
+        },
+        {
+            "type": "function",
+            "name": "depositIndex",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "head",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "isSpent",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_nullifierHash",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "isSpentArray",
+            "inputs": [
+                {
+                    "internalType": "uint256[]",
+                    "name": "_nullifierHashes",
+                    "type": "uint256[]"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool[]",
+                    "name": "spent",
+                    "type": "bool[]"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "send",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_checkpoint_head",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_latest_values_commitment_head",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "struct Owshen.Proof",
+                    "name": "_proof",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256[2]"
+                        },
+                        {
+                            "type": "uint256[2][2]"
+                        },
+                        {
+                            "type": "uint256[2]"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "struct Owshen.Point",
+                    "name": "_receiver_ephemeral",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "struct Owshen.Point",
+                    "name": "_sender_ephemeral",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "uint256[2]",
+                    "name": "_nullifiers",
+                    "type": "uint256[2]"
+                },
+                {
+                    "internalType": "uint256[2]",
+                    "name": "_commitments",
+                    "type": "uint256[2]"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_receiver_token_address_hint",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_sender_token_address_hint",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_receiver_amount_hint",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_sender_amount_hint",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "bool",
+                    "name": "_is_dual_output",
+                    "type": "bool"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "withdraw",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_checkpoint_head",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_latest_values_commitment_head",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "struct Owshen.Proof",
+                    "name": "_proof",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256[2]"
+                        },
+                        {
+                            "type": "uint256[2][2]"
+                        },
+                        {
+                            "type": "uint256[2]"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "struct Owshen.Point",
+                    "name": "_ephemeral",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "internalType": "uint256[2]",
+                    "name": "_nullifiers",
+                    "type": "uint256[2]"
+                },
+                {
+                    "internalType": "address",
+                    "name": "_tokenAddress",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_amount",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_obfuscated_remaining_amount",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "address",
+                    "name": "_to",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "_commitment",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "event",
+            "name": "Deposit",
+            "inputs": [
+                {
+                    "name": "pub_key",
+                    "type": "tuple",
+                    "indexed": true,
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "name": "ephemeral",
+                    "type": "tuple",
+                    "indexed": false,
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "name": "nullifier",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Sent",
+            "inputs": [
+                {
+                    "name": "ephemeral",
+                    "type": "tuple",
+                    "indexed": false,
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        }
+                    ]
+                },
+                {
+                    "name": "index",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "timestamp",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "hint_amount",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "hint_tokenAddress",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "commitment",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Spend",
+            "inputs": [
+                {
+                    "name": "nullifier",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        }
+    ],
+    "erc20_abi": [
+        {
+            "type": "constructor",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "initialSupply",
+                    "type": "uint256"
+                }
+            ]
+        },
+        {
+            "type": "function",
+            "name": "allowance",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "owner",
+                    "type": "address"
+                },
+                {
+                    "internalType": "address",
+                    "name": "spender",
+                    "type": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "approve",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "spender",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "approximate",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "amount_per_epoch",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "num_epochs",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "balanceOf",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "account",
+                    "type": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "claim",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "starting_epoch",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "num_epochs",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "coins",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "currentEpoch",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "decimals",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "uint8",
+                    "name": "",
+                    "type": "uint8"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "epoch_totals",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "epochs",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "address",
+                    "name": "",
+                    "type": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "get_burnt_balance",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "account",
+                    "type": "address"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "mint_burnt",
+            "inputs": [
+                {
+                    "internalType": "struct DiveToken.PrivateProofOfBurn",
+                    "name": "proof",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "uint256"
+                        },
+                        {
+                            "type": "tuple",
+                            "components": [
+                                {
+                                    "type": "uint256[2]"
+                                },
+                                {
+                                    "type": "uint256[2][2]"
+                                },
+                                {
+                                    "type": "uint256[2]"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "tuple",
+                            "components": [
+                                {
+                                    "type": "uint256[2]"
+                                },
+                                {
+                                    "type": "uint256[2][2]"
+                                },
+                                {
+                                    "type": "uint256[2]"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "bool"
+                        },
+                        {
+                            "type": "address"
+                        },
+                        {
+                            "type": "bytes"
+                        },
+                        {
+                            "type": "uint256[]"
+                        },
+                        {
+                            "type": "tuple[]",
+                            "components": [
+                                {
+                                    "type": "uint256[2]"
+                                },
+                                {
+                                    "type": "uint256[2][2]"
+                                },
+                                {
+                                    "type": "uint256[2]"
+                                }
+                            ]
+                        },
+                        {
+                            "type": "bytes"
+                        },
+                        {
+                            "type": "bytes"
+                        }
+                    ]
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "name",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "string",
+                    "name": "",
+                    "type": "string"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "nullifiers",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "participate",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "amount_per_epoch",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "num_epochs",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "rewardOf",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "_epoch",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "pure"
+        },
+        {
+            "type": "function",
+            "name": "spend_coin",
+            "inputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "coin",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "remainingCoin",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "withdrawnBalance",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "address",
+                    "name": "destination",
+                    "type": "address"
+                },
+                {
+                    "internalType": "struct DiveToken.Groth16Proof",
+                    "name": "proof",
+                    "type": "tuple",
+                    "components": [
+                        {
+                            "type": "uint256[2]"
+                        },
+                        {
+                            "type": "uint256[2][2]"
+                        },
+                        {
+                            "type": "uint256[2]"
+                        }
+                    ]
+                }
+            ],
+            "outputs": [],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "symbol",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "string",
+                    "name": "",
+                    "type": "string"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "totalSupply",
+            "inputs": [],
+            "outputs": [
+                {
+                    "internalType": "uint256",
+                    "name": "",
+                    "type": "uint256"
+                }
+            ],
+            "stateMutability": "view"
+        },
+        {
+            "type": "function",
+            "name": "transfer",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "to",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "function",
+            "name": "transferFrom",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "from",
+                    "type": "address"
+                },
+                {
+                    "internalType": "address",
+                    "name": "to",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "value",
+                    "type": "uint256"
+                }
+            ],
+            "outputs": [
+                {
+                    "internalType": "bool",
+                    "name": "",
+                    "type": "bool"
+                }
+            ],
+            "stateMutability": "nonpayable"
+        },
+        {
+            "type": "event",
+            "name": "Approval",
+            "inputs": [
+                {
+                    "name": "owner",
+                    "type": "address",
+                    "indexed": true
+                },
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "indexed": true
+                },
+                {
+                    "name": "value",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "CoinGenerated",
+            "inputs": [
+                {
+                    "name": "recipient",
+                    "type": "address",
+                    "indexed": false
+                },
+                {
+                    "name": "coin",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "CoinSpent",
+            "inputs": [
+                {
+                    "name": "spender",
+                    "type": "address",
+                    "indexed": false
+                },
+                {
+                    "name": "coin",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "remainingCoin",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "withdrawnBalance",
+                    "type": "uint256",
+                    "indexed": false
+                },
+                {
+                    "name": "destination",
+                    "type": "address",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "event",
+            "name": "Transfer",
+            "inputs": [
+                {
+                    "name": "from",
+                    "type": "address",
+                    "indexed": true
+                },
+                {
+                    "name": "to",
+                    "type": "address",
+                    "indexed": true
+                },
+                {
+                    "name": "value",
+                    "type": "uint256",
+                    "indexed": false
+                }
+            ],
+            "anonymous": false
+        },
+        {
+            "type": "error",
+            "name": "ERC20InsufficientAllowance",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "spender",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "allowance",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "needed",
+                    "type": "uint256"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC20InsufficientBalance",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "sender",
+                    "type": "address"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "balance",
+                    "type": "uint256"
+                },
+                {
+                    "internalType": "uint256",
+                    "name": "needed",
+                    "type": "uint256"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC20InvalidApprover",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "approver",
+                    "type": "address"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC20InvalidReceiver",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "receiver",
+                    "type": "address"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC20InvalidSender",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "sender",
+                    "type": "address"
+                }
+            ]
+        },
+        {
+            "type": "error",
+            "name": "ERC20InvalidSpender",
+            "inputs": [
+                {
+                    "internalType": "address",
+                    "name": "spender",
+                    "type": "address"
+                }
+            ]
+        }
+    ],
+    "token_contracts": {
+        "networks": {
+            "Ethereum_Sepolia": [
+                {
+                    "token_address": "0x4dd6437b30529ed32a4b9763025ee7ef759c60e1",
+                    "symbol": "DIVE"
+                }
+            ],
+            "Goerli": [
+                {
+                    "token_address": "0xdd69db25f6d620a7bad3023c5d32761d353d3de9",
+                    "symbol": "WETH"
+                }
+            ]
+        }
+    },
+    "poseidon4_contract_address": "0xe4d1dae979082968dfe5f9f2ac1c165d63827a01",
+    "poseidon2_contract_address": "0x31d66fcbc9c87758dc91d121c77968a22497e230"
+}

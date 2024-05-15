@@ -5,7 +5,7 @@ import {
   setReceivedCoins,
   setReceivedCoinsLoading,
   setIsTest,
-  setIsOwshenWalletExist
+  setIsOwshenWalletExist,
 } from "../../store/containerSlice";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
@@ -62,6 +62,7 @@ export const useMainApi = () => {
               dive_address: data.dive_contract,
               dive_abi: data.erc20_abi,
               token_contracts: data.token_contracts,
+              mode: data.mode,
             },
           })
         );
@@ -75,6 +76,15 @@ export const useMainApi = () => {
         dispatch(setIsOwshenWalletExist(false));
       });
   };
+  const setParamsOnCore = () => {
+    axios
+      .post(`${coreEndpoint}/set-params-path`, {
+        path: "test",
+      })
+      .then((res) => {
+        console.log(res);
+      });
+  };
 
-  return { setChainId, getCoins, getInfo };
+  return { setChainId, getCoins, getInfo,setParamsOnCore };
 };

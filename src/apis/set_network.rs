@@ -1,10 +1,9 @@
 use axum::{extract::Query, Json};
-use ethers::providers::{Http, Provider};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::config::{Config, Context, Network};
+use crate::config::{Config, Context};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Empty {
@@ -22,66 +21,35 @@ pub struct SetNetworkResponse {
 }
 
 lazy_static! {
-    static ref NETWORK_CONFIG_MAP: HashMap<String, (String, String)> = [
-        (
-            "1337".into(),
-            ("http://127.0.0.1:8545".into(), "Localhost.json".into())
-        ),
-        (
-            "5".into(),
-            (
-                "https://ethereum-goerli.publicnode.com".into(),
-                "Goerli.json".into()
-            )
-        ),
-        (
-            "11155111".into(),
-            (
-                "https://ethereum-sepolia.blockpi.network/v1/rpc/public".into(),
-                "Sepolia.json".into()
-            )
-        )
-    ]
-    .into_iter()
-    .collect();
+    static ref NETWORK_CONFIG_MAP: HashMap<u64, Config> = {
+        let mut res = HashMap::new();
+        for path in std::fs::read_dir("assets/networks").unwrap() {
+            let conf: Config =
+                serde_json::from_str(&std::fs::read_to_string(path.unwrap().path()).unwrap())
+                    .unwrap();
+            res.insert(conf.chain_id, conf);
+        }
+        res
+    };
 }
 
 pub async fn set_network(
     Query(req): Query<SetNetworkRequest>,
     ctx: Arc<Mutex<Context>>,
-    _test: bool,
-    config: Config,
+    forced_config: Option<Config>,
 ) -> Result<Json<SetNetworkResponse>, eyre::Report> {
-    let chain_id = req.chain_id;
-    let (provider_url, _config_path) = NETWORK_CONFIG_MAP
-        .get(&chain_id)
-        .ok_or(eyre::eyre!("Unsupported network!"))?
-        .clone();
-    // let app_dir_path = std::env::var("APPDIR").unwrap_or_default();
+    if forced_config.is_none() {
+        let config = NETWORK_CONFIG_MAP
+            .get(&req.chain_id.parse().unwrap())
+            .ok_or(eyre::eyre!(
+                "Unsupported network with chain-id: {}!",
+                req.chain_id
+            ))?
+            .clone();
 
-    // let config_path = if test {
-    //     std::fs::read_to_string(&config_path)
-    // } else {
-    //     std::fs::read_to_string(format!(
-    //         "{}/usr/share/networks/{}",
-    //         app_dir_path, config_path
-    //     ))
-    // };
+        ctx.lock().await.switch_network(config)?;
+    }
 
-    let provider: Arc<Provider<Http>> = Arc::new(Provider::<Http>::try_from(provider_url.clone())?);
-    let mut ctx = ctx.lock().await;
-    // let config = config_path
-    //     .map(|s| {
-    //         let c: Config = serde_json::from_str(&s).expect("Invalid config file!");
-    //         c
-    //     })
-    //     .ok()
-    //     .unwrap();
-    ctx.node_manager
-        .set_provider_network(Network { provider, config });
-
-    // reset the current coins with last provider
-    ctx.coins.clear();
     Ok(Json(SetNetworkResponse {
         success: Empty { ok: true },
     }))

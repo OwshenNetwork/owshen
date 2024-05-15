@@ -19,20 +19,10 @@ const CreateNewWallet = () => {
 
   const btnCS =
     "border lg:w-[270px] w-full rounded-xl p-3  my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
-  const inputCs = "border dark:border-white border-black rounded-lg py-2   w-5/6 text-center";
+  const inputCs =
+    "border dark:border-white border-black rounded-lg py-2   w-5/6 text-center";
   const inputHolderCs = "w-full flex items-center justify-between";
 
-  const fetchWallet = async () => {
-    try {
-      const response = await generateWallet();
-      const words = response.words[0].split(" ");
-      setCopyWords(response.words);
-      setWords(words); // Assuming the response is the wallet words
-    } catch (error) {
-      console.error("Error fetching wallet:", error);
-    } finally {
-    }
-  };
   useEffect(() => {
     getInfo();
     if (IsOwshenWalletExist && !walletCreated) {
@@ -40,6 +30,17 @@ const CreateNewWallet = () => {
     }
   });
   useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const response = await generateWallet();
+        const words = response.words[0].split(" ");
+        setCopyWords(response.words);
+        setWords(words); // Assuming the response is the wallet words
+      } catch (error) {
+        console.error("Error fetching wallet:", error);
+      } finally {
+      }
+    };
     fetchWallet();
     setWalletCreated(true);
   }, []);

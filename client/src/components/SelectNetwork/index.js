@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { selectIsTest, selectNetwork } from "../../store/containerSlice";
+import { selectIsTest } from "../../store/containerSlice";
 import Dropdown from "../DropDown";
 import { setNetworkDetails } from "../../store/containerSlice";
 import {
@@ -9,7 +9,7 @@ import {
   networkDetails,
 } from "../../utils/networkDetails";
 import { useSelectNetworkApi } from "../../api/hooks/useSelectNetworkApi";
-import { chainIdOfWallet, SwitchNetwork } from "../../utils/helper";
+import { chainIdOfWallet } from "../../utils/helper";
 import { toast } from "react-toastify";
 
 const SelectNetwork = () => {
@@ -37,26 +37,27 @@ const SelectNetwork = () => {
       );
     }
   });
-  const getChainId = async () => {
-    let ChainId = await chainIdOfWallet(); // Get the chainId
-    if (!isChainIdExist(ChainId)) {
-      return toast.error("please select your network")
-    }
 
-    const networkName = getNetworkNameByChainId(ChainId);
-
-    setNetWork(networkName);
-    const selectedNetwork = networkDetails[networkName];
-    updateNetworkDetails(
-      selectedNetwork.name,
-      selectedNetwork.chainId,
-      selectedNetwork.contractName
-    );
-    setChainId(ChainId);
-  };
   useEffect(() => {
+    const getChainId = async () => {
+      let ChainId = await chainIdOfWallet(); // Get the chainId
+      if (!isChainIdExist(ChainId)) {
+        return toast.error("please select your network");
+      }
+
+      const networkName = getNetworkNameByChainId(ChainId);
+
+      setNetWork(networkName);
+      const selectedNetwork = networkDetails[networkName];
+      updateNetworkDetails(
+        selectedNetwork.name,
+        selectedNetwork.chainId,
+        selectedNetwork.contractName
+      );
+      setChainId(ChainId);
+    }; // Add any dependencies here if getChainId depends on props or state
     getChainId();
-  }, []);
+  });
 
   const updateNetworkDetails = (name, chainId, contractName) => {
     dispatch(setNetworkDetails({ name, chainId, contractName }));
@@ -74,10 +75,12 @@ const SelectNetwork = () => {
         options={netWorkOptions}
         select={setNetWork}
         onChange={handelChangeNetwork}
-        style={"!text-white !py-3 !rounded-xl !bg-blue-100 dark:!bg-blue-900 !border-0 dark:!border-gray-300"}
+        style={
+          "!text-white !py-3 !rounded-xl !bg-blue-100 dark:!bg-blue-900 !border-0 dark:!border-gray-300"
+        }
       />
     </>
   );
 };
 
-export default SelectNetwork;
+export default React.memo(SelectNetwork);

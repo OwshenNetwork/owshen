@@ -23,7 +23,6 @@ export const useWalletSelectionApi = () => {
       toast.error("Failed to set chain ID on core");
     }
   };
-
   const callImportWallet = async (enteredWords) => {
     if (enteredWords.length !== 12) {
       return toast.error(
@@ -31,9 +30,6 @@ export const useWalletSelectionApi = () => {
       );
     }
     const words = [enteredWords.join(" ")];
-
-    //TODO remove this test words later
-    // const words = "cross awesome gas stock rice dune quiz cliff order rate laugh vessel";
     try {
       const response = await axios.post(
         `${coreEndpoint}/init`,
@@ -48,7 +44,6 @@ export const useWalletSelectionApi = () => {
         }
       );
       toast.success("your owshen wallet Imported successfully");
-
       return response.data;
     } catch (error) {
       console.error("Error:", error);

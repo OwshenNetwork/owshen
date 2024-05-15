@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Modal from ".";
 import Dropdown from "../DropDown";
 import {
@@ -40,7 +40,8 @@ const TransactionModal = ({
   const [selectedContract, setSelectedContract] = useState("");
   const [chainId, setChainId] = useState(null);
   const [selectTokenLabel, SetSelectTokenLabel] = useState("Choose your token");
-  const [selectWalletLabel, SetSelectWalletLabel] = useState("Source wallet");
+  const [selectWalletLabel, SetSelectWalletLabel] = useState("");
+  const [loadingText, SetLoadingText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isTest = useSelector(selectIsTest);
   const { send, withdrawal, newGetStealth } =
@@ -49,6 +50,8 @@ const TransactionModal = ({
   const walletOptions = [
     { title: "Your Owshen Account", value: "Your Owshen Account", img: Logo },
   ];
+
+  const isMetamaskOpen = !!window.ethereum && window.ethereum.selectAddress;
   useEffect(() => {
     if (!isTest) {
       walletOptions.push({
@@ -59,13 +62,19 @@ const TransactionModal = ({
     }
   });
 
-  const getChainId = async () => {
-    const ChainId = await chainIdOfWallet();
-    setChainId(ChainId);
-  };
   useEffect(() => {
+    if (isOpen) {
+      setIsLoading(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const getChainId = async () => {
+      const ChainId = await chainIdOfWallet();
+      setChainId(ChainId);
+    };
     getChainId();
-  }, []);
+  });
   useEffect(() => {
     if (OwshenWallet && chainId) {
       setContract(chainId);
@@ -74,7 +83,6 @@ const TransactionModal = ({
           selectedContract
         ].map(({ symbol, token_address }, id) => {
           const img = currencies[symbol].img;
-
           return { title: symbol, value: token_address, img: img };
         });
         setTokenOptions(newTokenOptions);
@@ -106,7 +114,6 @@ const TransactionModal = ({
     const val = trueAmount(maxValue);
     return setTokenAmount(val);
   };
-
   const findMatchingCoin = () => {
     for (let coin of receivedCoins) {
       if (
@@ -116,7 +123,6 @@ const TransactionModal = ({
         return coin;
       }
     }
-
     return toast.error("No matching coin is found");
   };
 
@@ -131,10 +137,8 @@ const TransactionModal = ({
     }
     const firstPartOfAddress = destOwshenWallet.slice(0, 4);
     if (firstPartOfAddress !== "OoOo") {
-      return toast.error(
-        "your destination wallet address must start with 'OoOo'"
-      );
-      setIsLoading(false)
+      toast.error("your destination wallet address must start with 'OoOo'");
+      return setIsLoading(false);
     }
     try {
       if (OwshenWallet.wallet === destOwshenWallet) {
@@ -152,7 +156,7 @@ const TransactionModal = ({
           tokenAmount,
           chainId,
           findMatchingCoin,
-          setIsOpen,
+          setIsOpen
         );
       }
     } catch (error) {
@@ -162,15 +166,39 @@ const TransactionModal = ({
       setIsLoading(false); // Set isLoading to false after the transaction is complete
     }
   };
+  const shuffleText = useCallback(() => {
+    const randomLoadingTexts = [
+      "Processing your request...",
+      "its may take some time",
+    ];
+    const index = Math.floor(Math.random() * randomLoadingTexts.length);
+    SetLoadingText(randomLoadingTexts[index]);
+  }, []);
+  const handleWithdraw = async () => {
+    setInterval(shuffleText, 4000);
+    try {
+      await withdrawal(
+        selectedCoin?.index,
+        OwshenWallet,
+        address,
+        setIsOpen,
+        tokenAmount,
+        setIsLoading
+      );
+    } catch (error) {
+      console.error("Error during withdrawal:", error);
+      // You can add more error handling here if needed
+    }
+  };
   const tokenAmountHandler = (e) => {
     const newVal = e.target.value;
     // Regular expression to match only numbers or an empty string
-    const regex = /^(\d+)?$/;
-    // Test the input value against the regular expression
+    const regex = /^[0-9]*\.?[0-9]*$/; // Test the input value against the regular expression
     if (regex.test(newVal)) {
       setTokenAmount(newVal);
     }
   };
+
   useEffect(() => {
     if (!isOpen) {
       setDstOwshenWallet("");
@@ -185,6 +213,7 @@ const TransactionModal = ({
   );
   return (
     <Modal title={transactionType} isOpen={isOpen} setIsOpen={setIsOpen}>
+      {console.log(isMetamaskOpen)}
       <p className="mt-5">
         {transactionType === "Withdraw"
           ? "Privately withdraw ERC-20 tokens from your Owshen address!"
@@ -248,24 +277,18 @@ const TransactionModal = ({
           <input
             className="rounded py-5 px-2 bg-white dark:bg-indigo-950 my-4 border w-60 text-center"
             placeholder="Enter amount"
+            min={0}
             onChange={tokenAmountHandler}
-            type="number"
+            type="string"
             value={tokenAmount}
           />
         </>
       </div>
+      <div>{transactionType === "Withdraw" && isLoading && loadingText}</div>
       <button
         disabled={isLoading}
         onClick={() =>
-          transactionType === "Withdraw"
-            ? withdrawal(
-                selectedCoin?.index,
-                OwshenWallet,
-                address,
-                setIsOpen,
-                tokenAmount
-              )
-            : handleSend()
+          transactionType === "Withdraw" ? handleWithdraw() : handleSend()
         }
         className="border border-blue-400 bg-blue-200 text-blue-600 rounded-lg px-6 mt-3 font-bold py-1"
       >

@@ -25,6 +25,7 @@ const containerSlice = createSlice({
       dive_abi: null,
       token_contracts: [],
       selected_token_contract: null,
+      mode: null,
     },
     isTest: false,
     netWorkDetails: {

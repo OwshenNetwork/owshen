@@ -25,7 +25,6 @@ pub struct GetCoinsResponse {
 pub async fn coins(
     provider: Arc<Mutex<Context>>,
     priv_key: PrivateKey,
-    owshen_contract_deployment_block_number: U64,
 ) -> Result<Json<GetCoinsResponse>, eyre::Report> {
     let mut prov = provider.lock().await;
 
@@ -80,7 +79,7 @@ pub async fn coins(
 
         let chc = match cache.clone() {
             Some(cache) => cache.chc.clone(),
-            None => prov.genesis.chc.clone(),
+            None => network.genesis.chc.clone(),
         };
 
         let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));
@@ -94,7 +93,10 @@ pub async fn coins(
                 cache.height
             }
         } else {
-            owshen_contract_deployment_block_number.as_u64()
+            network
+                .config
+                .owshen_contract_deployment_block_number
+                .as_u64()
         };
 
         #[allow(unused_assignments)]

@@ -1,5 +1,4 @@
 use std::{
-    fs::read_to_string,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     process::Command,
@@ -10,38 +9,27 @@ use axum::{
     body::Body,
     extract::{self, Query},
     http::{Response, StatusCode},
-    response::{Html, IntoResponse},
-    routing::{get, get_service, post},
+    routing::{get, post},
     Router,
 };
 use mime_guess::from_ext;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tower_http::services::ServeFile;
 
 use eyre::Result;
 
 use structopt::StructOpt;
-use tokio::{fs::File, sync::Mutex, task};
-use tokio_util::codec::{BytesCodec, FramedRead};
+use tokio::{sync::Mutex, task};
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    apis::{self},
+    apis,
     checkpointed_hashchain::CheckpointedHashchain,
-    config::{Config, Context, EventsLatestStatus, NetworkManager, NodeManager, Peer, Wallet},
-    genesis::Genesis,
+    config::{Config, Context, EventsLatestStatus, NodeManager, Peer, Wallet},
     keys::{PrivateKey, PublicKey},
 };
-use statics::*;
 
-enum ResourceType {
-    Statics,
-    Asset,
-    CircuitsStatics,
-    ZkStatics,
-}
-
-#[derive(Debug, StructOpt, PartialEq, Clone)]
+#[derive(Debug, StructOpt, PartialEq, Clone, Serialize, Deserialize, Copy)]
 pub enum Mode {
     Test,
     AppImage,
@@ -56,7 +44,7 @@ impl std::str::FromStr for Mode {
             "test" => Ok(Mode::Test),
             "appimage" => Ok(Mode::AppImage),
             "windows" => Ok(Mode::Windows),
-            _ => Err("no match"),
+            _ => Err("No matching mod found"),
         }
     }
 }
@@ -68,7 +56,7 @@ pub struct WalletOpt {
     #[structopt(long)]
     db: Option<PathBuf>,
     #[structopt(long)]
-    config: PathBuf,
+    config: Option<PathBuf>,
     #[structopt(long, default_value = "127.0.0.1")]
     ip: String,
     #[structopt(long, default_value = "9000")]
@@ -80,7 +68,7 @@ pub struct WalletOpt {
     #[structopt(long, help = "Select mode: test, appimage, windows")]
     mode: Mode,
     #[structopt(long)]
-    test: bool,
+    dev: bool,
 }
 
 pub async fn wallet(opt: WalletOpt, wallet_path: PathBuf) -> Result<(), eyre::Report> {
@@ -92,41 +80,26 @@ pub async fn wallet(opt: WalletOpt, wallet_path: PathBuf) -> Result<(), eyre::Re
         bootstrap_peers,
         peer2peer,
         mode,
-        test,
+        dev,
     } = opt;
 
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let config_path = if test {
-        config
+    let forced_config: Option<Config> = if let Some(p) = config {
+        Some(serde_json::from_str(&std::fs::read_to_string(&p)?)?)
     } else {
-        PathBuf::from(format!("{}/usr/share/networks/Sepolia.json", app_dir_path))
-    };
-
-    let config = match mode {
-        Mode::Windows => serde_json::from_slice::<Config>(
-            &ConfigAsset::get("Localhost.json")
-                .ok_or(eyre::eyre!("Asset not found!"))?
-                .data,
-        )?,
-        _ => serde_json::from_str(&std::fs::read_to_string(&config_path)?)?,
+        None
     };
 
     let wallet_path = db.unwrap_or(wallet_path.clone());
-    let send_mode = mode.clone();
-    let withdrawal_mode = mode.clone();
 
     serve_wallet(
         ip,
         port,
         wallet_path,
-        config.token_contracts.clone(),
         bootstrap_peers,
         peer2peer,
         mode,
-        test,
-        config.clone(),
-        send_mode,
-        withdrawal_mode,
+        dev,
+        forced_config,
     )
     .await?;
 
@@ -144,57 +117,24 @@ fn read_priv_key(wallet_path: PathBuf) -> Option<PrivateKey> {
     wallet.map(|w| w.entropy.clone().into())
 }
 
+lazy_static! {
+    pub static ref PROVER_FILE: PathBuf = "assets/bin/prover".into();
+    pub static ref WITNESS_GEN_FILE: PathBuf = "assets/bin/coin_withdraw".into();
+    pub static ref PARAMS_FILE: PathBuf = "assets/zk/coin_withdraw_0001.zkey".into();
+}
+
 async fn serve_wallet(
     ip: String,
     port: u16,
     wallet_path: PathBuf,
-    token_contracts: NetworkManager,
     bootstrap_peers: Vec<Peer>,
     peer2peer: bool,
     mode: Mode,
-    test: bool,
-    config: Config,
-    send_mode: Mode,
-    withdrawal_mode: Mode,
+    dev: bool,
+    forced_config: Option<Config>,
 ) -> Result<()> {
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-
-    let (params_file, genesis_path, witness_gen_path, prover_path): (
-        PathBuf,
-        PathBuf,
-        PathBuf,
-        PathBuf,
-    ) = if test {
-        (
-            "contracts/circuits/coin_withdraw_0001.zkey".into(),
-            "owshen-genesis.dat".into(),
-            "contracts/circuits/coin_withdraw_cpp/coin_withdraw".into(),
-            "rapidsnark/package/bin/prover".into(),
-        )
-    } else {
-        (
-            format!("{}/usr/bin/coin_withdraw_0001.zkey", app_dir_path).into(),
-            format!(
-                "{}/usr/share/genesis/{}-owshen-genesis.dat",
-                app_dir_path, config.name
-            )
-            .into(),
-            format!("{}/usr/bin/coin_withdraw", app_dir_path).into(),
-            format!("{}/usr/bin/prover", app_dir_path).into(),
-        )
-    };
-
-    let send_witness_gen_path = witness_gen_path.clone();
-    let send_prover_path = prover_path.clone();
-    let send_params_file = params_file.clone();
-
-    let genesis: Genesis = bincode::deserialize(&std::fs::read(genesis_path)?)?;
-
-    let owshen_contract_deployment_block_number = config.owshen_contract_deployment_block_number;
-
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
-        genesis,
         chc: CheckpointedHashchain::new(),
         events_latest_status: EventsLatestStatus {
             last_sent_event: 0,
@@ -213,6 +153,10 @@ async fn serve_wallet(
         syncing: Arc::new(std::sync::Mutex::new(None)),
         syncing_task: None,
     }));
+
+    if let Some(conf) = forced_config.clone() {
+        context.lock().await.switch_network(conf)?;
+    }
 
     if peer2peer {
         let context_sync = context.clone();
@@ -244,8 +188,6 @@ async fn serve_wallet(
     let context_send = context.clone();
     let context_info = context.clone();
     let contest_set_network = context.clone();
-    let root_files_path = format!("{}/usr/share/owshen/client", app_dir_path);
-    let static_files_path = format!("{}/usr/share/owshen/client/static", app_dir_path);
 
     let withdraw_wallet_path = wallet_path.clone();
     let coins_wallet_path = wallet_path.clone();
@@ -255,69 +197,12 @@ async fn serve_wallet(
     let set_params_path_wallet_path = wallet_path.clone();
 
     let mut app = Router::new();
-    if mode != Mode::Windows {
-        app = app
-            .route("/", get(move || serve_index(test)))
-            .route(
-                "/static/*file",
-                get(|params: extract::Path<String>| async move {
-                    let file_path =
-                        PathBuf::from(static_files_path).join(params.trim_start_matches('/'));
-                    serve_file(file_path).await
-                }),
-            )
-            .route(
-                "/manifest.json",
-                get_service(ServeFile::new(format!("{}/manifest.json", root_files_path))),
-            )
-            .route(
-                "/asset-manifest.json",
-                get_service(ServeFile::new(format!(
-                    "{}/asset-manifest.json",
-                    root_files_path
-                ))),
-            )
-            .route(
-                "/robots.txt",
-                get_service(ServeFile::new(format!("{}/robots.txt", root_files_path))),
-            )
-    } else {
-        // For Windows mode, use embedded static file serving
-        app = app
-            .route("/", get(move || serve_embedded_index()))
-            .route(
-                "/static/*file",
-                get(|params: extract::Path<String>| async move {
-                    let file_name = params.as_str();
-                    serve_embedded_file(file_name, ResourceType::Statics).await
-                }),
-            )
-            .route(
-                "/*file",
-                get(|params: extract::Path<String>| async move {
-                    let file_name = params.as_str();
-                    serve_embedded_file(file_name, ResourceType::Asset).await
-                }),
-            )
-            .route(
-                "/witness/:filename",
-                get(|params: extract::Path<String>| async move {
-                    let file_name = params.as_str();
-                    println!("file name witness {:?}", file_name);
-                    serve_embedded_file(file_name, ResourceType::CircuitsStatics).await
-                }),
-            )
-            .route(
-                "/zk/:filename",
-                get(|params: extract::Path<String>| async move {
-                    let file_name = params.as_str();
-                    println!("file name witness {:?}", file_name);
-                    serve_embedded_file(file_name, ResourceType::ZkStatics).await
-                }),
-            )
-    }
 
     app = app
+        .route(
+            "/",
+            get(|| async move { serve_file("index.html").unwrap() }),
+        )
         .route(
             "/coins",
             get(move || async move {
@@ -325,12 +210,7 @@ async fn serve_wallet(
                     async {
                         let priv_key = read_priv_key(coins_wallet_path)
                             .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
-                        apis::coins(
-                            context_coin,
-                            priv_key,
-                            owshen_contract_deployment_block_number,
-                        )
-                        .await
+                        apis::coins(context_coin, priv_key).await
                     }
                     .await,
                 )
@@ -348,10 +228,10 @@ async fn serve_wallet(
                                 Query(req),
                                 context_withdraw,
                                 priv_key,
-                                witness_gen_path,
-                                prover_path,
-                                Some(params_file),
-                                withdrawal_mode,
+                                WITNESS_GEN_FILE.clone(),
+                                PROVER_FILE.clone(),
+                                Some(PARAMS_FILE.clone()),
+                                mode,
                             )
                             .await
                         }
@@ -372,10 +252,10 @@ async fn serve_wallet(
                                 Query(req),
                                 context_send,
                                 priv_key,
-                                send_witness_gen_path,
-                                send_prover_path,
-                                Some(send_params_file),
-                                send_mode,
+                                WITNESS_GEN_FILE.clone(),
+                                PROVER_FILE.clone(),
+                                Some(PARAMS_FILE.clone()),
+                                mode,
                             )
                             .await
                         }
@@ -399,13 +279,7 @@ async fn serve_wallet(
                     async {
                         let priv_key = read_priv_key(info_wallet_path)
                             .ok_or(eyre::Report::msg("Wallet is not initialized!"))?;
-                        Ok(apis::info(
-                            PublicKey::from(priv_key),
-                            context_info,
-                            token_contracts,
-                            test,
-                        )
-                        .await?)
+                        Ok(apis::info(PublicKey::from(priv_key), context_info, dev, mode).await?)
                     }
                     .await,
                 )
@@ -416,7 +290,7 @@ async fn serve_wallet(
             post(
                 move |extract::Query(req): extract::Query<apis::SetNetworkRequest>| async move {
                     handle_error(
-                        apis::set_network(Query(req), contest_set_network, test, config).await,
+                        apis::set_network(Query(req), contest_set_network, forced_config).await,
                     )
                 },
             ),
@@ -437,12 +311,19 @@ async fn serve_wallet(
                 },
             ),
         )
+        .route(
+            "/*file",
+            get(|params: extract::Path<String>| async move {
+                let file_name = params.as_str();
+                serve_file(file_name).unwrap()
+            }),
+        )
         .layer(CorsLayer::permissive());
 
     let ip_addr: IpAddr = ip.parse().expect("failed to parse ip");
     let addr = SocketAddr::new(ip_addr, port);
 
-    if test {
+    if dev {
         let frontend = async {
             task::spawn_blocking(move || {
                 let _output = Command::new("npm")
@@ -484,80 +365,23 @@ async fn serve_wallet(
     }
 }
 
-async fn serve_index(test: bool) -> impl IntoResponse {
-    let app_dir_path = std::env::var("APPDIR").unwrap_or_else(|_| "".to_string());
-    let index_path = if test {
-        "client/build/index.html".to_string()
+fn serve_file(path: &str) -> Result<Response<Body>, eyre::Report> {
+    if let Ok(content) = std::fs::read(Path::new("assets").join(path)) {
+        let mime_type = match Path::new(path).extension().and_then(|ext| ext.to_str()) {
+            Some(ext) => from_ext(ext).first_or_octet_stream().as_ref().to_string(),
+            None => "application/octet_stream".to_string(),
+        };
+
+        let response = Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", mime_type)
+            .body(Body::from(content))?;
+
+        Ok(response)
     } else {
-        format!("{}/usr/share/owshen/client/index.html", app_dir_path)
-    };
-
-    println!("index path {}", index_path);
-    match read_to_string(index_path) {
-        Ok(contents) => Html(contents),
-        Err(_) => Html("<h1>Error: Unable to read the index file</h1>".to_string()),
-    }
-}
-
-async fn serve_file(file_path: PathBuf) -> impl IntoResponse {
-    if let Ok(file) = File::open(file_path).await {
-        let stream = FramedRead::new(file, BytesCodec::new());
-
-        Response::new(Body::wrap_stream(stream))
-    } else {
-        Response::builder()
+        Ok(Response::builder()
             .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::from("File not found"))
-            .unwrap()
-    }
-}
-
-async fn serve_embedded_index() -> impl IntoResponse {
-    match Asset::get("index.html") {
-        Some(content) => {
-            let body = String::from_utf8(content.data.into_owned())
-                .unwrap_or_else(|_| "Failed to parse the file content.".to_string());
-
-            Html(body)
-        }
-        None => {
-            Html("<h1>Error: Unable to find the index file in embedded assets</h1>".to_string())
-        }
-    }
-}
-
-async fn serve_embedded_file(file: &str, resource_type: ResourceType) -> impl IntoResponse {
-    match resource_type {
-        ResourceType::Statics => serve_from_embed(file, Statics::get),
-        ResourceType::Asset => serve_from_embed(file, Asset::get),
-        ResourceType::CircuitsStatics => serve_from_embed(file, CircuitsStatics::get),
-        ResourceType::ZkStatics => serve_from_embed(file, ZkStatics::get),
-    }
-}
-
-fn serve_from_embed<F>(file: &str, get_fn: F) -> Response<Body>
-where
-    F: Fn(&str) -> Option<rust_embed::EmbeddedFile>,
-{
-    match get_fn(file) {
-        Some(content) => {
-            let mime_type = match Path::new(file).extension().and_then(|ext| ext.to_str()) {
-                Some(ext) => from_ext(ext).first_or_octet_stream().as_ref().to_string(),
-                None => "application/octet_stream".to_string(),
-            };
-
-            let response = Response::builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", mime_type)
-                .body(Body::from(content.data))
-                .unwrap();
-
-            response
-        }
-        None => Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::from("File not found"))
-            .unwrap(),
+            .body(Body::from("File not found"))?)
     }
 }
 

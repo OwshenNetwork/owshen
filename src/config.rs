@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     checkpointed_hashchain::CheckpointedHashchain,
     fp::Fp,
-    genesis::Genesis,
+    genesis,
     hash::hash2,
     helper::u256_to_h160,
     keys::{Entropy, PrivateKey, PublicKey},
@@ -21,13 +21,38 @@ pub struct Context {
     pub chc: CheckpointedHashchain,
     pub node_manager: NodeManager,
     pub events_latest_status: EventsLatestStatus,
-    pub genesis: Genesis,
     pub syncing: Arc<std::sync::Mutex<Option<f32>>>,
     pub syncing_task: Option<
         tokio::task::JoinHandle<
             std::result::Result<(CheckpointedHashchain, Vec<Coin>), eyre::Report>,
         >,
     >,
+}
+
+impl Context {
+    pub fn switch_network(&mut self, config: Config) -> Result<(), eyre::Report> {
+        if Some(config.chain_id)
+            == self
+                .node_manager
+                .network
+                .as_ref()
+                .map(|c| c.config.chain_id)
+        {
+            return Ok(());
+        }
+        let provider: Arc<Provider<Http>> =
+            Arc::new(Provider::<Http>::try_from(config.endpoint.clone())?);
+        log::info!("Filling the genesis tree... (This might take some time)");
+        let genesis = genesis::fill_genesis(config.dive_contract_address);
+        self.node_manager.set_provider_network(Network {
+            provider,
+            config,
+            genesis,
+        });
+        self.coins.clear();
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,6 +81,7 @@ pub struct NodeContext {
 pub struct Network {
     pub provider: Arc<Provider<Http>>,
     pub config: Config,
+    pub genesis: genesis::Genesis,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -224,6 +250,7 @@ impl Wallet {
 pub struct Config {
     pub name: String,
     pub endpoint: String,
+    pub chain_id: u64,
     pub dive_contract_address: H160,
     pub owshen_contract_address: H160,
     pub owshen_contract_deployment_block_number: U64,
