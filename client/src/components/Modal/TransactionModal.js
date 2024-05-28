@@ -51,7 +51,6 @@ const TransactionModal = ({
     { title: "Your Owshen Account", value: "Your Owshen Account", img: Logo },
   ];
 
-  const isMetamaskOpen = !!window.ethereum && window.ethereum.selectAddress;
   useEffect(() => {
     if (!isTest) {
       walletOptions.push({
@@ -213,7 +212,6 @@ const TransactionModal = ({
   );
   return (
     <Modal title={transactionType} isOpen={isOpen} setIsOpen={setIsOpen}>
-      {console.log(isMetamaskOpen)}
       <p className="mt-5">
         {transactionType === "Withdraw"
           ? "Privately withdraw ERC-20 tokens from your Owshen address!"
