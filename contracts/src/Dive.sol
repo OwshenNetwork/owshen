@@ -8,10 +8,8 @@ import "./MptPathVerifier.sol";
 import "./MptLastVerifier.sol";
 import "./SpendVerifier.sol";
 
-
 contract DiveToken is ERC20 {
-    uint256 constant FIELD_SIZE =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    uint256 constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     struct Groth16Proof {
         uint256[2] a;
@@ -48,11 +46,7 @@ contract DiveToken is ERC20 {
 
     event CoinGenerated(address recipient, uint256 coin);
     event CoinSpent(
-        address spender,
-        uint256 coin,
-        uint256 remainingCoin,
-        uint256 withdrawnBalance,
-        address destination
+        address spender, uint256 coin, uint256 remainingCoin, uint256 withdrawnBalance, address destination
     );
 
     constructor(uint256 initialSupply) ERC20("Dive", "DIVE") {
@@ -127,25 +121,14 @@ contract DiveToken is ERC20 {
         coins[coin] = false;
 
         require(
-            spend_verifier.verifyProof(
-                proof.a,
-                proof.b,
-                proof.c,
-                [coin, remainingCoin, withdrawnBalance]
-            ),
+            spend_verifier.verifyProof(proof.a, proof.b, proof.c, [coin, remainingCoin, withdrawnBalance]),
             "SpendVerifier: invalid proof"
         );
 
         coins[remainingCoin] = true;
         _burnt_balances[destination] += withdrawnBalance;
 
-        emit CoinSpent(
-            msg.sender,
-            coin,
-            remainingCoin,
-            withdrawnBalance,
-            destination
-        );
+        emit CoinSpent(msg.sender, coin, remainingCoin, withdrawnBalance, destination);
         emit CoinGenerated(destination, remainingCoin);
     }
 
@@ -157,10 +140,7 @@ contract DiveToken is ERC20 {
         return (block.number - starting_block) / BLOCK_PER_EPOCH;
     }
 
-    function approximate(
-        uint256 amount_per_epoch,
-        uint256 num_epochs
-    ) public view returns (uint256) {
+    function approximate(uint256 amount_per_epoch, uint256 num_epochs) public view returns (uint256) {
         uint256 mint_amount = 0;
         uint256 currEpoch = currentEpoch();
         for (uint256 i = 0; i < num_epochs; i++) {
@@ -180,14 +160,8 @@ contract DiveToken is ERC20 {
         return reward;
     }
 
-    function participate(
-        uint256 amount_per_epoch,
-        uint256 num_epochs
-    ) external {
-        require(
-            _burnt_balances[msg.sender] >= amount_per_epoch * num_epochs,
-            "Insufficient balance"
-        );
+    function participate(uint256 amount_per_epoch, uint256 num_epochs) external {
+        require(_burnt_balances[msg.sender] >= amount_per_epoch * num_epochs, "Insufficient balance");
         _burnt_balances[msg.sender] -= amount_per_epoch * num_epochs;
 
         uint256 currEpoch = currentEpoch();
@@ -198,10 +172,7 @@ contract DiveToken is ERC20 {
     }
 
     function claim(uint256 starting_epoch, uint256 num_epochs) external {
-        require(
-            starting_epoch + num_epochs <= currentEpoch(),
-            "Cannot claim an ongoing epoch!"
-        );
+        require(starting_epoch + num_epochs <= currentEpoch(), "Cannot claim an ongoing epoch!");
         uint256 mint_amount = 0;
         for (uint256 i = 0; i < num_epochs; i++) {
             uint256 total = epoch_totals[starting_epoch + i];

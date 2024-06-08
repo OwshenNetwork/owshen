@@ -20,6 +20,7 @@ pub struct GetSendRequest {
     pub new_amount: String,
     pub receiver_address: String,
     pub address: String,
+    pub memo: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -36,6 +37,7 @@ pub struct GetSendResponse {
     pub obfuscated_sender_amount: U256,
     pub obfuscated_receiver_token_address: U256,
     pub obfuscated_sender_token_address: U256,
+    pub memo: String,
 }
 
 pub async fn send<P: AsRef<Path>>(
@@ -51,6 +53,7 @@ pub async fn send<P: AsRef<Path>>(
     let new_amount = req.new_amount;
     let receiver_address = req.receiver_address;
     let address = req.address;
+    let memo = req.memo;
     let coins = context_send.lock().await.coins.clone();
     let chc = context_send.lock().await.chc.clone();
     let filtered_coin = coins.iter().find(|coin| coin.index == index);
@@ -152,6 +155,7 @@ pub async fn send<P: AsRef<Path>>(
             sender_commitment: u256_calc_sender_commitment,
             sender_ephemeral: address_ephemeral.point,
             receiver_ephemeral: receiver_address_pub_ephemeral.point,
+            memo,
         }))
     } else {
         log::warn!("No coin with index {} found", index);

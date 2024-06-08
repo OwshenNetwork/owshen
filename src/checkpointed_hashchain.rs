@@ -127,7 +127,10 @@ impl CheckpointedHashchain {
         let mut chks = vec![];
         chks.push(proof.checkpoints[0]);
         for i in 1..proof.checkpoints.len() {
-            chks.push(hash2([proof.checkpoints[i - 1], proof.checkpoint_commitments[i]]));
+            chks.push(hash2([
+                proof.checkpoints[i - 1],
+                proof.checkpoint_commitments[i],
+            ]));
         }
         assert!(chks.contains(&proof.checkpoint_head));
 

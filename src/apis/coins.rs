@@ -198,6 +198,7 @@ fn sync_coins(
                 let hint_token_address = sent_event.hint_token_address;
                 let commitment = Fp::try_from(sent_event.commitment).ok()?;
                 let shared_secret = stealth_priv.shared_secret(ephemeral);
+
                 if let Ok(Some((fp_hint_token_address, fp_hint_amount))) = extract_token_amount(
                     hint_token_address,
                     hint_amount,
@@ -213,6 +214,7 @@ fn sync_coins(
                         priv_key: stealth_priv,
                         pub_key: stealth_pub,
                         commitment: sent_event.commitment,
+                        memo: sent_event.memo.clone(),
                     })
                 } else {
                     None

@@ -13,7 +13,7 @@ pub fn hash2(vals: [Fp; 2]) -> Fp {
 #[cfg(test)]
 mod tests {
     use crate::fp::Fp;
-    use crate::hash::{hash4, hash2};
+    use crate::hash::{hash2, hash4};
     use ff::PrimeField;
     #[test]
     fn poseidon4_hash() {

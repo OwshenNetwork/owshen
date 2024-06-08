@@ -95,7 +95,8 @@ export const useTransactionModalApi = (tokenContract) => {
             ephemeral,
             tokenContract,
             utils.toBigInt(to_wei_token_amount),
-            options
+            OwshenWallet.wallet,
+            options,
           );
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -166,6 +167,7 @@ export const useTransactionModalApi = (tokenContract) => {
           address: OwshenWallet.wallet,
           new_amount: to_wei_token_amount,
           receiver_address: destOwshenWallet,
+          memo: OwshenWallet.wallet,
         },
       })
       .then(async (result) => {
@@ -228,7 +230,8 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.obfuscated_receiver_amount,
             result.data.obfuscated_sender_amount,
             true,
-            options
+            options,
+            result.data.memo,
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();
@@ -329,7 +332,8 @@ export const useTransactionModalApi = (tokenContract) => {
             toBigInt(desireAmount),
             result.data.obfuscated_remaining_amount,
             address,
-            commitment
+            commitment,
+            OwshenWallet.wallet,
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();

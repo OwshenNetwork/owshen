@@ -27,7 +27,8 @@ contract Owshen {
         uint256 timestamp,
         uint256 hint_amount,
         uint256 hint_tokenAddress,
-        uint256 commitment
+        uint256 commitment,
+        string memo
     );
 
     event Spend(uint256 nullifier);
@@ -52,15 +53,18 @@ contract Owshen {
         depositIndex = _deposit_index;
     }
 
-    function deposit(Point calldata _pub_key, Point calldata _ephemeral, address _tokenAddress, uint256 _amount)
-        public
-        payable
-    {
+    function deposit(
+        Point calldata _pub_key,
+        Point calldata _ephemeral,
+        address _tokenAddress,
+        uint256 _amount,
+        string memory _memo
+    ) public payable {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
         uint256 leaf = poseidon4.poseidon([_pub_key.x, _pub_key.y, _amount, uint_tokenaddress]);
         chc.set(leaf);
         _processDeposit(msg.sender, address(this), _tokenAddress, _amount);
-        emit Sent(_ephemeral, depositIndex, block.timestamp, _amount, uint_tokenaddress, leaf);
+        emit Sent(_ephemeral, depositIndex, block.timestamp, _amount, uint_tokenaddress, leaf, _memo);
         depositIndex += 1;
     }
 
@@ -121,7 +125,8 @@ contract Owshen {
         uint256 _amount,
         uint256 _obfuscated_remaining_amount,
         address _to,
-        uint256 _commitment
+        uint256 _commitment,
+        string memory _memo
     ) public {
         uint256 uint_tokenaddress = getUintTokenAddress(_tokenAddress);
         uint256 null_commitment = poseidon4.poseidon([uint256(uint160(_to)), 0, _amount, uint_tokenaddress]);
@@ -132,7 +137,13 @@ contract Owshen {
         IERC20 payToken = IERC20(_tokenAddress);
         payToken.transfer(_to, _amount);
         emit Sent(
-            _ephemeral, depositIndex, block.timestamp, _obfuscated_remaining_amount, uint_tokenaddress, _commitment
+            _ephemeral,
+            depositIndex,
+            block.timestamp,
+            _obfuscated_remaining_amount,
+            uint_tokenaddress,
+            _commitment,
+            _memo
         );
         emit Spend(_nullifiers[0]);
         emit Spend(_nullifiers[1]);
@@ -151,7 +162,8 @@ contract Owshen {
         uint256 _sender_token_address_hint,
         uint256 _receiver_amount_hint,
         uint256 _sender_amount_hint,
-        bool _is_dual_output
+        bool _is_dual_output,
+        string memory _memo
     ) public {
         spend(_proof, _checkpoint_head, _latest_values_commitment_head, _nullifiers, [_commitments[1], _commitments[0]]);
         chc.set(_commitments[1]);
@@ -161,7 +173,8 @@ contract Owshen {
             block.timestamp,
             _receiver_amount_hint,
             _receiver_token_address_hint,
-            _commitments[1]
+            _commitments[1],
+            _memo
         );
         depositIndex += 1;
         if (_is_dual_output) {
@@ -172,7 +185,8 @@ contract Owshen {
                 block.timestamp,
                 _sender_amount_hint,
                 _sender_token_address_hint,
-                _commitments[0]
+                _commitments[0],
+                _memo
             );
             depositIndex += 1;
         }

@@ -23,6 +23,7 @@ pub struct Entry {
     hint_amount: Fp,
     hint_token_address: Fp,
     commitment: Fp,
+    memo: String,
 }
 
 impl Into<SentFilter> for Entry {
@@ -34,6 +35,7 @@ impl Into<SentFilter> for Entry {
             hint_amount: self.hint_amount.into(),
             hint_token_address: self.hint_token_address.into(),
             commitment: self.commitment.into(),
+            memo: self.memo.into(),
         }
     }
 }
@@ -51,6 +53,7 @@ unsafe impl Sync for Genesis {}
 pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
     let dive_token_addr: Fp = h160_to_u256(dive_token_address).try_into().unwrap();
     let coeff = Fp::from_str_vartime("1000000000000000000").unwrap();
+    let memo = "genesis".to_string();
     GENESIS
         .clone()
         .into_par_iter()
@@ -72,6 +75,7 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
                 hint_amount: amount,
                 hint_token_address: dive_token_addr,
                 commitment: commit,
+                memo: memo.clone(),
             }
         })
         .collect()

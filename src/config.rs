@@ -128,7 +128,7 @@ pub struct NetworkManager {
     pub networks: HashMap<String, Vec<TokenInfo>>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Coin {
     pub index: U256,
     pub uint_token: H160,
@@ -137,6 +137,7 @@ pub struct Coin {
     pub pub_key: PublicKey,
     pub nullifier: U256,
     pub commitment: U256,
+    pub memo: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
