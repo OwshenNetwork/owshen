@@ -16,7 +16,7 @@ const Web3ModalComponent = () => {
         dispatch(setUserDetails({ address: accounts[0] }));
       });
     }
-  }, []);
+  }, [dispatch]);
 
   const connectWallet = async () => {
     try {

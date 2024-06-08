@@ -22,17 +22,17 @@ export const builder = async (code, options) => {
     runtime: {
       exceptionHandler: function (code) {
         let err;
-        if (code == 1) {
+        if (code === 1) {
           err = "Signal not found.\n";
-        } else if (code == 2) {
+        } else if (code === 2) {
           err = "Too many signals set.\n";
-        } else if (code == 3) {
+        } else if (code === 3) {
           err = "Signal already set.\n";
-        } else if (code == 4) {
+        } else if (code === 4) {
           err = "Assert Failed.\n";
-        } else if (code == 5) {
+        } else if (code === 5) {
           err = "Not enough memory.\n";
-        } else if (code == 6) {
+        } else if (code === 6) {
           err = "Input signal array access exceeds the size.\n";
         } else {
           err = "Unknown error.\n";
@@ -80,7 +80,7 @@ export const builder = async (code, options) => {
   function getMessage() {
     var message = "";
     var c = instance.exports.getMessageChar();
-    while (c != 0) {
+    while (c !== 0) {
       message += String.fromCharCode(c);
       c = instance.exports.getMessageChar();
     }

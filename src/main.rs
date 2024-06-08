@@ -140,8 +140,6 @@ mod tests {
 
         let contract = deployer.send().await.unwrap();
 
-        println!("{:?}", contract.methods);
-
         let func = contract
             .method_hash::<_, U256>(
                 [36, 143, 102, 119],

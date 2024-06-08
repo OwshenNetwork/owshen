@@ -11,8 +11,8 @@ use structopt::StructOpt;
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 
+use crate::apis;
 use crate::config::{Config, Network, NodeContext, NodeManager, Peer, NODE_UPDATE_INTERVAL};
-use crate::{apis, genesis};
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct NodeOpt {
@@ -51,8 +51,6 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
         c
     })?;
 
-    let genesis = genesis::fill_genesis(config.dive_contract_address);
-
     let provider = Provider::<Http>::try_from(endpoint.clone())?;
     let context = Arc::new(Mutex::new(NodeContext {
         node_manager: NodeManager {
@@ -60,7 +58,6 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
             network: Some(Network {
                 provider: Arc::new(provider),
                 config,
-                genesis,
             }),
             peers: bootstrap_peers,
             elected_peer: None,

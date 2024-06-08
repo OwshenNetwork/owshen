@@ -37,6 +37,7 @@ assets:
 	cp -r rapidsnark/package/bin/prover assets/bin
 	cp -r contracts/circuits/coin_withdraw_cpp/coin_withdraw assets/bin
 	cp -r contracts/circuits/coin_withdraw_cpp/coin_withdraw.dat assets/bin
+	cp -r owshen-genesis.dat assets/bin
 	cp -r client/build/static assets
 	cp -r client/build/static assets
 	cp -r client/build/static assets

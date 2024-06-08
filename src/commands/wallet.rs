@@ -26,6 +26,7 @@ use crate::{
     apis,
     checkpointed_hashchain::CheckpointedHashchain,
     config::{Config, Context, EventsLatestStatus, NodeManager, Peer, Wallet},
+    genesis::Genesis,
     keys::{PrivateKey, PublicKey},
 };
 
@@ -121,6 +122,7 @@ lazy_static! {
     pub static ref PROVER_FILE: PathBuf = "assets/bin/prover".into();
     pub static ref WITNESS_GEN_FILE: PathBuf = "assets/bin/coin_withdraw".into();
     pub static ref PARAMS_FILE: PathBuf = "assets/zk/coin_withdraw_0001.zkey".into();
+    pub static ref GENESIS_FILE: PathBuf = "assets/bin/owshen-genesis.dat".into();
 }
 
 async fn serve_wallet(
@@ -133,8 +135,11 @@ async fn serve_wallet(
     dev: bool,
     forced_config: Option<Config>,
 ) -> Result<()> {
+    let genesis: Genesis = bincode::deserialize(&std::fs::read(GENESIS_FILE.clone())?)?;
+
     let context = Arc::new(Mutex::new(Context {
         coins: vec![],
+        genesis,
         chc: CheckpointedHashchain::new(),
         events_latest_status: EventsLatestStatus {
             last_sent_event: 0,

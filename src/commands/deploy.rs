@@ -37,6 +37,8 @@ pub struct DeployOpt {
     deploy_hash_function: bool,
     #[structopt(long)]
     deploy_owshen: bool,
+    #[structopt(long)]
+    genesis: bool,
 }
 
 pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
@@ -50,6 +52,7 @@ pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
         deploy_dive,
         deploy_hash_function,
         deploy_owshen,
+        genesis,
     } = opt;
 
     let cfg: Option<Config> = std::fs::read_to_string(&config)
@@ -69,6 +72,7 @@ pub async fn deploy(opt: DeployOpt) -> Result<(), eyre::Report> {
         deploy_dive,
         deploy_hash_function,
         deploy_owshen,
+        genesis,
     )
     .await?;
 
@@ -87,6 +91,7 @@ async fn initialize_config(
     deploy_dive: bool,
     deploy_hash_function: bool,
     deploy_owshen: bool,
+    genesis_feed: bool,
 ) -> Result<Config, eyre::Report> {
     let mut network_manager = NetworkManager::new();
     let provider = Arc::new(Provider::<Http>::try_from(endpoint.clone())?);
@@ -170,8 +175,25 @@ async fn initialize_config(
 
     let dive_contract = DiveToken::new(dive_contract_address, client.clone());
 
-    log::info!("Filling the genesis tree... (This might take some time)");
-    let genesis = genesis::fill_genesis(dive_contract_address);
+    let genesis = if genesis_feed {
+        log::info!("Filling the genesis tree... (This might take some time)");
+        let genesis = genesis::fill_genesis(dive_contract_address);
+        std::fs::write("owshen-genesis.dat", bincode::serialize(&genesis)?)?;
+        Some(genesis)
+    } else {
+        log::info!("Loading existing genesis tree...");
+        if let Ok(f) = std::fs::read("owshen-genesis.dat") {
+            bincode::deserialize(&f).ok()
+        } else {
+            log::warn!("No existing genesis data found. Proceeding without it.");
+            None
+        }
+    };
+
+    let genesis = match genesis {
+        Some(ref g) => g,
+        None => panic!("Genesis data is required but not available"),
+    };
 
     let new_nonce = provider.get_transaction_count(from_address, None).await?;
 

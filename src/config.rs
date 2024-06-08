@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     checkpointed_hashchain::CheckpointedHashchain,
     fp::Fp,
-    genesis,
+    genesis::Genesis,
     hash::hash2,
     helper::u256_to_h160,
     keys::{Entropy, PrivateKey, PublicKey},
@@ -21,6 +21,7 @@ pub struct Context {
     pub chc: CheckpointedHashchain,
     pub node_manager: NodeManager,
     pub events_latest_status: EventsLatestStatus,
+    pub genesis: Genesis,
     pub syncing: Arc<std::sync::Mutex<Option<f32>>>,
     pub syncing_task: Option<
         tokio::task::JoinHandle<
@@ -42,13 +43,8 @@ impl Context {
         }
         let provider: Arc<Provider<Http>> =
             Arc::new(Provider::<Http>::try_from(config.endpoint.clone())?);
-        log::info!("Filling the genesis tree... (This might take some time)");
-        let genesis = genesis::fill_genesis(config.dive_contract_address);
-        self.node_manager.set_provider_network(Network {
-            provider,
-            config,
-            genesis,
-        });
+        self.node_manager
+            .set_provider_network(Network { provider, config });
         self.coins.clear();
 
         Ok(())
@@ -81,7 +77,6 @@ pub struct NodeContext {
 pub struct Network {
     pub provider: Arc<Provider<Http>>,
     pub config: Config,
-    pub genesis: genesis::Genesis,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

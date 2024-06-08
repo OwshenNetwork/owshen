@@ -4,7 +4,6 @@ import Dropdown from "../DropDown";
 import {
   selectUserAddress,
   selectOwshen,
-  selectReceivedCoins,
   selectIsTest,
 } from "../../store/containerSlice";
 import { getERC20Balance, chainIdOfWallet } from "../../utils/helper";
@@ -12,7 +11,7 @@ import { useSelector } from "react-redux";
 import Logo from "../../pics/icons/logo.png";
 import MetaMaskLogo from "../../pics/icons/metaMask.png";
 import { toast } from "react-toastify";
-import { currencies } from "../../utils/Currencies";
+import { currencies, getNameByContractAddress } from "../../utils/Currencies";
 import { trueAmount } from "../../utils/helper";
 import {
   getNetworkNameByChainId,
@@ -31,16 +30,13 @@ const TransactionModal = ({
 }) => {
   const address = useSelector(selectUserAddress);
   const OwshenWallet = useSelector(selectOwshen);
-  const receivedCoins = useSelector(selectReceivedCoins);
   const [destOwshenWallet, setDstOwshenWallet] = useState("");
   const [tokenAmount, setTokenAmount] = useState(0);
-  const [, setWalletName] = useState("");
   const [tokenOptions, setTokenOptions] = useState([]);
   const [MaxBalanceOfWithdraw, setMaxBalanceOfWithdraw] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
   const [chainId, setChainId] = useState(null);
   const [selectTokenLabel, SetSelectTokenLabel] = useState("Choose your token");
-  const [selectWalletLabel, SetSelectWalletLabel] = useState("");
   const [loadingText, SetLoadingText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isTest = useSelector(selectIsTest);
@@ -113,17 +109,6 @@ const TransactionModal = ({
     const val = trueAmount(maxValue);
     return setTokenAmount(val);
   };
-  const findMatchingCoin = () => {
-    for (let coin of receivedCoins) {
-      if (
-        trueAmount(coin.amount, coin.uint_token) > Number(tokenAmount) &&
-        String(coin.uint_token) === String(tokenContract)
-      ) {
-        return coin;
-      }
-    }
-    return toast.error("No matching coin is found");
-  };
 
   const handleSend = async () => {
     setIsLoading(true); // Set isLoading to true at the beginning of the method
@@ -131,7 +116,7 @@ const TransactionModal = ({
     if (destOwshenWallet.length !== 69) {
       setIsLoading(false); // Set isLoading to false if there's an error
       return toast.error(
-        "Please make sure your destination wallet address is correct"
+        "Please make sure your destination wallet address is correct."
       );
     }
     const firstPartOfAddress = destOwshenWallet.slice(0, 4);
@@ -154,7 +139,6 @@ const TransactionModal = ({
           tokenContract,
           tokenAmount,
           chainId,
-          findMatchingCoin,
           setIsOpen
         );
       }
@@ -168,13 +152,15 @@ const TransactionModal = ({
   const shuffleText = useCallback(() => {
     const randomLoadingTexts = [
       "Processing your request...",
-      "its may take some time",
+      "It may take some time.",
+      "Please hold on while we process your request.",
+      "Don't go away, we're almost done.",
     ];
     const index = Math.floor(Math.random() * randomLoadingTexts.length);
     SetLoadingText(randomLoadingTexts[index]);
   }, []);
   const handleWithdraw = async () => {
-    setInterval(shuffleText, 4000);
+    setInterval(shuffleText, 8000);
     try {
       await withdrawal(
         selectedCoin?.index,
@@ -203,7 +189,6 @@ const TransactionModal = ({
       setDstOwshenWallet("");
       setTokenAmount(0);
       SetSelectTokenLabel("Choose your token");
-      SetSelectWalletLabel("Source wallet");
     }
   }, [isOpen]);
 
@@ -230,31 +215,29 @@ const TransactionModal = ({
               value={destOwshenWallet}
             />
           </div>
-          <div className="px-3 flex justify-between items-center">
-            <label>
-              <b>From: </b>
-            </label>
-            <Dropdown
-              label={selectWalletLabel}
-              options={walletOptions}
-              select={setWalletName}
-              style={`py-5 !w-60`}
-              setLabel={SetSelectWalletLabel}
-            />
-          </div>
         </>
       )}
       <div className="px-3 flex justify-between items-center mt-3">
         <label>
           <b>Token: </b>
         </label>
-        <Dropdown
-          label={isDataSet ? "DIVE" : selectTokenLabel}
-          options={tokenOptions}
-          select={setTokenContract}
-          style={`py-5 ${isDataSet ? "pointer-events-none" : ""}!w-60`}
-          setLabel={SetSelectTokenLabel}
-        />
+        {transactionType === "Withdraw" ? (
+          <span
+            style={{
+              marginRight: "100px",
+            }}
+          >
+            {getNameByContractAddress(selectedCoin?.uint_token)}
+          </span>
+        ) : (
+          <Dropdown
+            label={isDataSet ? "DIVE" : selectTokenLabel}
+            options={tokenOptions}
+            select={setTokenContract}
+            style={`py-5 ${isDataSet ? "pointer-events-none" : ""}!w-60`}
+            setLabel={SetSelectTokenLabel}
+          />
+        )}
       </div>
       <div className="px-3 flex justify-between items-center relative">
         <button
@@ -265,7 +248,7 @@ const TransactionModal = ({
           }}
           className="border rounded-3xl px-3 absolute -bottom-2 left-4 border-blue-500 text-blue-600"
         >
-          <small> max</small>
+          <small>Max</small>
         </button>
         <>
           <label>

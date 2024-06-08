@@ -30,7 +30,7 @@ const WalletConnectionChecker = () => {
     };
 
     checkWalletConnection();
-  }, [wallet]);
+  }, [dispatch, wallet]);
 
   return (
     <div>

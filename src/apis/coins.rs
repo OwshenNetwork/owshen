@@ -79,7 +79,7 @@ pub async fn coins(
 
         let chc = match cache.clone() {
             Some(cache) => cache.chc.clone(),
-            None => network.genesis.chc.clone(),
+            None => prov.genesis.chc.clone(),
         };
 
         let syncing_arc = Arc::new(std::sync::Mutex::new(Some(0f32)));

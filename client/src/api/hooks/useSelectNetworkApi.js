@@ -23,7 +23,6 @@ export const useSelectNetworkApi = () => {
       const response = await axios.post(`${coreEndpoint}/set-network`, null, {
         params: { chain_id },
       });
-      console.log("Response:", response.data);
       setChainId(chain_id);
       return response.data;
     } catch (error) {

@@ -8,7 +8,6 @@ import {
   selectIsWalletConnected,
   selectIsOwshenWalletExist,
 } from "../../store/containerSlice";
-import SetParamsModal from "../Modal/SetParamsModal";
 import { useDispatch, useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import { Tooltip } from "react-tooltip";
@@ -42,7 +41,6 @@ const Main = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isInprogress, setIsInprogress] = useState(false);
   const [isOpenWithdraw, setIsOpenWithdraw] = useState(false);
-  const [isOpenSetParams, setIsOpenSetParams] = useState(false);
 
   const isConnected = useSelector(selectIsWalletConnected);
   const defaultChainId = isTest ? 11155111 : null;
@@ -70,34 +68,21 @@ const Main = ({ children }) => {
     if (networkChainId && isChainIdExist(networkChainId)) {
       setChainId(networkChainId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     networkChainId,
     OwshenWallet.wallet,
     OwshenWallet.contract_address,
-    isConnected
+    isConnected,
   ]);
   useEffect(() => {
     if (!isOwshenWalletExist) {
       navigate("/walletSelection");
     }
   });
-  // const setParamsToastContent = (
-  //   <div className="text-center">
-  //     pleas set your params to do transaction
-  //     <button
-  //       className="!bg-white p-2 w-full text-black rounded my-2"
-  //       onClick={() => setIsOpenSetParams(true)}
-  //     >
-  //       open set params
-  //     </button>
-  //   </div>
-  // );
+
 
   const canOpenModal = () => {
-    // return toast.error(setParamsToastContent, {
-    //   closeOnClick: false,
-    //   className: "custom-toast-container",
-    // });
     if (isTest) {
       return setIsInprogress(true);
     }
@@ -137,11 +122,10 @@ const Main = ({ children }) => {
         isOpen={isOpen}
         setIsOpen={setIsOpen}
       />
-      <SetParamsModal isOpen={isOpenSetParams} setIsOpen={setIsOpenSetParams} />
       <InProgress isOpen={isInprogress} setIsOpen={setIsInprogress} />
 
       <div className="mt-10 text-center">
-        <Tooltip id="copy" place="top" content="Copy wallet address" />
+        <Tooltip id="copy" place="top" content="Copy to clipboard" />
         {OwshenWallet.wallet && (
           <button
             data-tooltip-id="copy"
@@ -160,11 +144,11 @@ const Main = ({ children }) => {
         <div className="my-8 flex justify-around w-32 mx-auto">
           <button onClick={canOpenModal}>
             <img src={SendIcon} alt="sendIcon" />
-            <p>send</p>
+            <p>Send</p>
           </button>
           <button onClick={() => setIsInprogress(true)}>
             <img src={SwapIcon} alt="swapIcon" />
-            <p>swap</p>
+            <p>Swap</p>
           </button>
         </div>
       </div>

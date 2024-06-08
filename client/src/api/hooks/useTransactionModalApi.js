@@ -1,13 +1,18 @@
 import { useSelector } from "react-redux";
 import { toast } from "react-toastify";
 import axios from "axios";
-import { coreEndpoint, validateTransaction } from "../../utils/helper";
+import {
+  coreEndpoint,
+  trueAmount,
+  validateTransaction,
+} from "../../utils/helper";
 import {
   selectUserAddress,
   selectOwshen,
   selectNetwork,
   selectIsTest,
   setReceivedCoins,
+  selectReceivedCoins,
 } from "../../store/containerSlice";
 import { ethers, toBigInt } from "ethers";
 import { utils } from "web3";
@@ -17,6 +22,7 @@ import { groth16 } from "snarkjs";
 
 export const useTransactionModalApi = (tokenContract) => {
   const address = useSelector(selectUserAddress);
+  const receivedCoins = useSelector(selectReceivedCoins);
   const OwshenWallet = useSelector(selectOwshen);
   const network = useSelector(selectNetwork);
   const isTest = useSelector(selectIsTest);
@@ -81,8 +87,9 @@ export const useTransactionModalApi = (tokenContract) => {
         const ephemeral = [ex, ey];
         const to_wei_token_amount = utils.toWei(Number(tokenAmount), "ether");
         try {
-          if (Number(allowance) < Number(tokenAmount))
+          if (Number(allowance) < to_wei_token_amount)
             await approve(to_wei_token_amount);
+
           const tx = await contract.deposit(
             pubKey,
             ephemeral,
@@ -93,8 +100,8 @@ export const useTransactionModalApi = (tokenContract) => {
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
             setReceivedCoins(result.data.coins);
-            setIsOpen(false);
           });
+          setIsOpen(false);
         } catch (error) {
           toast.error("Error while transferring tokens!");
 
@@ -122,7 +129,6 @@ export const useTransactionModalApi = (tokenContract) => {
     tokenContract,
     tokenAmount,
     chainId,
-    findMatchingCoin,
     setIsOpen
   ) => {
     const errorMessage = validateTransaction(
@@ -136,7 +142,17 @@ export const useTransactionModalApi = (tokenContract) => {
       return toast.error(errorMessage);
     }
 
-    const selectedCoint = findMatchingCoin();
+    let selectedCoint;
+    for (let coin of receivedCoins) {
+      if (
+        trueAmount(coin.amount, coin.uint_token) > Number(tokenAmount) &&
+        String(coin.uint_token) === String(tokenContract)
+      ) {
+        return coin;
+      } else {
+        return toast.error("No matching coin is found");
+      }
+    }
 
     const options = {
       gasLimit: 5000000,
@@ -154,7 +170,7 @@ export const useTransactionModalApi = (tokenContract) => {
       })
       .then(async (result) => {
         let abi = OwshenWallet.contract_abi;
-        let reciver_commitment = result.data.receiver_commitment;
+        let receiver_commitment = result.data.receiver_commitment;
         let sender_commitment = result.data.sender_commitment;
 
         let proof =
@@ -206,7 +222,7 @@ export const useTransactionModalApi = (tokenContract) => {
             receiver_ephemeral,
             sender_ephemeral,
             [result.data.nullifier, utils.toBigInt(0)],
-            [sender_commitment, reciver_commitment],
+            [sender_commitment, receiver_commitment],
             result.data.obfuscated_receiver_token_address,
             result.data.obfuscated_sender_token_address,
             result.data.obfuscated_receiver_amount,
@@ -225,6 +241,7 @@ export const useTransactionModalApi = (tokenContract) => {
         }
       })
       .catch((error) => {
+        console.log("error ", error);
         setIsOpen(false);
         return toast.error(`Internal server error: ${error}`);
       });
@@ -245,8 +262,14 @@ export const useTransactionModalApi = (tokenContract) => {
         "Your wallet is not connected. Please connect your wallet to proceed."
       );
     }
+    if (!tokenAmount || tokenAmount === 0) {
+      setIsLoading(false);
+      return toast.error(
+        "Token amount is not specified. Please enter the amount of tokens you want to withdraw."
+      );
+    }
+
     const desireAmount = utils.toWei(Number(tokenAmount), "ether");
-    console.log("request withdrawal", index, owshen.wallet, desireAmount);
     axios
       .get(`${coreEndpoint}/withdraw`, {
         params: {

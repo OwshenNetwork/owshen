@@ -123,29 +123,27 @@ impl CheckpointedHashchain {
 
     #[allow(dead_code)]
     pub fn verify(index: u64, proof: &CheckpointedHashchainProof) -> bool {
-        assert_eq!(proof.checkpoints.len(), proof.checkpoint_commitments.len());
-
-        for i in 0..proof.checkpoints.len() {
-            let mut prev_checkpoint = Fp::from(0);
-            if i > 0 {
-                prev_checkpoint = proof.checkpoints[i - 1];
-            }
-            if hash2([prev_checkpoint, proof.checkpoint_commitments[i]]) != proof.checkpoints[i] {
-                return false;
-            }
+        assert!(proof.checkpoints.len() > 0);
+        let mut chks = vec![];
+        chks.push(proof.checkpoints[0]);
+        for i in 1..proof.checkpoints.len() {
+            chks.push(hash2([proof.checkpoints[i - 1], proof.checkpoint_commitments[i]]));
         }
+        assert!(chks.contains(&proof.checkpoint_head));
 
+        assert!(proof.latest_values.len() > 0);
         let mut seen = false;
-        let mut commitment = Fp::from(0);
         if proof.is_in_latest_commits {
-            for i in 0..proof.latest_values.len() - 1 {
+            let mut commitment = proof.latest_values[0];
+            for i in 1..proof.latest_values.len() {
                 commitment = hash2([commitment, proof.latest_values[i as usize]]);
                 if proof.value == proof.latest_values[i as usize] {
                     seen = true;
                 }
             }
         } else {
-            for i in 0..proof.between_values.len() {
+            let mut commitment = proof.between_values[0];
+            for i in 1..proof.between_values.len() {
                 commitment = hash2([commitment, proof.between_values[i as usize]]);
                 if proof.value == proof.between_values[i as usize] {
                     seen = true;
@@ -182,7 +180,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_chc() {
+    fn test_index_in_latest_commits_proof_is_valid() {
         let mut chc = CheckpointedHashchain::new();
         chc.set(Fp::from(123));
         chc.set(Fp::from(234));
@@ -194,9 +192,22 @@ mod tests {
         chc.set(Fp::from(890));
         chc.set(Fp::from(901));
         let proof = chc.get(2);
-        assert!(CheckpointedHashchain::verify(1, &proof));
+        assert!(CheckpointedHashchain::verify(2, &proof));
 
         let proof = chc.get(7);
-        assert!(CheckpointedHashchain::verify(1, &proof));
+        assert!(CheckpointedHashchain::verify(7, &proof));
+    }
+
+    #[test]
+    fn test_index_in_between_checkpoint_proof_is_valid() {
+        let mut chc = CheckpointedHashchain::new();
+        for i in 0..2024 {
+            chc.set(Fp::from(i));
+        }
+        let proof = chc.get(3);
+        assert!(CheckpointedHashchain::verify(3, &proof));
+
+        let proof = chc.get(8);
+        assert!(CheckpointedHashchain::verify(8, &proof));
     }
 }
