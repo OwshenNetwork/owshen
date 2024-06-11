@@ -40,7 +40,6 @@ const Main = ({ children }) => {
   const [tokenContract, setTokenContract] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [isInprogress, setIsInprogress] = useState(false);
-  const [isOpenWithdraw, setIsOpenWithdraw] = useState(false);
 
   const isConnected = useSelector(selectIsWalletConnected);
   const defaultChainId = isTest ? 11155111 : null;
@@ -109,12 +108,6 @@ const Main = ({ children }) => {
 
   return (
     <>
-      <TransactionModal
-        transactionType="Withdraw"
-        setTokenContract={setTokenContract}
-        isOpen={isOpenWithdraw}
-        setIsOpen={setIsOpenWithdraw}
-      />
       <TransactionModal
         transactionType="Send"
         tokenContract={tokenContract}

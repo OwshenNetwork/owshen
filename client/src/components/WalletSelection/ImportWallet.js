@@ -36,17 +36,17 @@ const ImportWallet = () => {
   };
 
   const btnCS =
-    "border lg:w-[270px] w-full rounded-xl p-3  my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
+    "border lg:w-[270px] w-full rounded-xl p-3 text-sm  my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
   const inputCs =
     "border border-black rounded-lg py-2 w-5/6 text-center dark:bg-transparent dark:border-white";
   const inputHolderCs = "w-full flex items-center justify-between";
   return (
     <>
-      <div className="text-center flex h-full w-full justify-center items-center ">
+      <div className="text-center flex lg:h-[700px] w-full justify-center items-center ">
         <div className="w-full md:w-[570px] md:border-2 md:p-6 rounded-lg">
           <p className="text-lg  my-5">
-            Please enter your 12-word secret phrase to securely import your
-            wallet.
+            Please enter your 12-word mnemonic phrase to securely import your
+            wallet!
           </p>
           <div className="border-2 grid md:grid-cols-3 grid-cols-2	p-3 rounded-lg gap-5">
             <div className={inputHolderCs}>
@@ -160,7 +160,7 @@ const ImportWallet = () => {
           </div>
           <div className="flex flex-col items-center mt-4">
             <button onClick={importWallet} className={btnCS}>
-              import Owshen Wallet
+              Import
             </button>
           </div>
         </div>

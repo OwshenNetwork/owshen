@@ -42,7 +42,7 @@ const SelectNetwork = () => {
     const getChainId = async () => {
       let ChainId = await chainIdOfWallet(); // Get the chainId
       if (!isChainIdExist(ChainId)) {
-        return toast.error("please select your network");
+        return toast.error("Please select your network!");
       }
 
       const networkName = getNetworkNameByChainId(ChainId);
@@ -75,17 +75,8 @@ const SelectNetwork = () => {
         options={netWorkOptions}
         select={setNetWork}
         onChange={handelChangeNetwork}
-        style={{
-          color: "white",
-          padding: "3px",
-          borderRadius: "xl",
-          backgroundColor: "blue-100",
-          borderColor: "0",
-          ":dark": {
-            backgroundColor: "blue-900",
-            borderColor: "gray-300",
-          },
-        }}
+        width="w-60"
+        style={`!text-white !py-3 !rounded-xl !bg-blue-100 dark:!bg-blue-900 !border-0 dark:!border-gray-300`}
       />
     </>
   );

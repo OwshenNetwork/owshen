@@ -30,6 +30,7 @@ const ReceivedCoinList = () => {
   const [isInprogress, setIsInprogress] = useState(false);
   const isTest = useSelector(selectIsTest);
   const address = useSelector(selectUserAddress);
+  
 
   const withdrawHandler = (coin) => {
     if (!address) {
@@ -138,7 +139,7 @@ const ReceivedCoinList = () => {
             </ul>
           </div>
         ) : (
-          <p className="text-4xl font-bold mt-28">No coins yet </p>
+          <p className="text-4xl font-extralight mt-28">Your wallet is empty!</p>
         )}
       </div>
     </Main>

@@ -27,7 +27,7 @@ const Web3ModalComponent = () => {
       const accounts = await web3.eth.getAccounts();
       dispatch(setUserDetails({ address: accounts[0] }));
     } catch (error) {
-      console.error("Error connecting wallet:", error);
+      console.error("Error while connecting to your wallet:", error);
       // Handle the error appropriately, e.g., show a message to the user
       return toast.error(
         "No wallet detected. Please connect your wallet to proceed."
@@ -50,7 +50,7 @@ const Web3ModalComponent = () => {
             className={`${buttonClass} bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950  lg:ml-3 mt-3 lg:mt-0`}
             onClick={disconnectWallet}
           >
-            Disconnect Wallet
+            Disconnect wallet
           </button>
         </>
       ) : (
@@ -59,7 +59,7 @@ const Web3ModalComponent = () => {
           onClick={connectWallet}
         >
           <img src={WalletIcon} width="20px" alt="WalletIcon" />
-          <p>Connect Wallet</p>
+          <p>Connect wallet</p>
         </button>
       )}
 

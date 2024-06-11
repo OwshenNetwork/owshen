@@ -26,7 +26,7 @@ const Modal = ({ title, setIsOpen, isOpen, children }) => {
       <div className="flex items-center h-full pb-48">
         <div
           ref={ref}
-          className=" border-2 text-center md:w-3/4 lg:!min-w-[510px] lg:w-1/4 p-5 mt-16 mx-auto bg-white dark:bg-indigo-950 rounded-xl"
+          className=" border-2 text-center md:w-3/4 lg:!min-w-[510px] lg:w-5/12 p-5 mt-16 mx-auto bg-white dark:bg-indigo-950 rounded-xl"
         >
           <div className="relative">
             <div

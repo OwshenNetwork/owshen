@@ -8,7 +8,7 @@ import {
 } from "../../store/containerSlice";
 import { getERC20Balance, chainIdOfWallet } from "../../utils/helper";
 import { useSelector } from "react-redux";
-import Logo from "../../pics/icons/logo.png";
+import Logo from "../../pics/logo.png";
 import MetaMaskLogo from "../../pics/icons/metaMask.png";
 import { toast } from "react-toastify";
 import { currencies, getNameByContractAddress } from "../../utils/Currencies";
@@ -31,7 +31,7 @@ const TransactionModal = ({
   const address = useSelector(selectUserAddress);
   const OwshenWallet = useSelector(selectOwshen);
   const [destOwshenWallet, setDstOwshenWallet] = useState("");
-  const [tokenAmount, setTokenAmount] = useState(0);
+  const [tokenAmount, setTokenAmount] = useState(null);
   const [tokenOptions, setTokenOptions] = useState([]);
   const [MaxBalanceOfWithdraw, setMaxBalanceOfWithdraw] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
@@ -39,6 +39,8 @@ const TransactionModal = ({
   const [selectTokenLabel, SetSelectTokenLabel] = useState("Choose your token");
   const [loadingText, SetLoadingText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [defaultVal, setDefaultVal] = useState(true);
+
   const isTest = useSelector(selectIsTest);
   const { send, withdrawal, newGetStealth } =
     useTransactionModalApi(tokenContract);
@@ -111,17 +113,18 @@ const TransactionModal = ({
   };
 
   const handleSend = async () => {
+    setInterval(shuffleText, 8000);
     setIsLoading(true); // Set isLoading to true at the beginning of the method
 
     if (destOwshenWallet.length !== 69) {
       setIsLoading(false); // Set isLoading to false if there's an error
       return toast.error(
-        "Please make sure your destination wallet address is correct."
+        "Please make sure the destination wallet address is valid."
       );
     }
     const firstPartOfAddress = destOwshenWallet.slice(0, 4);
     if (firstPartOfAddress !== "OoOo") {
-      toast.error("your destination wallet address must start with 'OoOo'");
+      toast.error("The destination wallet address must start with 'OoOo'");
       return setIsLoading(false);
     }
     try {
@@ -143,8 +146,8 @@ const TransactionModal = ({
         );
       }
     } catch (error) {
-      console.error("Error during transaction:", error);
-      toast.error("An error occurred during the transaction.");
+      console.error("Error while processing the transaction:", error);
+      toast.error("An error occurred while processing the transaction.");
     } finally {
       setIsLoading(false); // Set isLoading to false after the transaction is complete
     }
@@ -152,9 +155,9 @@ const TransactionModal = ({
   const shuffleText = useCallback(() => {
     const randomLoadingTexts = [
       "Processing your request...",
-      "It may take some time.",
-      "Please hold on while we process your request.",
-      "Don't go away, we're almost done.",
+      "This may take some time...",
+      "Please hold on! Proof generation takes time...",
+      "We're almost done...",
     ];
     const index = Math.floor(Math.random() * randomLoadingTexts.length);
     SetLoadingText(randomLoadingTexts[index]);
@@ -187,8 +190,8 @@ const TransactionModal = ({
   useEffect(() => {
     if (!isOpen) {
       setDstOwshenWallet("");
-      setTokenAmount(0);
-      SetSelectTokenLabel("Choose your token");
+      setTokenAmount(null);
+      SetSelectTokenLabel("DIVE");
     }
   }, [isOpen]);
 
@@ -205,42 +208,22 @@ const TransactionModal = ({
       {transactionType !== "Withdraw" && (
         <>
           <div className="px-3 flex justify-between items-center relative">
-            <p className="absolute top-5 text-blue-500 left-5 text-xl">
+            {/* <p className="absolute top-5 text-blue-500 left-5 text-xl">
               Destination
-            </p>
+            </p> */}
             <input
-              className="rounded py-7 px-2 bg-white dark:bg-indigo-950 my-4 border w-full border-blue-500 focus:border-blue-500 active:border-blue-500 "
+              className="rounded-lg text-center   py-3 px-2 bg-white dark:bg-indigo-950 my-4 border w-full border-blue-500 focus:border-blue-500 active:border-blue-500 "
               onChange={(e) => setDstOwshenWallet(e.target.value)}
               type="text"
+              placeholder="Destination"
               value={destOwshenWallet}
             />
           </div>
         </>
       )}
-      <div className="px-3 flex justify-between items-center mt-3">
-        <label>
-          <b>Token: </b>
-        </label>
-        {transactionType === "Withdraw" ? (
-          <span
-            style={{
-              marginRight: "100px",
-            }}
-          >
-            {getNameByContractAddress(selectedCoin?.uint_token)}
-          </span>
-        ) : (
-          <Dropdown
-            label={isDataSet ? "DIVE" : selectTokenLabel}
-            options={tokenOptions}
-            select={setTokenContract}
-            style={`py-5 ${isDataSet ? "pointer-events-none" : ""}!w-60`}
-            setLabel={SetSelectTokenLabel}
-          />
-        )}
-      </div>
-      <div className="px-3 flex justify-between items-center relative">
-        <button
+      <div className="flex justify-center items-center w-full px-3">
+        <div className="flex justify-between items-center relative w-4/6 lg:w-5/6">
+          {/* <button
           onClick={() => {
             transactionType === "Withdraw"
               ? MaxBalanceOfWithdrawHandler(MaxBalanceOfWithdraw)
@@ -249,29 +232,45 @@ const TransactionModal = ({
           className="border rounded-3xl px-3 absolute -bottom-2 left-4 border-blue-500 text-blue-600"
         >
           <small>Max</small>
-        </button>
-        <>
-          <label>
-            <b>Amount:</b>
-          </label>
-
-          <input
-            className="rounded py-5 px-2 bg-white dark:bg-indigo-950 my-4 border w-60 text-center"
-            placeholder="Enter amount"
-            min={0}
-            onChange={tokenAmountHandler}
-            type="string"
-            value={tokenAmount}
-          />
-        </>
+        </button> */}
+          <>
+            <input
+              className="rounded-lg rounded-r-none py-3 px-2 bg-white dark:bg-indigo-950 my-4 border w-full text-center border-gray-400"
+              placeholder="Amount"
+              onChange={tokenAmountHandler}
+              type="string"
+              value={tokenAmount}
+            />
+          </>
+        </div>
+        <div className="flex justify-between items-center w-2/6 lg:w-1/6">
+          {transactionType === "Withdraw" ? (
+            <span className="py-3 !w-full rounded-lg  border rounded-l-none border-gray-400 flex">
+              <img className="w-6 mr-2 ml-5" src={Logo} alt="logo" />{" "}
+              {getNameByContractAddress(selectedCoin?.uint_token)}
+            </span>
+          ) : (
+            <Dropdown
+              label={isDataSet ? "DIVE" : selectTokenLabel}
+              options={tokenOptions}
+              select={setTokenContract}
+              setDefaultVal={setDefaultVal}
+              defaultVal={defaultVal}
+              style={`py-3 !w-full   rounded-l-none ${
+                isDataSet ? "pointer-events-none" : ""
+              }`}
+              setLabel={SetSelectTokenLabel}
+            />
+          )}
+        </div>
       </div>
-      <div>{transactionType === "Withdraw" && isLoading && loadingText}</div>
+
       <button
         disabled={isLoading}
         onClick={() =>
           transactionType === "Withdraw" ? handleWithdraw() : handleSend()
         }
-        className="border border-blue-400 bg-blue-200 text-blue-600 rounded-lg px-6 mt-3 font-bold py-1"
+        className="border border-blue-400 bg-blue-200 text-blue-600 rounded-lg px-6 mt-3 font-bold py-1 "
       >
         {isLoading
           ? loading
@@ -279,6 +278,7 @@ const TransactionModal = ({
           ? transactionType
           : "Send"}
       </button>
+      <div className="my-2">{isLoading && loadingText}</div>
     </Modal>
   );
 };

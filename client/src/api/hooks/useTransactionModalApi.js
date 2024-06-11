@@ -149,10 +149,13 @@ export const useTransactionModalApi = (tokenContract) => {
         trueAmount(coin.amount, coin.uint_token) > Number(tokenAmount) &&
         String(coin.uint_token) === String(tokenContract)
       ) {
-        return coin;
-      } else {
-        return toast.error("No matching coin is found");
+        selectedCoint = coin;
+        break;
       }
+    }
+
+    if(!selectedCoint) {
+      return toast.error("No matching coin is found");
     }
 
     const options = {

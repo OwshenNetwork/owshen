@@ -17,20 +17,19 @@ const WalletSelection = () => {
     }
   });
   const btnCS =
-    "border lg:w-[270px] w-full rounded-xl p-3  my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
+    "border lg:w-[270px]  w-full rounded-xl p-3 text-sm   my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
   return (
     <>
-      {<div>IsOwshenWalletExist</div>}
-      <div className="text-center flex h-full w-full justify-center items-center ">
+      <div className="text-center flex lg:h-[700px] w-full justify-center items-center ">
         <div className="w-[470px] border-2 p-6 rounded-lg">
-          <h3 className="text-2xl my-7">Welcome</h3>
+          <h3 className="text-2xl my-7">Welcome!</h3>
           <img src={Logo} alt="logo" className="w-32 mx-auto" />
           <div className="flex flex-col items-center mt-4">
             <Link className={`${btnCS}`} to="/walletSelection/importWallet">
-              Import Owshen Wallet
+              Import an existing wallet
             </Link>
             <Link className={btnCS} to="/walletSelection/createNewWallet">
-              Create New Owshen Wallet
+              Create a new wallet
             </Link>
           </div>
         </div>

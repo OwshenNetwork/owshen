@@ -23,7 +23,7 @@ const WalletConnectionChecker = () => {
         }
       } else {
         console.log(
-          "Non-Ethereum browser detected. You should consider trying MetaMask!"
+          "Non-Ethereum browser detected. You should consider using MetaMask!"
         );
         dispatch(setIsWalletConnected(false));
       }

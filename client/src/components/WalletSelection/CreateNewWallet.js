@@ -18,7 +18,7 @@ const CreateNewWallet = () => {
   const { generateWallet } = useWalletSelectionApi();
 
   const btnCS =
-    "border lg:w-[270px] w-full rounded-xl p-3  my-2  ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
+    "border lg:w-[270px] w-full rounded-xl p-3  my-2 text-sm ease-in-out duration-300 flex items-center justify-around bg-[#EBEDEF]  hover:bg-[#BBDCFBCC] dark:bg-indigo-950";
   const inputCs =
     "border dark:border-white border-black rounded-lg py-2   w-5/6 text-center";
   const inputHolderCs = "w-full flex items-center justify-between";
@@ -65,11 +65,10 @@ const CreateNewWallet = () => {
 
   return (
     <>
-      <div className="text-center flex h-full w-full justify-center items-center ">
+      <div className="text-center flex  w-full justify-center items-center ">
         <div className="w-full md:w-[570px] md:border-2 md:p-6 rounded-lg">
           <p className="text-lg  my-5">
-            Securely save these 12 phrases to access your Owshen wallet at any
-            time.
+            Here is the 12-word mnemonic phrase for your brand new wallet!<span className="font-bold italic"> Keep them safe to avoid losses!</span>
           </p>
           <div className="border-2  grid md:grid-cols-3 grid-cols-2	p-3 rounded-lg gap-5">
             {words ? (
@@ -97,10 +96,10 @@ const CreateNewWallet = () => {
               onClick={() => copyWalletWords(CopyWords)}
               className="text-blue-500 my-4"
             >
-              copy to clipboard
+              Copy to clipboard
             </button>
             <Link to={"/"} className={btnCS}>
-              Home
+              Continue to your wallet!
             </Link>
           </div>
         </div>
