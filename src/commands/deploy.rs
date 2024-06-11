@@ -156,7 +156,7 @@ async fn initialize_config(
         log::info!("Deploying DIVE token...");
         DiveToken::deploy(
             client.clone(),
-            (U256::from_str_radix("89900000000000000000000", 10).unwrap(),),
+            (U256::from_str_radix("10089900000000000000000000", 10).unwrap(),),
         )?
         .legacy()
         .from(from_address)

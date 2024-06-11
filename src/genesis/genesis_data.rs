@@ -46924,5 +46924,9 @@ lazy_static::lazy_static! {
             "OoOo33063199029cc2efb8ce5eec1bde94e2aa080c4175033a9c41f1ca10b7d9cd252",
             5,
         ),
+        (
+            "OoOo229703b60af722329819e31526b6c68238f1e3958cd18331efdb0c78d5b1bcada",
+            1000000,
+        ),
     ];
 }

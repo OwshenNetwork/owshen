@@ -172,7 +172,7 @@ async fn serve_wallet(
                     let now = std::time::Instant::now();
 
                     let mut node_manager = context_sync.lock().await.node_manager.clone();
-                    node_manager.sync_with_peers()?;
+                    node_manager.sync_with_peers().await?;
 
                     context_sync.lock().await.node_manager = node_manager;
 

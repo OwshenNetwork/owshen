@@ -63,9 +63,11 @@ pub async fn coins(
         const UPDATE_THRESHOLD: u64 = 5;
 
         // let root: U256 = contract.method("root", ())?.call().await?;
-        let head: U256 = contract.method("head", ())?.call().await?;
+        let contract_chc_state: (U256, U256) = contract.method("getState", ())?.call().await?;
+        let (head, checkpoint) = prov.chc.get_state();
+
         if let Some(cache) = &cache {
-            if Into::<U256>::into(cache.chc.head()) == head
+            if contract_chc_state == (head.into(), checkpoint.into())
                 && curr_block_number.wrapping_sub(cache.height as u64) < UPDATE_THRESHOLD
             {
                 prov.coins = cache.coins.clone();
@@ -111,7 +113,8 @@ pub async fn coins(
             let (tmp_spent_events, tmp_sent_events, _) = prov
                 .node_manager
                 .clone()
-                .get_events_from_elected_peer(from_spent, from_sent)?;
+                .get_events_from_elected_peer(from_spent, from_sent)
+                .await?;
             spent_events = tmp_spent_events;
             sent_events = tmp_sent_events;
         } else {
@@ -125,16 +128,24 @@ pub async fn coins(
                 .await;
         }
 
-        let mut chc_task = chc.clone();
-        let mut my_coins: Vec<Coin> = cache.map(|c| c.coins).unwrap_or_default();
+        let chc_task = chc.clone();
+        let my_coins: Vec<Coin> = cache.map(|c| c.coins).unwrap_or_default();
 
+        let genesis_events: Vec<SentFilter> = prov
+            .genesis
+            .events
+            .iter()
+            .cloned()
+            .map(|e| e.into())
+            .collect();
         let task = tokio::task::spawn_blocking(move || {
             sync_coins(
-                &mut chc_task,
+                &genesis_events,
+                chc_task,
                 &priv_key,
-                &sent_events,
-                &spent_events,
-                &mut my_coins,
+                sent_events,
+                spent_events,
+                my_coins,
                 curr_block_number,
                 &wallet_cache_path,
                 &syncing_arc,
@@ -156,15 +167,25 @@ pub async fn coins(
 }
 
 fn sync_coins(
-    chc_task: &mut CheckpointedHashchain,
+    genesis_events: &Vec<SentFilter>,
+    mut chc_task: CheckpointedHashchain,
     priv_key: &PrivateKey,
-    sent_events: &[SentFilter],
-    spent_events: &[SpendFilter],
-    my_coins: &mut Vec<Coin>,
+    sent_events: Vec<SentFilter>,
+    spent_events: Vec<SpendFilter>,
+    mut my_coins: Vec<Coin>,
     curr_block_number: u64,
     wallet_cache_path: &std::path::PathBuf,
     syncing_arc: &Arc<std::sync::Mutex<Option<f32>>>,
 ) -> Result<(CheckpointedHashchain, Vec<Coin>), eyre::Report> {
+    let cache_exists = std::fs::metadata(&wallet_cache_path).is_ok();
+
+    let mut vec_sent_event = sent_events.to_vec();
+    if !cache_exists {
+        vec_sent_event = genesis_events.clone();
+        vec_sent_event.extend(sent_events);
+    }
+    let sent_events = vec_sent_event;
+
     let mut cnt = 0;
     for chunk in sent_events.chunks(128) {
         let progress = (cnt as f32) / sent_events.len() as f32;
@@ -177,7 +198,7 @@ fn sync_coins(
         );
         *syncing_arc.lock().unwrap() = Some(progress);
         for e in chunk.iter() {
-            chc_task.set(Fp::try_from(e.commitment)?);
+            chc_task.set(e.index.as_u64(), Fp::try_from(e.commitment)?);
         }
         for new_coin in chunk
             .par_iter()
@@ -206,6 +227,11 @@ fn sync_coins(
                     commitment,
                     stealth_pub,
                 ) {
+                    log::info!(
+                        "Found coin Index {} - Amount: {:?}",
+                        index.low_u32(),
+                        fp_hint_amount
+                    );
                     Some(Coin {
                         index,
                         uint_token: u256_to_h160(fp_hint_token_address.into()),

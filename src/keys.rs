@@ -12,7 +12,7 @@ use std::{
     ops::{Add, Mul, Neg, Sub},
     str::FromStr,
 };
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Point {
     pub x: Fp,
     pub y: Fp,
@@ -34,7 +34,7 @@ pub struct EphemeralPrivKey {
     pub secret: Fp,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 pub struct EphemeralPubKey {
     pub point: Point,
 }

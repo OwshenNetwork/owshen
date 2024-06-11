@@ -33,7 +33,13 @@ impl CheckpointedHashchain {
         }
     }
 
-    pub fn set(&mut self, value: Fp) {
+    pub fn set(&mut self, index: u64, value: Fp) {
+        while self.values.len() as u64 > index {
+            if self.values.len() as u64 % CHECKPOINT_INTERVAL == 0 {
+                self.checkpoints.pop();
+            }
+            self.values.pop();
+        }
         self.values.push(value);
 
         let index = self.values.len() as u64;
@@ -109,7 +115,7 @@ impl CheckpointedHashchain {
             latest_values.push(Fp::from(0));
         }
 
-        CheckpointedHashchainProof {
+        let proof = CheckpointedHashchainProof {
             checkpoint_head: self.checkpoints.last().cloned().unwrap_or_default(),
             latest_values_commitment_head: latest_values_commitment_head,
             value,
@@ -118,10 +124,11 @@ impl CheckpointedHashchain {
             checkpoints,
             latest_values: latest_values,
             is_in_latest_commits,
-        }
+        };
+
+        proof
     }
 
-    #[allow(dead_code)]
     pub fn verify(index: u64, proof: &CheckpointedHashchainProof) -> bool {
         assert!(proof.checkpoints.len() > 0);
         let mut chks = vec![];
@@ -166,15 +173,23 @@ impl CheckpointedHashchain {
     }
 
     pub fn head(&self) -> Fp {
-        self.values.last().cloned().unwrap_or_default()
+        if self.size() == 0 {
+            return Fp::from(0);
+        }
+
+        self.get(self.size() - 1).latest_values_commitment_head
     }
 
     pub fn get_last_checkpoint(&self) -> Fp {
         self.checkpoints.last().cloned().unwrap_or_default()
     }
 
-    pub fn size(&self) -> usize {
-        self.values.len()
+    pub fn get_state(&self) -> (Fp, Fp) {
+        (self.head(), self.get_last_checkpoint())
+    }
+
+    pub fn size(&self) -> u64 {
+        self.values.len() as u64
     }
 }
 

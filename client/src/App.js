@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import "@fontsource/jetbrains-mono"; // Defaults to weight 400
 import "@fontsource/jetbrains-mono/400.css"; // Specify weight
 import { ToastContainer } from "react-toastify";
@@ -23,7 +23,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        <div className={`h-[90vh] ${isDarkTheme ? "dark" : ""}  `}>
+        <div className={`h-[90vh] ${!isDarkTheme ? "dark" : ""}  `}>
           <WalletConnectionChecker />
           <ToastContainer theme="colored" position="bottom-right" />
           <div className={bodyCS}>

@@ -213,8 +213,8 @@ contract Owshen {
         }
     }
 
-    function head() public view returns (uint256) {
-        return chc.getLastCommitment();
+    function getState() public view returns (uint256, uint256) {
+        return chc.getState();
     }
 
     function getUintTokenAddress(address _token_address) private pure returns (uint256) {

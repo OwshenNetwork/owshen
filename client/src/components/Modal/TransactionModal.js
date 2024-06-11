@@ -111,7 +111,16 @@ const TransactionModal = ({
     const val = trueAmount(maxValue);
     return setTokenAmount(val);
   };
-
+  const shuffleText = useCallback(() => {
+    const randomLoadingTexts = [
+      "Processing your request...",
+      "This may take some time...",
+      "Please hold on! Proof generation takes time...",
+      "We're almost done...",
+    ];
+    const index = Math.floor(Math.random() * randomLoadingTexts.length);
+    SetLoadingText(randomLoadingTexts[index]);
+  }, []);
   const handleSend = async () => {
     setInterval(shuffleText, 8000);
     setIsLoading(true); // Set isLoading to true at the beginning of the method
@@ -137,6 +146,7 @@ const TransactionModal = ({
           setIsOpen
         );
       } else {
+        setInterval(shuffleText, 8000);
         await send(
           destOwshenWallet,
           tokenContract,
@@ -152,16 +162,6 @@ const TransactionModal = ({
       setIsLoading(false); // Set isLoading to false after the transaction is complete
     }
   };
-  const shuffleText = useCallback(() => {
-    const randomLoadingTexts = [
-      "Processing your request...",
-      "This may take some time...",
-      "Please hold on! Proof generation takes time...",
-      "We're almost done...",
-    ];
-    const index = Math.floor(Math.random() * randomLoadingTexts.length);
-    SetLoadingText(randomLoadingTexts[index]);
-  }, []);
   const handleWithdraw = async () => {
     setInterval(shuffleText, 8000);
     try {

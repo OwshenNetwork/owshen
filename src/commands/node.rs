@@ -80,8 +80,7 @@ pub async fn node(opt: NodeOpt) -> Result<(), eyre::Report> {
                 let now = std::time::Instant::now();
 
                 let mut node_manager = context_sync.lock().await.node_manager.clone();
-                node_manager.sync_with_peers()?;
-
+                node_manager.sync_with_peers().await?;
                 context_sync.lock().await.node_manager = node_manager;
 
                 log::info!("Syncing with peers took: {:?}", now.elapsed());
@@ -188,22 +187,23 @@ async fn relay_txs(priv_key: String, context: Arc<Mutex<NodeContext>>) -> Result
 }
 
 async fn update_events(context: Arc<Mutex<NodeContext>>) -> Result<(), eyre::Report> {
-    let mut context = context.lock().await;
-    let network = context.node_manager.get_provider_network().clone();
+    let mut ctx = context.lock().await;
+    let network = ctx.node_manager.get_provider_network().clone();
 
     if let Some(network) = network {
-        if context.node_manager.is_peer2peer {
-            let from_spent = context.spent_events.len();
-            let from_sent = context.sent_events.len();
-            let (spent_events, sent_events, peer_current_block_number) = context
+        if ctx.node_manager.is_peer2peer {
+            let from_spent = ctx.spent_events.len();
+            let from_sent = ctx.sent_events.len();
+            let (spent_events, sent_events, peer_current_block_number) = ctx
                 .node_manager
                 .clone()
-                .get_events_from_elected_peer(from_spent, from_sent)?;
+                .get_events_from_elected_peer(from_spent, from_sent)
+                .await?;
 
-            if peer_current_block_number >= context.currnet_block_number {
-                context.spent_events.extend(spent_events.clone());
-                context.sent_events.extend(sent_events.clone());
-                context.currnet_block_number = peer_current_block_number;
+            if peer_current_block_number >= ctx.currnet_block_number {
+                ctx.spent_events.extend(spent_events.clone());
+                ctx.sent_events.extend(sent_events.clone());
+                ctx.currnet_block_number = peer_current_block_number;
 
                 log::info!(
                     "new events: {} spent, {} sent",
@@ -214,27 +214,34 @@ async fn update_events(context: Arc<Mutex<NodeContext>>) -> Result<(), eyre::Rep
                 log::info!("No new events");
             }
         } else {
+            let curr = std::cmp::max(
+                ctx.currnet_block_number,
+                ctx.node_manager
+                    .network
+                    .as_ref()
+                    .unwrap()
+                    .config
+                    .owshen_contract_deployment_block_number
+                    .as_u64(),
+            );
+            let node_manager = ctx.node_manager.clone();
+            drop(ctx);
+
             let curr_block_number = network.provider.get_block_number().await?.as_u64();
 
-            let curr = context.currnet_block_number;
+            let spent_events = node_manager.get_spend_events(curr, curr_block_number).await;
 
-            let spent_events = context
-                .node_manager
-                .get_spend_events(curr, curr_block_number)
-                .await;
-            let sent_events = context
-                .node_manager
-                .get_sent_events(curr, curr_block_number)
-                .await;
+            let sent_events = node_manager.get_sent_events(curr, curr_block_number).await;
 
             log::info!(
                 "New events: {} spent, {} sent",
                 spent_events.len(),
                 sent_events.len()
             );
-            context.spent_events.extend(spent_events);
-            context.sent_events.extend(sent_events);
-            context.currnet_block_number = curr_block_number;
+            ctx = context.lock().await;
+            ctx.spent_events.extend(spent_events);
+            ctx.sent_events.extend(sent_events);
+            ctx.currnet_block_number = curr_block_number;
         }
     } else {
         log::error!("Provider is not set");

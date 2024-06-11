@@ -96,7 +96,7 @@ export const useTransactionModalApi = (tokenContract) => {
             tokenContract,
             utils.toBigInt(to_wei_token_amount),
             OwshenWallet.wallet,
-            options,
+            options
           );
           await tx.wait();
           axios.get(`${coreEndpoint}/coins`).then((result) => {
@@ -143,19 +143,19 @@ export const useTransactionModalApi = (tokenContract) => {
       return toast.error(errorMessage);
     }
 
-    let selectedCoint;
+    let selectedCoin;
     for (let coin of receivedCoins) {
       if (
         trueAmount(coin.amount, coin.uint_token) > Number(tokenAmount) &&
         String(coin.uint_token) === String(tokenContract)
       ) {
-        selectedCoint = coin;
+        selectedCoin = coin;
         break;
       }
     }
 
-    if(!selectedCoint) {
-      return toast.error("No matching coin is found");
+    if (!selectedCoin) {
+      return toast.error("No matching coin is found!");
     }
 
     const options = {
@@ -166,7 +166,7 @@ export const useTransactionModalApi = (tokenContract) => {
 
       .get(`${coreEndpoint}/send`, {
         params: {
-          index: selectedCoint.index,
+          index: selectedCoin.index,
           address: OwshenWallet.wallet,
           new_amount: to_wei_token_amount,
           receiver_address: destOwshenWallet,
@@ -233,8 +233,8 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.obfuscated_receiver_amount,
             result.data.obfuscated_sender_amount,
             true,
-            options,
             result.data.memo,
+            options
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();
@@ -336,7 +336,7 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.obfuscated_remaining_amount,
             address,
             commitment,
-            OwshenWallet.wallet,
+            OwshenWallet.wallet
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();

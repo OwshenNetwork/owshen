@@ -35,11 +35,10 @@ impl NodeManager {
         self.add_peer(peer);
     }
 
-    pub fn sync_with_peers(&mut self) -> Result<(), eyre::Report> {
+    pub async fn sync_with_peers(&mut self) -> Result<(), eyre::Report> {
         let mut elected_peer: Option<Peer> = None;
         let mut max_length: u64 = 0;
-
-        let client = reqwest::blocking::Client::builder()
+        let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(1))
             .build()?;
 
@@ -57,11 +56,11 @@ impl NodeManager {
                         .ok_or(eyre::eyre!("Caller not a node!"))?
                 );
             }
-            let resp = client.get(&url).send();
+            let resp = client.get(&url).send().await;
 
             if let Ok(resp) = resp {
                 if resp.status().is_success() {
-                    let body = resp.text();
+                    let body = resp.text().await;
                     if let Ok(body) = body {
                         let handshake: GetHandShakeResponse = serde_json::from_str(&body)?;
                         log::info!(
@@ -77,7 +76,7 @@ impl NodeManager {
                             max_length = handshake.current_block_number;
                         }
 
-                        self._add_batch_peer_peers(peer.clone())?;
+                        self._add_batch_peer_peers(peer.clone()).await?;
                     } else {
                         log::error!("Failed to parse response from peer: {}", url);
                         self.remove_peer(peer.clone());
@@ -101,17 +100,17 @@ impl NodeManager {
         Ok(())
     }
 
-    fn _add_batch_peer_peers(&mut self, peer: Peer) -> Result<(), eyre::Report> {
-        let client = reqwest::blocking::Client::builder()
+    async fn _add_batch_peer_peers(&mut self, peer: Peer) -> Result<(), eyre::Report> {
+        let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(1))
             .build()?;
 
         let url = format!("http://{}/get-peers", peer.addr);
-        let resp = client.get(&url).send();
+        let resp = client.get(&url).send().await;
 
         if let Ok(resp) = resp {
             if resp.status().is_success() {
-                let body = resp.text();
+                let body = resp.text().await;
                 if let Ok(body) = body {
                     let peers: GetPeersResponse = serde_json::from_str(&body)?;
                     for p in peers.peers {
@@ -140,7 +139,7 @@ impl NodeManager {
         self.network.clone()
     }
 
-    pub fn get_events_from_elected_peer(
+    pub async fn get_events_from_elected_peer(
         &self,
         mut from_spend: usize,
         mut from_sent: usize,
@@ -155,14 +154,15 @@ impl NodeManager {
                     "http://{}/events?from_spend={}&from_sent={}&length={}",
                     elected_peer.addr, from_spend, from_sent, step
                 );
-                let client = reqwest::blocking::Client::builder()
+
+                let client = reqwest::Client::builder()
                     .timeout(Duration::from_secs(1))
                     .build()?;
-                let resp = client.get(&url).send();
+                let resp = client.get(&url).send().await;
 
                 if let Ok(resp) = resp {
                     if resp.status().is_success() {
-                        let body = resp.text();
+                        let body = resp.text().await;
                         if let Ok(body) = body {
                             let json_resp: GetEventsResponse = serde_json::from_str(&body)?;
                             if json_resp.spend_events.is_empty() && json_resp.sent_events.is_empty()
@@ -205,7 +205,8 @@ impl NodeManager {
             let mut step = 1024;
             let mut events = Vec::new();
 
-            while from <= to {
+            while from < to {
+                log::info!("{} {}", from, to);
                 if let Some(new_spent_events) = timeout(std::time::Duration::from_secs(10), async {
                     contract
                         .event::<SpendFilter>()
@@ -248,7 +249,7 @@ impl NodeManager {
             let mut step = 1024;
             let mut events = Vec::new();
 
-            while from <= to {
+            while from < to {
                 if let Some(new_sent_events) = timeout(std::time::Duration::from_secs(10), async {
                     contract
                         .event::<SentFilter>()

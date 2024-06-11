@@ -14,15 +14,15 @@ const Header = ({ isDarkTheme, setIsDarkTheme }) => {
   }, [isDarkTheme]);
 
   const darkThemeHandler = () => {
-    const newTheme = !isDarkTheme;
-    setIsDarkTheme(newTheme);
+    const newTheme = isDarkTheme;
+    setIsDarkTheme(!newTheme);
     localStorage.setItem("theme", newTheme);
   };
   useEffect(() => {
     if (isDarkTheme) {
-      document.documentElement.classList.add("dark");
-    } else {
       document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
     }
   }, [isDarkTheme]);
 
@@ -34,7 +34,7 @@ const Header = ({ isDarkTheme, setIsDarkTheme }) => {
     >
       <img
         className=" w-8"
-        src={isDarkTheme ? SunIcon : MoonIcon}
+        src={!isDarkTheme ? SunIcon : MoonIcon}
         alt="theme Icon"
       />
     </button>

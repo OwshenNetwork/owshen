@@ -80,8 +80,8 @@ contract CheckpointedHashchain {
         return false;
     }
 
-    function getLastCommitment() public view returns (uint256) {
-        return last_commitment;
+    function getState() public view returns (uint256, uint256) {
+        return (head, checkpoint);
     }
 
     function getCheckpointInterval() public pure returns (uint256) {

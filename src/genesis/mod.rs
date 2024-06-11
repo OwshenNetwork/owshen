@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use genesis_data::GENESIS;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct Entry {
     ephemeral: EphemeralPubKey,
     index: usize,
@@ -84,15 +84,16 @@ pub fn gen_genesis_events(dive_token_address: H160) -> Vec<Entry> {
 pub fn fill_genesis(dive_token_address: H160) -> Genesis {
     let mut chc = CheckpointedHashchain::new();
     let mut total: Fp = Fp::default();
-    let events = gen_genesis_events(dive_token_address);
-    for event in events.iter() {
-        chc.set(event.commitment);
-        total += event.hint_amount;
+    let mut events = gen_genesis_events(dive_token_address);
+    while events.len() % 1024 != 0 {
+        let mut default_entry = Entry::default();
+        default_entry.index = events.len();
+        events.push(default_entry);
     }
-    if events.len() % 1024 != 0 {
-        for _ in 0..(1024 - events.len() % 1024) {
-            chc.set(Fp::default());
-        }
+
+    for event in events.iter() {
+        chc.set(chc.size(), event.commitment);
+        total += event.hint_amount;
     }
 
     Genesis { total, chc, events }

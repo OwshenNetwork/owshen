@@ -17,6 +17,7 @@ use config::{Coin, NetworkManager};
 use eyre::Result;
 use helper::{h160_to_u256, u256_to_h160};
 use keys::Point;
+use std::env;
 use structopt::StructOpt;
 
 #[macro_use]
@@ -52,6 +53,17 @@ async fn main() -> Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
+    let mut args: Vec<String> = env::args().collect();
+
+    if args.len() == 1 {
+        args.push("wallet".to_string());
+        args.push("--mode".to_string());
+        args.push("windows".to_string());
+        args.push("--peer2peer".to_string());
+        args.push("--bootstrap-peers".to_string());
+        args.push("195.35.3.102:8888".to_string());
+    }
+
     let wallet_path = home::home_dir().unwrap().join(".owshen-wallet.json");
 
     log::info!(
@@ -60,7 +72,7 @@ async fn main() -> Result<()> {
         wallet_path.to_string_lossy()
     );
 
-    let opt = OwshenCliOpt::from_args();
+    let opt = OwshenCliOpt::from_iter(args.iter());
 
     match opt {
         OwshenCliOpt::Init(init_opt) => {
