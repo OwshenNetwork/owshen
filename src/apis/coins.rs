@@ -56,8 +56,10 @@ pub async fn coins(
             .ok_or(eyre::eyre!("Cannot extract home directory!"))?
             .join(".owshen-wallet-cache");
         let cache: Option<WalletCache> = if let Ok(f) = std::fs::read(&wallet_cache_path) {
+            log::info!("Cache exists");
             bincode::deserialize(&f).ok()
         } else {
+            log::info!("Cache not found");
             None
         };
         const UPDATE_THRESHOLD: u64 = 5;
@@ -65,9 +67,23 @@ pub async fn coins(
         // let root: U256 = contract.method("root", ())?.call().await?;
         let contract_chc_state: (U256, U256) = contract.method("getState", ())?.call().await?;
         let (head, checkpoint) = prov.chc.get_state();
+        let genesis_checkpoint_head: U256 = prov.genesis.chc.get_state().1.into();
+        log::info!("Genesis Checkpoint head {}", genesis_checkpoint_head);
 
         if let Some(cache) = &cache {
-            if contract_chc_state == (head.into(), checkpoint.into())
+            let (head_u256, checkpoint_u256) = (head.into(), checkpoint.into());
+            log::info!(
+                "Local/Contract heads: {}/{}",
+                head_u256,
+                contract_chc_state.0
+            );
+            log::info!(
+                "Local/Contract checkpoints: {}/{}",
+                checkpoint_u256,
+                contract_chc_state.1
+            );
+            log::info!("chc size: {}", prov.chc.size());
+            if contract_chc_state == (head_u256, checkpoint_u256)
                 && curr_block_number.wrapping_sub(cache.height as u64) < UPDATE_THRESHOLD
             {
                 prov.coins = cache.coins.clone();
@@ -88,7 +104,8 @@ pub async fn coins(
         prov.syncing = syncing_arc.clone();
 
         let step = 1024;
-        let curr = if let Some(cache) = &cache {
+        let mut curr = if let Some(cache) = &cache {
+            log::info!("Cache height: {}", cache.height as u64);
             if cache.height > step {
                 (cache.height as u64).wrapping_sub(step)
             } else {
@@ -100,6 +117,15 @@ pub async fn coins(
                 .owshen_contract_deployment_block_number
                 .as_u64()
         };
+        log::info!("In curr {}", curr);
+        curr = curr.max(
+            network
+                .config
+                .owshen_contract_deployment_block_number
+                .as_u64(),
+        );
+        curr = curr - 1;
+        log::info!("Un curr {}", curr);
 
         #[allow(unused_assignments)]
         let mut spent_events: Vec<SpendFilter> = vec![];
@@ -120,12 +146,20 @@ pub async fn coins(
         } else {
             spent_events = prov
                 .node_manager
-                .get_spend_events(curr + 1, curr_block_number)
+                .get_spend_events(curr, curr_block_number)
                 .await;
             sent_events = prov
                 .node_manager
-                .get_sent_events(curr + 1, curr_block_number)
+                .get_sent_events(curr, curr_block_number)
                 .await;
+
+            log::info!(
+                "{}-{}, Got {} sent events and {} spent events",
+                curr,
+                curr_block_number,
+                sent_events.len(),
+                spent_events.len()
+            );
         }
 
         let chc_task = chc.clone();
@@ -179,6 +213,12 @@ fn sync_coins(
 ) -> Result<(CheckpointedHashchain, Vec<Coin>), eyre::Report> {
     let cache_exists = std::fs::metadata(&wallet_cache_path).is_ok();
 
+    log::info!(
+        "Genesis len {}, Sent events len{}, Genesis events len + Sent event len {}",
+        genesis_events.len(),
+        sent_events.len(),
+        genesis_events.len() + sent_events.len()
+    );
     let mut vec_sent_event = sent_events.to_vec();
     if !cache_exists {
         vec_sent_event = genesis_events.clone();
@@ -199,6 +239,12 @@ fn sync_coins(
         *syncing_arc.lock().unwrap() = Some(progress);
         for e in chunk.iter() {
             chc_task.set(e.index.as_u64(), Fp::try_from(e.commitment)?);
+            log::debug!(
+                "Setting {}th CHC element to event with memo '{}' (New checkpoint/head: {:?})",
+                e.index.as_u64(),
+                e.memo,
+                chc_task.get_state()
+            );
         }
         for new_coin in chunk
             .par_iter()
@@ -227,7 +273,7 @@ fn sync_coins(
                     commitment,
                     stealth_pub,
                 ) {
-                    log::info!(
+                    log::debug!(
                         "Found coin Index {} - Amount: {:?}",
                         index.low_u32(),
                         fp_hint_amount
@@ -258,6 +304,11 @@ fn sync_coins(
     for spend_event in spent_events {
         my_coins.retain(|c| c.nullifier != spend_event.nullifier);
     }
+
+    log::info!(
+        "Wallet cache current block number {}",
+        curr_block_number as u64
+    );
 
     let wallet_cache = WalletCache {
         coins: my_coins.clone(),

@@ -34,6 +34,9 @@ impl CheckpointedHashchain {
     }
 
     pub fn set(&mut self, index: u64, value: Fp) {
+        if self.values.len() as u64 > index {
+            log::warn!("{}th index already set! (Size: {})", index, self.size());
+        }
         while self.values.len() as u64 > index {
             if self.values.len() as u64 % CHECKPOINT_INTERVAL == 0 {
                 self.checkpoints.pop();

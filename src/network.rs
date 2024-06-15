@@ -206,7 +206,8 @@ impl NodeManager {
             let mut events = Vec::new();
 
             while from < to {
-                log::info!("{} {}", from, to);
+                log::info!("Block numbers: {} {}", from, to);
+                log::info!("F:{} F+S:{} S:{}", from, from + step, step);
                 if let Some(new_spent_events) = timeout(std::time::Duration::from_secs(10), async {
                     contract
                         .event::<SpendFilter>()
@@ -223,11 +224,13 @@ impl NodeManager {
                 {
                     events.extend(new_spent_events);
                     from += step;
+                    log::info!("fetch event successfully");
                     if step < 1024 {
                         step = step * 2;
                     }
                 } else {
                     step = step / 2;
+                    log::info!("failed to fetch event");
                 }
             }
             events

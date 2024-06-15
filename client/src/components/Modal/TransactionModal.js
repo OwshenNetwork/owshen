@@ -143,7 +143,8 @@ const TransactionModal = ({
           tokenContract,
           tokenAmount,
           chainId,
-          setIsOpen
+          setIsOpen,
+          setIsLoading
         );
       } else {
         setInterval(shuffleText, 8000);
@@ -152,14 +153,13 @@ const TransactionModal = ({
           tokenContract,
           tokenAmount,
           chainId,
-          setIsOpen
+          setIsOpen,
+          setIsLoading
         );
       }
     } catch (error) {
       console.error("Error while processing the transaction:", error);
       toast.error("An error occurred while processing the transaction.");
-    } finally {
-      setIsLoading(false); // Set isLoading to false after the transaction is complete
     }
   };
   const handleWithdraw = async () => {
@@ -190,7 +190,7 @@ const TransactionModal = ({
   useEffect(() => {
     if (!isOpen) {
       setDstOwshenWallet("");
-      setTokenAmount(null);
+      setTokenAmount(0);
       SetSelectTokenLabel("DIVE");
     }
   }, [isOpen]);

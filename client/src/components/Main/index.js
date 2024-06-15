@@ -80,7 +80,6 @@ const Main = ({ children }) => {
     }
   });
 
-
   const canOpenModal = () => {
     if (isTest) {
       return setIsInprogress(true);

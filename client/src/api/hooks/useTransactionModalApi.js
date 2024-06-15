@@ -47,8 +47,10 @@ export const useTransactionModalApi = (tokenContract) => {
     tokenContract,
     tokenAmount,
     chainId,
-    setIsOpen
+    setIsOpen,
+    setIsLoading
   ) => {
+    setIsLoading(true);
     if (isTest) {
       return toast.error("You can't send to yourself!");
     }
@@ -95,7 +97,7 @@ export const useTransactionModalApi = (tokenContract) => {
             ephemeral,
             tokenContract,
             utils.toBigInt(to_wei_token_amount),
-            OwshenWallet.wallet,
+            "Deposit to " + OwshenWallet.wallet,
             options
           );
           await tx.wait();
@@ -111,6 +113,10 @@ export const useTransactionModalApi = (tokenContract) => {
       })
       .catch((error) => {
         return toast.error(`Internal server error: ${error}`);
+      })
+      .finally(() => {
+        setIsLoading(false); // Stop loading if address is not provided
+        setIsOpen(false);
       });
   };
 
@@ -130,8 +136,10 @@ export const useTransactionModalApi = (tokenContract) => {
     tokenContract,
     tokenAmount,
     chainId,
-    setIsOpen
+    setIsOpen,
+    setIsLoading
   ) => {
+    setIsLoading(true);
     const errorMessage = validateTransaction(
       destOwshenWallet,
       tokenContract,
@@ -170,7 +178,8 @@ export const useTransactionModalApi = (tokenContract) => {
           address: OwshenWallet.wallet,
           new_amount: to_wei_token_amount,
           receiver_address: destOwshenWallet,
-          memo: OwshenWallet.wallet,
+          memo:
+            "Sending from " + OwshenWallet.wallet + " to " + destOwshenWallet,
         },
       })
       .then(async (result) => {
@@ -250,6 +259,10 @@ export const useTransactionModalApi = (tokenContract) => {
         console.log("error ", error);
         setIsOpen(false);
         return toast.error(`Internal server error: ${error}`);
+      })
+      .finally(() => {
+        setIsLoading(false); // Stop loading if address is not provided
+        setIsOpen(false);
       });
   };
 
@@ -336,7 +349,7 @@ export const useTransactionModalApi = (tokenContract) => {
             result.data.obfuscated_remaining_amount,
             address,
             commitment,
-            OwshenWallet.wallet
+            "Withdrawing from " + OwshenWallet.wallet
           );
           console.log("Transaction response", txResponse);
           const txReceipt = await txResponse.wait();
