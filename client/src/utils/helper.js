@@ -71,11 +71,13 @@ export const coreEndpoint =
 
 export const chainIdOfWallet = async () => {
   try {
-    const web3Modal = new Web3Modal();
-    const provider = await web3Modal.connect();
-    const web3 = new Web3(provider);
-    const chainId = await web3.eth.getChainId(); // Get the chainId
-    return Number(chainId);
+    if (window.ethereum) {
+      const web3Modal = new Web3Modal();
+      const provider = await web3Modal.connect();
+      const web3 = new Web3(provider);
+      const chainId = await web3.eth.getChainId(); // Get the chainId
+      return Number(chainId);
+    }
   } catch (error) {
     console.error("Error getting chain ID:", error);
   }

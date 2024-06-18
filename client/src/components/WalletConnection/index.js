@@ -15,14 +15,40 @@ const Web3ModalComponent = () => {
       window.ethereum.on("accountsChanged", (accounts) => {
         dispatch(setUserDetails({ address: accounts[0] }));
       });
-    }else{
-      toast.error("Please make sure you have installed Metamask on your browser!")
+    } else {
+      toast.error(
+        "Please make sure you have installed Metamask on your browser!"
+      );
     }
   }, [dispatch]);
 
   const connectWallet = async () => {
+    if (!window.ethereum) {
+      toast.error(
+        "Please make sure you have installed Metamask on your browser!"
+      );
+      return;
+    }
+
     try {
-      const web3Modal = new Web3Modal();
+      const web3Modal = new Web3Modal({
+        cacheProvider: true,
+        providerOptions: {
+          injected: {
+            id: "WEB3_CONNECT_MODAL_ID",
+            enable: () => {
+              if (typeof window.ethereum !== "undefined") {
+                try {
+                  return window.ethereum.enable();
+                } catch (error) {
+                  console.error("User denied account access");
+                }
+              }
+            },
+          },
+        },
+      });
+
       const _provider = await web3Modal.connect();
       const web3 = new Web3(_provider);
 
@@ -30,7 +56,6 @@ const Web3ModalComponent = () => {
       dispatch(setUserDetails({ address: accounts[0] }));
     } catch (error) {
       console.error("Error while connecting to your wallet:", error);
-      // Handle the error appropriately, e.g., show a message to the user
       return toast.error(
         "No wallet detected. Please connect your wallet to proceed."
       );

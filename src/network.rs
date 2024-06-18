@@ -27,7 +27,10 @@ impl NodeManager {
     }
 
     pub fn remove_peer(&mut self, peer: Peer) {
-        self.peers.retain(|p| p.addr != peer.addr);
+        // Keep at least one peer!
+        if self.peers.len() > 1 {
+            self.peers.retain(|p| p.addr != peer.addr);
+        }
     }
 
     fn update_peer(&mut self, peer: Peer) {
