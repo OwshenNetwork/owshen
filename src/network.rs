@@ -42,7 +42,7 @@ impl NodeManager {
         let mut elected_peer: Option<Peer> = None;
         let mut max_length: u64 = 0;
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
             .build()?;
 
         for mut peer in self.get_peers() {
@@ -105,7 +105,7 @@ impl NodeManager {
 
     async fn _add_batch_peer_peers(&mut self, peer: Peer) -> Result<(), eyre::Report> {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
             .build()?;
 
         let url = format!("http://{}/get-peers", peer.addr);
@@ -148,7 +148,7 @@ impl NodeManager {
         mut from_sent: usize,
     ) -> Result<(Vec<SpendFilter>, Vec<SentFilter>, u64), eyre::Report> {
         if let Some(elected_peer) = self.elected_peer.clone() {
-            let step: usize = 256;
+            let step: usize = 32768;
             let mut spend_events = Vec::new();
             let mut sent_events = Vec::new();
 
@@ -159,7 +159,7 @@ impl NodeManager {
                 );
 
                 let client = reqwest::Client::builder()
-                    .timeout(Duration::from_secs(5))
+                    .timeout(Duration::from_secs(10))
                     .build()?;
                 let resp = client.get(&url).send().await;
 

@@ -24,8 +24,8 @@ pub async fn events(
     Query(req): Query<GetEventsRequest>,
     context_events: Arc<Mutex<NodeContext>>,
 ) -> Result<Json<GetEventsResponse>, eyre::Report> {
-    if req.length > 256 {
-        return Err(eyre::eyre!("Length must be less than 256"));
+    if req.length > 32768 {
+        return Err(eyre::eyre!("Length must be less than 32768"));
     }
 
     let context = context_events.lock().await;
