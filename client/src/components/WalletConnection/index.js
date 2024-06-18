@@ -15,6 +15,8 @@ const Web3ModalComponent = () => {
       window.ethereum.on("accountsChanged", (accounts) => {
         dispatch(setUserDetails({ address: accounts[0] }));
       });
+    }else{
+      toast.error("Please make sure you have installed Metamask on your browser!")
     }
   }, [dispatch]);
 

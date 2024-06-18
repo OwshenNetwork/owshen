@@ -147,7 +147,6 @@ const TransactionModal = ({
           setIsLoading
         );
       } else {
-        setInterval(shuffleText, 8000);
         await send(
           destOwshenWallet,
           tokenContract,
@@ -190,7 +189,7 @@ const TransactionModal = ({
   useEffect(() => {
     if (!isOpen) {
       setDstOwshenWallet("");
-      setTokenAmount(0);
+      setTokenAmount('');
       SetSelectTokenLabel("DIVE");
     }
   }, [isOpen]);

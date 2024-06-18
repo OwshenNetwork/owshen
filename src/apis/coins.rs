@@ -117,7 +117,6 @@ pub async fn coins(
                 .owshen_contract_deployment_block_number
                 .as_u64()
         };
-        log::info!("In curr {}", curr);
         curr = curr.max(
             network
                 .config
@@ -125,7 +124,6 @@ pub async fn coins(
                 .as_u64(),
         );
         curr = curr - 1;
-        log::info!("Un curr {}", curr);
 
         #[allow(unused_assignments)]
         let mut spent_events: Vec<SpendFilter> = vec![];

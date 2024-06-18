@@ -27,7 +27,7 @@ const containerSlice = createSlice({
       selected_token_contract: null,
       mode: null,
     },
-    isTest: false,
+    isTest: true,
     netWorkDetails: {
       name: "",
       chainId: 0,

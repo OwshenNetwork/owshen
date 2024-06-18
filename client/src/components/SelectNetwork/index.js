@@ -45,7 +45,9 @@ const SelectNetwork = () => {
         return toast.error("Please select your network!");
       }
 
-      const networkName = getNetworkNameByChainId(ChainId);
+      const networkName = isTest
+        ? getNetworkNameByChainId(11155111)
+        : getNetworkNameByChainId(ChainId);
 
       setNetWork(networkName);
       const selectedNetwork = networkDetails[networkName];
@@ -57,7 +59,7 @@ const SelectNetwork = () => {
       setChainId(ChainId);
     }; // Add any dependencies here if getChainId depends on props or state
     getChainId();
-  });
+  },[isTest]);
 
   const updateNetworkDetails = (name, chainId, contractName) => {
     dispatch(setNetworkDetails({ name, chainId, contractName }));
