@@ -62,7 +62,7 @@ pub async fn coins(
             log::info!("Cache not found");
             None
         };
-        const UPDATE_THRESHOLD: u64 = 5;
+        const UPDATE_THRESHOLD: u64 = 128;
 
         // let root: U256 = contract.method("root", ())?.call().await?;
         let contract_chc_state: (U256, U256) = contract.method("getState", ())?.call().await?;
