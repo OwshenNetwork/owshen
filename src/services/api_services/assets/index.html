@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src=" https://cdn.jsdelivr.net/npm/web3@4.6.0/dist/web3.min.js "></script>
+    <script>
+      window.ethereum
+        .request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0xe0301",
+              chainName: "Owshen Network",
+              nativeCurrency: {
+                name: "Dive",
+                symbol: "DIVE",
+                decimals: 18,
+              },
+              rpcUrls: ["http://127.0.0.1:8645/"],
+              blockExplorerUrls: ["http://127.0.0.1:3000/explorer"],
+            },
+          ],
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+
+      window.ethereum
+        .request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: "0x539",
+              chainName: "Ganache",
+              nativeCurrency: {
+                name: "Ganache",
+                symbol: "ETH",
+                decimals: 18,
+              },
+              rpcUrls: ["http://127.0.0.1:8545/"],
+              blockExplorerUrls: ["http://127.0.0.1:8545/explorer"],
+            },
+          ],
+        })
+        .catch((error) => {
+          console.log(error);
+        });
+
+      async function deposit() {
+        let amount = Web3.utils.toHex(BigInt(Web3.utils.toWei("1", "ether")));
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x539" }],
+        });
+        accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        const sender = accounts[0];
+        let tx_hash = await ethereum.request({
+          method: "eth_sendTransaction",
+          params: [
+            {
+              chainId: "0x539",
+              from: sender,
+              to: "0xb794f5ea0ba39494ce839613fffba74279579268",
+              value: amount,
+            },
+          ],
+        });
+
+        let response = await fetch("http://0.0.0.0:3000/deposit", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            tx_hash,
+            token: "native",
+            amount,
+            address: sender,
+          }),
+        });
+      }
+      async function withdraw() {
+        let amount = Web3.utils.toHex(BigInt(Web3.utils.toWei("1", "ether")));
+        await ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0xe0301" }],
+        });
+        accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        const sender = accounts[0];
+
+        let sig = await ethereum.request({
+          method: "eth_signTypedData",
+          params: [
+            [
+              {
+                type: "string",
+                name: "testname",
+                value: "1234567890",
+              },
+            ],
+            accounts[0],
+          ],
+        });
+
+        alert(sig);
+
+        // Now call /withdraw
+      }
+      async function airdrop() {
+        let prompt = window.prompt("Enter your 12 words:");
+        accounts = await ethereum.request({ method: "eth_requestAccounts" });
+        const sender = accounts[0];
+        alert("Claiming for: " + sender);
+
+        // Convert 12 words to owshen private-key
+        // Use the private-key to sign hash(sender)
+        // Create a OwshenAirdrop transaction
+        // Submit the tx
+      }
+    </script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      body {
+        font-family: monospace;
+        background-color: black;
+        padding-top: 40vh;
+        text-align: center;
+        color: white;
+        font-size: 5em;
+      }
+
+      a {
+        color: white;
+        font-size: 0.3em;
+      }
+
+      a:visited {
+        color: white;
+      }
+    </style>
+  </head>
+
+  <body>
+    🐟 Hello Owshen Network! 🤿
+    <p>
+      <a href="#" onclick="deposit()">Deposit!</a>
+      <a href="#" onclick="withdraw()">Withdraw!</a>
+      <a href="#" onclick="airdrop()">Airdrop!</a>
+    </p>
+  </body>
+</html>

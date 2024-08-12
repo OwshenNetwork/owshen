@@ -1,0 +1,30 @@
+h1 {
+    font-family: "JetBrains Mono";
+    margin: 0.5em;
+    font-size: 3em;
+    text-align: center;
+}
+
+body {
+    font-family: "JetBrains Mono";
+    line-height: 1.4em;
+    font-size: 1.1em;
+}
+
+h2 {
+    font-size: 1.5em;
+    text-align: center;
+}
+
+b {
+    font-weight: bold;
+}
+
+th {
+    font-weight: bold;
+    border-bottom: 1px solid white;
+}
+
+th, td {
+    padding: 0.2em;
+}

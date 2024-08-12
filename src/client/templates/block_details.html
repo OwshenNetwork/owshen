@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>OwshenScan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Vazirmatn:wght@100..900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+
+    <h1 style="margin-top: 2em; margin-bottom: 1em;">🐟 owshen scan 🤿</h1>
+    <div style="padding: 1em; max-width: 900px; margin: 0 auto;">
+        <p><b>> height:</b> {height_info.height}</p>
+        <p><b>> timestamp:</b>{time_stamp}</p>
+        <p><b>> market cap:</b> 1.237m $</p>
+        <p><b>> tps:</b> 96</p>
+        <div style="margin-top: 2em;">
+            {{ if block_txs }}
+            <tr>
+            </tr>
+            {{ else }}
+            <tr>
+                <td colspan="4">No block data available</td>
+            </tr>
+            {{ endif }}
+            <h2>> block #{block_id}</h2>
+            <table style="width: 100%; text-align: center;">
+                <tr>
+                    <th>tx</th>
+                    <th>wat</th>
+                    <th>who</th>
+                    <th>how much</th>
+                </tr>
+                {{ for block in blocks }}
+                <tr>
+                    <td>{block.who}</td>
+                    <td>{block.num_txs}</td>
+                    <td>0x8aF3d2E...</td>
+                    <td>{block.wen}</td>
+                </tr>
+                {{ endfor }}
+            </table>
+        </div>
+    </div>
+</body>
+
+</html>
