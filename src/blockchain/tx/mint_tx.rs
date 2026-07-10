@@ -69,7 +69,7 @@ mod tests {
             owner: None,
             genesis: GENESIS.clone(),
             owshen: OWSHEN_CONTRACT,
-            provider_address: "http://127.0.0.1:8888".parse().expect("faild to parse"),
+            provider_address: "http://127.0.0.1:8888".parse().expect("failed to parse"),
         };
 
         let mut chain = Owshenchain::new(conf, RamKvStore::new());
@@ -96,7 +96,7 @@ mod tests {
             owner: None,
             genesis: GENESIS.clone(),
             owshen: OWSHEN_CONTRACT,
-            provider_address: "http://127.0.0.1:8888".parse().expect("faild to parse"),
+            provider_address: "http://127.0.0.1:8888".parse().expect("failed to parse"),
         };
 
         let mut chain = Owshenchain::new(conf, RamKvStore::new());
@@ -136,7 +136,7 @@ mod tests {
             owner: None,
             genesis: GENESIS.clone(),
             owshen: OWSHEN_CONTRACT,
-            provider_address: "http://127.0.0.1:8888".parse().expect("faild to parse"),
+            provider_address: "http://127.0.0.1:8888".parse().expect("failed to parse"),
         };
 
         let mut chain = Owshenchain::new(conf, RamKvStore::new());
@@ -207,7 +207,7 @@ mod tests {
             owner: None,
             genesis: GENESIS.clone(),
             owshen: OWSHEN_CONTRACT,
-            provider_address: "http://127.0.0.1:8888".parse().expect("faild to parse"),
+            provider_address: "http://127.0.0.1:8888".parse().expect("failed to parse"),
         };
 
         let mut chain = Owshenchain::new(conf, RamKvStore::new());
